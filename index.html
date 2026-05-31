@@ -3,7 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<!-- Firebase SDK — doit être chargé EN PREMIER -->
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f0a500">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mon Négoce">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="Mon Négoce">
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -262,8 +271,6 @@ canvas.chart-canvas{display:block;width:100%!important;}
 .thermal-receipt .tr-title{font-size:14px;font-weight:900;text-align:center;letter-spacing:2px;}
 .thermal-receipt .tr-sub{font-size:9px;text-align:center;color:#444;}
 
-/* MULTI-DEVISE */
-.currency-selector{background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:11px;border-radius:5px;padding:3px 6px;outline:none;cursor:pointer;}
 
 /* CALENDRIER / AGENDA */
 .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
@@ -403,6 +410,17 @@ canvas.chart-canvas{display:block;width:100%!important;}
     <div class="lfg"><label>Identifiant</label><input id="l-id" placeholder="ADM01, VEN01..." onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div class="lfg"><label>Code Secret</label><input type="password" id="l-pwd" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="lbtn" onclick="doLogin()">🔓 Se connecter</button>
+    <div style="text-align:center;margin-top:9px;">
+      <span style="font-size:10px;color:var(--text3);cursor:pointer;" onclick="showResetPanel()">🔑 Mot de passe oublié ?</span>
+    </div>
+    <div id="reset-panel" style="display:none;margin-top:9px;background:rgba(240,165,0,.08);border:1px solid rgba(240,165,0,.3);border-radius:8px;padding:10px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:7px;">🔑 Réinitialisation d'urgence</div>
+      <div style="font-size:10px;color:var(--text2);margin-bottom:6px;">Code Admin requis :</div>
+      <input id="reset-admin-code" type="password" placeholder="Code Admin" style="width:100%;background:var(--surf3);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:11px;border-radius:6px;padding:6px 8px;outline:none;box-sizing:border-box;margin-bottom:6px;">
+      <div style="font-size:10px;color:var(--text2);margin-bottom:6px;">Nouveau code pour <span id="reset-target-id"></span> :</div>
+      <input id="reset-new-pwd" type="password" placeholder="Nouveau code secret" style="width:100%;background:var(--surf3);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:11px;border-radius:6px;padding:6px 8px;outline:none;box-sizing:border-box;margin-bottom:7px;">
+      <button class="lbtn" style="font-size:11px;padding:7px;" onclick="doResetPassword()">✅ Réinitialiser</button>
+    </div>
   </div>
 </div>
 
@@ -456,9 +474,6 @@ canvas.chart-canvas{display:block;width:100%!important;}
         <span style="width:6px;height:6px;border-radius:50%;background:var(--red);display:inline-block;"></span>
         <span>📴 Hors ligne</span>
       </div>
-      <select class="currency-selector" id="currency-sel" onchange="setCurrency(this.value)" title="Devise">
-        <option value="FCFA">FCFA</option><option value="USD">USD $</option><option value="EUR">EUR €</option><option value="GNF">GNF</option>
-      </select>
       <div id="topbar-clock"></div>
       <div class="notif-bell" id="notif-bell" onclick="toggleNotifPanel(event)" title="Notifications">🔔<span class="notif-badge" id="notif-badge" style="display:none">0</span></div>
       <button class="theme-btn" onclick="toggleTheme()" id="app-theme-btn">☀️</button>
@@ -1663,12 +1678,46 @@ function buildBoutiqueSelects(){
   buildCaisseSelect('l-caisse','C1');
 }
 
+function showResetPanel(){
+  const id=document.getElementById('l-id').value.trim().toUpperCase();
+  document.getElementById('reset-target-id').textContent=id||'utilisateur';
+  document.getElementById('reset-panel').style.display='block';
+  document.getElementById('reset-admin-code').focus();
+}
+function doResetPassword(){
+  const targetId=document.getElementById('l-id').value.trim().toUpperCase();
+  const adminCode=document.getElementById('reset-admin-code').value;
+  const newPwd=document.getElementById('reset-new-pwd').value;
+  if(!targetId){toast('Entrez d\'abord l\'identifiant en haut','err');return;}
+  if(!newPwd||newPwd.length<2){toast('Nouveau code trop court','err');return;}
+  // Verify admin code
+  const admin=DB.users.find(u=>u.role==='admin'&&u.pwd===adminCode&&u.actif!==false);
+  if(!admin){soundErr();toast('Code Admin incorrect','err');return;}
+  const target=DB.users.find(u=>u.id===targetId);
+  if(!target){toast('Utilisateur "'+targetId+'" introuvable','err');return;}
+  target.pwd=newPwd;
+  save();
+  toast(`✅ Mot de passe de ${targetId} réinitialisé !`,'ok');
+  document.getElementById('reset-panel').style.display='none';
+  document.getElementById('l-pwd').value=newPwd;
+  document.getElementById('reset-admin-code').value='';
+  document.getElementById('reset-new-pwd').value='';
+}
+
 function doLogin(){
   if(AC&&AC.state==='suspended')AC.resume();
   const id=document.getElementById('l-id').value.trim().toUpperCase();
   const pwd=document.getElementById('l-pwd').value;
+  // Debug: check what's in DB
+  const userFound=DB.users.find(u=>u.id===id);
   const u=DB.users.find(u=>u.id===id&&u.pwd===pwd&&u.actif!==false);
-  if(!u){soundErr();toast('Identifiant ou code incorrect','err');return;}
+  if(!u){
+    soundErr();
+    if(userFound&&userFound.actif===false) toast('Compte désactivé — contactez Admin','err');
+    else if(userFound) toast('Code secret incorrect pour '+id,'err');
+    else toast('Identifiant "'+id+'" introuvable','err');
+    return;
+  }
   session.user=u;
   session.boutique=document.getElementById('l-boutique').value;
   session.caisse=u.caisse||document.getElementById('l-caisse').value||'C1';
@@ -2922,28 +2971,9 @@ function startRealtimeSync(){
 
 function syncNow(){if(!fbConnected){toast('📴 Pas de connexion','err');return;}pullFromFirebase();}
 
-// ══ MULTI-DEVISE ══
-let CURRENCY = {code:'FCFA', rate:1, symbol:'FCFA'};
-const CURRENCIES = {
-  FCFA:{code:'FCFA',rate:1,symbol:'FCFA'},
-  USD:{code:'USD',rate:0.00165,symbol:'$'},
-  EUR:{code:'EUR',rate:0.00153,symbol:'€'},
-  GNF:{code:'GNF',rate:14.2,symbol:'GNF'},
-  XOF:{code:'XOF',rate:1,symbol:'XOF'}
-};
-function setCurrency(code){
-  CURRENCY=CURRENCIES[code]||CURRENCIES.FCFA;
-  SS('currency',code);
-  // Update fmt function
-  fmt = n => {
-    const v = Number(n||0) * CURRENCY.rate;
-    if(CURRENCY.code==='FCFA'||CURRENCY.code==='XOF') return _fmtBase(v)+' '+CURRENCY.symbol;
-    return CURRENCY.symbol + v.toFixed(2);
-  };
-  toast(`Devise : ${CURRENCY.code}`,'info');
-  const active=document.querySelector('.sec.active');
-  if(active&&active.id){const key=active.id.replace('sec-','');if(RENDERS[key])RENDERS[key]();}
-}
+// ══ DEVISE FCFA UNIQUEMENT ══
+const CURRENCY={code:'FCFA',rate:1,symbol:'FCFA'};
+function setCurrency(){}  // désactivé
 
 // ══ NOTIFICATIONS ══
 let NOTIFS = [];
@@ -3314,13 +3344,6 @@ function openExportModal(){openModal('modal-export');}
 
 // ══ INIT NOUVELLES FONCTIONS ══
 (function initNewFeatures(){
-  // Load currency
-  const savedCurrency=LS('currency');
-  if(savedCurrency&&CURRENCIES[savedCurrency]){
-    CURRENCY=CURRENCIES[savedCurrency];
-    const sel=document.getElementById('currency-sel');
-    if(sel)sel.value=savedCurrency;
-  }
   // Load notifs
   const savedNotifs=LS('notifs');
   if(savedNotifs){
@@ -3397,6 +3420,16 @@ renderClock();
 if(cwTimer)clearInterval(cwTimer);
 cwTimer=setInterval(renderClock,1000);
 fetchWeather(cwConf.ville);
+</script>
+<!-- PWA Service Worker -->
+<script>
+if('serviceWorker' in navigator && location.hostname !== 'www.claudeusercontent.com' && location.protocol !== 'file:'){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js')
+      .then(()=>console.log('✅ PWA actif'))
+      .catch(e=>console.log('SW:',e));
+  });
+}
 </script>
 </body>
 </html>
