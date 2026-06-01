@@ -1758,6 +1758,7 @@ function startApp(){
     save=function(){_origSaveLocal();DB._syncTime=Date.now();if(fbConnected)pushToFirebase();};
     initFirebase();
     setTimeout(startRealtimeSync,3000);
+    setTimeout(()=>{pullUsersFromFirebase();startUsersSync();},4000);
   },800);
 }
 
@@ -2971,7 +2972,90 @@ function startRealtimeSync(){
 
 function syncNow(){if(!fbConnected){toast('📴 Pas de connexion','err');return;}pullFromFirebase();}
 
-// ══ DEVISE FCFA UNIQUEMENT ══
+// ══ SYNC USERS SUR FIREBASE ══
+function pushUsersToFirebase(){
+  if(!fbInitialized||!fbDB||!fbConnected)return;
+  fbDB.ref('negoce_users').set({
+    users: DB.users.map(u=>({...u})),
+    _updated: Date.now()
+  }).catch(e=>console.error('Users push:',e));
+}
+
+async function pullUsersFromFirebase(){
+  if(!fbInitialized||!fbDB)return;
+  try{
+    const snap=await fbDB.ref('negoce_users').once('value');
+    const data=snap.val();
+    if(data&&data.users&&data.users.length){
+      // Merge — garde les users Firebase mais garde mots de passe locaux si plus récents
+      const localUsers=DB.users||[];
+      data.users.forEach(fbUser=>{
+        const localUser=localUsers.find(u=>u.id===fbUser.id);
+        if(!localUser){
+          // Nouvel utilisateur depuis Firebase
+          DB.users.push(fbUser);
+        } else {
+          // Mettre à jour sauf le mot de passe si local est différent
+          Object.assign(localUser, {...fbUser, pwd: localUser.pwd});
+        }
+      });
+      SS('users', DB.users);
+      console.log('✅ Users synchronisés depuis Firebase');
+    } else {
+      // Première fois — envoyer les users locaux
+      pushUsersToFirebase();
+    }
+  } catch(e){console.error('Users pull:',e);}
+}
+
+// Écouter les changements users en temps réel
+function startUsersSync(){
+  if(!fbInitialized||!fbDB)return;
+  fbDB.ref('negoce_users').on('value', snap=>{
+    const data=snap.val();
+    if(!data||!data.users)return;
+    const localUsers=DB.users||[];
+    let changed=false;
+    data.users.forEach(fbUser=>{
+      const localUser=localUsers.find(u=>u.id===fbUser.id);
+      if(!localUser){DB.users.push(fbUser);changed=true;}
+      else {
+        // Sync tout sauf pwd
+        const newData={...fbUser, pwd: localUser.pwd};
+        if(JSON.stringify(localUser)!==JSON.stringify(newData)){
+          Object.assign(localUser, newData);changed=true;
+        }
+      }
+    });
+    if(changed){SS('users',DB.users);console.log('Users mis à jour depuis Firebase');}
+  });
+}
+
+// Override doResetPassword pour aussi pousser sur Firebase
+const _origDoReset = doResetPassword;
+doResetPassword = function(){
+  _origDoReset();
+  // Push users après reset
+  setTimeout(()=>{
+    if(fbConnected) pushUsersToFirebase();
+  }, 500);
+};
+
+// Override saveUser pour aussi pousser sur Firebase  
+const _origSaveUser = typeof saveUser==='function'?saveUser:null;
+if(_origSaveUser){
+  saveUser = function(){
+    _origSaveUser();
+    setTimeout(()=>{if(fbConnected)pushUsersToFirebase();},300);
+  };
+}
+
+// Override toggleUser
+const _origToggleUser = toggleUser;
+toggleUser = function(id){
+  _origToggleUser(id);
+  setTimeout(()=>{if(fbConnected)pushUsersToFirebase();},300);
+};
 const CURRENCY={code:'FCFA',rate:1,symbol:'FCFA'};
 function setCurrency(){}  // désactivé
 
