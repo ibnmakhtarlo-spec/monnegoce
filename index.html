@@ -3122,21 +3122,146 @@ function pushToFirebase(){
   fbPushTimer=setTimeout(async()=>{
     fbSyncing=true;updateSyncUI('syncing');
     try{
-      // D'abord lire les factures existantes sur Firebase pour les fusionner
-      const snap=await fbDB.ref('negoce/shared/data/factures').once('value');
-      const cloudFactures=snap.val()||[];
-      const mergedFactures=mergeFactures(DB.factures||[],cloudFactures);
-      DB.factures=mergedFactures;
-
+      const userId=session.user?.id||'default';
+      // Chaque utilisateur écrit dans son propre nœud
+      // Données partagées (produits, clients, etc.) dans /shared
+      // Factures dans /factures/{userId}
       const dbClean=JSON.parse(JSON.stringify(DB));
       dbClean.produits=dbClean.produits.map(p=>({...p,photo:p.photo?.startsWith('http')?p.photo:''}));
       delete dbClean.users;
-      await fbDB.ref('negoce/shared/data').set({...dbClean,_syncTime:Date.now(),_device:navigator.userAgent.substring(0,50)});
+      delete dbClean.factures; // Factures gérées séparément
+
+      // 1. Pousser données partagées
+      await fbDB.ref('negoce/shared/data').set({
+        ...dbClean,
+        _syncTime:Date.now(),
+        _device:navigator.userAgent.substring(0,50)
+      });
+
+      // 2. Pousser factures de CET utilisateur
+      if(DB.factures&&DB.factures.length>0){
+        const myFactures=DB.factures.filter(f=>!f._author||f._author===userId||f._author===session.user?.nom);
+        // Taguer les nouvelles factures avec l'auteur
+        DB.factures.forEach(f=>{if(!f._author)f._author=userId;});
+        await fbDB.ref(`negoce/factures/${userId}`).set(DB.factures);
+      }
+
       updateSyncUI('connected');
       const el=document.getElementById('last-save-time');if(el)el.textContent=new Date().toLocaleTimeString('fr-FR');
     }catch(e){console.error('Push:',e);updateSyncUI('error');toast('❌ Erreur sync cloud','err');}
     fbSyncing=false;
   },1500);
+}
+
+async function pullFromFirebase(){
+  if(!fbInitialized||!fbDB)return;
+  try{
+    // 1. Récupérer données partagées
+    const snap=await fbDB.ref('negoce/shared/data').once('value');
+    const cloudData=snap.val();
+
+    // 2. Récupérer TOUTES les factures de TOUS les utilisateurs
+    const factSnap=await fbDB.ref('negoce/factures').once('value');
+    const allFacturesObj=factSnap.val()||{};
+    let allFactures=[];
+    Object.values(allFacturesObj).forEach(userFacts=>{
+      if(Array.isArray(userFacts))allFactures=[...allFactures,...userFacts];
+    });
+    // Dédoublonner par ID
+    const seen=new Set();
+    allFactures=allFactures.filter(f=>{if(seen.has(f.id))return false;seen.add(f.id);return true;});
+    allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+    if(!cloudData&&allFactures.length===0){
+      toast('☁️ Première sync — envoi local...','info');
+      pushToFirebase();return;
+    }
+
+    const currentUsers=DB.users;
+    if(cloudData){
+      const{_syncTime,_device,users:cloudUsers,...cleanCloud}=cloudData;
+      const cloudTime=_syncTime||0,localTime=DB._syncTime||0;
+      if(cloudTime>localTime){
+        if(cleanCloud.produits&&DB.produits){
+          cleanCloud.produits=cleanCloud.produits.map(cp=>{
+            const lp=DB.produits.find(p=>p.id===cp.id);
+            if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;
+            return cp;
+          });
+        }
+        Object.assign(DB,cleanCloud);
+        DB._syncTime=cloudTime;
+      }
+    }
+
+    // Toujours mettre à jour les factures avec TOUTES les factures
+    if(allFactures.length>0){
+      DB.factures=allFactures;
+    }
+    DB.users=currentUsers;
+    (window._origSave||save)();
+
+    if(allFactures.length>0)
+      toast('✅ Toutes les ventes synchronisées','ok');
+    else
+      toast('✅ Données récupérées du cloud','ok');
+
+    addNotif('Données mises à jour','Sync cloud réussie','ok');
+    const active=document.querySelector('.ni.active');
+    if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m)nav(m[1]);}
+  }catch(e){console.error('Pull:',e);}
+}
+
+function startRealtimeSync(){
+  if(!fbInitialized||!fbDB)return;
+
+  // Écouter les changements de données partagées
+  fbDB.ref('negoce/shared/data').on('value',snap=>{
+    if(fbSyncing)return;
+    const cloudData=snap.val();if(!cloudData)return;
+    const cloudTime=cloudData._syncTime||0,localTime=DB._syncTime||0;
+    if(cloudTime>localTime+2000){
+      const{_syncTime,_device,users:cloudUsers,...cleanCloud}=cloudData;
+      if(cleanCloud.produits&&DB.produits){
+        cleanCloud.produits=cleanCloud.produits.map(cp=>{
+          const lp=DB.produits.find(p=>p.id===cp.id);
+          if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;
+          return cp;
+        });
+      }
+      const currentUsers=DB.users;
+      const currentFactures=DB.factures;
+      Object.assign(DB,cleanCloud);
+      DB.users=currentUsers;
+      DB.factures=currentFactures; // Garder les factures locales
+      DB._syncTime=cloudTime;
+      (window._origSave||save)();
+    }
+  });
+
+  // Écouter les changements de TOUTES les factures
+  fbDB.ref('negoce/factures').on('value',snap=>{
+    if(fbSyncing)return;
+    const allFacturesObj=snap.val()||{};
+    let allFactures=[];
+    Object.values(allFacturesObj).forEach(userFacts=>{
+      if(Array.isArray(userFacts))allFactures=[...allFactures,...userFacts];
+    });
+    if(allFactures.length===0)return;
+    // Dédoublonner
+    const seen=new Set();
+    allFactures=allFactures.filter(f=>{if(seen.has(f.id))return false;seen.add(f.id);return true;});
+    allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
+    // Mettre à jour si nouvelles factures
+    if(allFactures.length!==DB.factures.length||allFactures.some(cf=>!DB.factures.find(lf=>lf.id===cf.id))){
+      DB.factures=allFactures;
+      (window._origSave||save)();
+      toast('🔄 Nouvelles ventes reçues !','ok');
+      // Rafraîchir page active si factures/ventes
+      const active=document.querySelector('.ni.active');
+      if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m&&['factures','ventes-jour','dashboard','accueil'].includes(m[1]))nav(m[1]);}
+    }
+  });
 }
 
 async function pullFromFirebase(){
