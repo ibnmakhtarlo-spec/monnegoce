@@ -329,6 +329,41 @@ canvas.chart-canvas{display:block;width:100%!important;}
 .rp-btn,.cr-btn{transition:all .2s!important;}
 .btn-cyan{background:rgba(6,182,212,.12);color:var(--cyan);border:1px solid rgba(6,182,212,.3);}
 
+/* SCANNER CODE-BARRES */
+.scanner-btn{background:rgba(6,182,212,.12);color:var(--cyan);border:1px solid rgba(6,182,212,.3);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:5px;}
+.scanner-btn:hover{background:rgba(6,182,212,.2);}
+.scanner-modal-video{width:100%;border-radius:9px;background:#000;max-height:260px;object-fit:cover;}
+.barcode-input-wrap{display:flex;gap:5px;align-items:center;margin-top:7px;}
+.barcode-input-wrap input{flex:1;background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:13px;border-radius:7px;padding:7px 10px;outline:none;letter-spacing:2px;}
+.barcode-input-wrap input:focus{border-color:var(--cyan);}
+
+/* COMPARAISON BOUTIQUES */
+.comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:13px;}
+.comp-card{background:var(--surf);border:2px solid var(--border2);border-radius:12px;padding:13px;}
+.comp-card.b1-card{border-color:rgba(240,165,0,.3);}
+.comp-card.b2-card{border-color:rgba(59,130,246,.3);}
+.comp-card .cc-title{font-size:13px;font-weight:900;margin-bottom:9px;}
+.comp-kpi{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;}
+.comp-kpi .ck-label{color:var(--text2);}
+.comp-kpi .ck-val{font-weight:700;font-family:var(--mono);}
+.comp-winner{color:var(--green)!important;}
+.comp-loser{color:var(--red)!important;}
+.comp-bar-track{height:10px;background:var(--surf3);border-radius:5px;overflow:hidden;display:flex;margin-top:5px;}
+.comp-bar-b1{height:100%;background:var(--gold);transition:width .5s ease;}
+.comp-bar-b2{height:100%;background:var(--blue);transition:width .5s ease;}
+
+/* IA PRÉVISIONS */
+.prevision-card{background:var(--surf);border:1px solid var(--border2);border-radius:12px;padding:13px;margin-bottom:11px;}
+.prevision-card .pc-title{font-size:12px;font-weight:800;color:var(--gold);margin-bottom:9px;}
+.prevision-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--border);}
+.prevision-item .pi-icon{font-size:18px;flex-shrink:0;}
+.prevision-item .pi-body{flex:1;}
+.prevision-item .pi-title{font-size:11px;font-weight:700;}
+.prevision-item .pi-val{font-size:13px;font-weight:900;color:var(--gold);}
+.trend-up{background:rgba(16,185,129,.15);color:var(--green);font-size:9px;padding:2px 6px;border-radius:10px;}
+.trend-down{background:rgba(239,68,68,.15);color:var(--red);font-size:9px;padding:2px 6px;border-radius:10px;}
+.trend-stable{background:rgba(240,165,0,.15);color:var(--gold);font-size:9px;padding:2px 6px;border-radius:10px;}
+
 /* ══ ACCUEIL DASHBOARD ══ */
 .accueil-hero{background:linear-gradient(135deg,var(--surf2),var(--surf3));border:1px solid var(--border2);border-radius:14px;padding:18px;margin-bottom:13px;display:flex;align-items:center;gap:14px;}
 .accueil-hero .ah-icon{font-size:36px;}
@@ -450,6 +485,8 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="ni admin-nav" onclick="nav('dashboard')"><span class="ic">📊</span> Tableau de bord</div>
   <div class="ni admin-nav" onclick="nav('benefice')"><span class="ic">💰</span> Bénéfice journalier</div>
   <div class="ni admin-nav" onclick="nav('inventaire')"><span class="ic">📦</span> Inventaire</div>
+  <div class="ni admin-nav" onclick="nav('comparaison')"><span class="ic">📊</span> Comparaison Boutiques</div>
+  <div class="ni admin-nav" onclick="nav('previsions')"><span class="ic">🤖</span> IA Prévisions</div>
   <div class="ni admin-nav" onclick="nav('ia-centre')"><span class="ic">🤖</span> Centre IA</div>
   <div class="ni admin-nav" onclick="nav('agenda')"><span class="ic">📅</span> Agenda</div>
   <div class="ni admin-nav" onclick="nav('heures-fortes')"><span class="ic">🔥</span> Heures Fortes</div>
@@ -486,7 +523,8 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="sec active" id="sec-caisse">
     <div class="pos-layout">
       <div class="pos-left">
-        <input class="srch" style="width:100%" placeholder="🔍 Produit, référence..." id="pos-srch" oninput="renderGrid()">
+        <input class="srch" style="width:100%" placeholder="🔍 Produit, référence, code-barres..." id="pos-srch" oninput="renderGrid()">
+        <button class="scanner-btn" onclick="openScanner()" title="Scanner code-barres">📷 Scanner</button>
         <div class="pos-prods"><div class="pgrid" id="pos-grid"></div></div>
       </div>
       <div class="pos-right">
@@ -1084,6 +1122,53 @@ canvas.chart-canvas{display:block;width:100%!important;}
       </div>
     </div>
   </div>
+
+  <!-- COMPARAISON BOUTIQUES -->
+  <div class="sec" id="sec-comparaison">
+    <div style="display:flex;gap:7px;align-items:center;margin-bottom:13px;flex-wrap:wrap;">
+      <div class="tab-bar" style="flex:1;">
+        <button class="tab-btn active" id="comp-tab-jour" onclick="setCompPeriod('jour')">Aujourd'hui</button>
+        <button class="tab-btn" id="comp-tab-semaine" onclick="setCompPeriod('semaine')">Semaine</button>
+        <button class="tab-btn" id="comp-tab-mois" onclick="setCompPeriod('mois')">Ce mois</button>
+        <button class="tab-btn" id="comp-tab-annee" onclick="setCompPeriod('annee')">Année</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="renderComparaison()">🔄</button>
+    </div>
+    <div class="kgrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:13px;">
+      <div class="kpi g"><div class="klabel">CA Total</div><div class="kval" id="comp-ca-total">0</div></div>
+      <div class="kpi gr"><div class="klabel">Meilleure boutique</div><div class="kval" id="comp-best">—</div></div>
+      <div class="kpi bl"><div class="klabel">Ventes totales</div><div class="kval" id="comp-nb-total">0</div></div>
+      <div class="kpi pu"><div class="klabel">Panier moyen</div><div class="kval" id="comp-panier">0</div></div>
+    </div>
+    <div class="comp-grid" id="comp-boutiques-grid"></div>
+    <div class="row" style="margin-top:11px;">
+      <div class="col card" style="padding:13px;">
+        <h3 style="font-size:12px;font-weight:800;margin-bottom:9px;">📊 CA comparatif par jour</h3>
+        <div class="chart-container" style="height:150px;"><canvas id="chart-comp-ca" class="chart-canvas"></canvas></div>
+      </div>
+      <div class="col card" style="padding:13px;">
+        <h3 style="font-size:12px;font-weight:800;margin-bottom:9px;">🏆 Top produits par boutique</h3>
+        <div id="comp-top-prods"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IA PRÉVISIONS -->
+  <div class="sec" id="sec-previsions">
+    <div class="card" style="padding:13px;margin-bottom:13px;background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(240,165,0,.05));border:1px solid rgba(139,92,246,.2);">
+      <div style="display:flex;align-items:center;gap:9px;">
+        <span style="font-size:22px;">🤖</span>
+        <div>
+          <div style="font-size:13px;font-weight:900;color:var(--purple);">IA Prévisions & Recommandations</div>
+          <div style="font-size:10px;color:var(--text2);">Analyse basée sur votre historique de ventes</div>
+        </div>
+        <button class="btn btn-purple btn-sm" style="margin-left:auto" onclick="genererPrevisions()">🔮 Générer</button>
+      </div>
+    </div>
+    <div id="previsions-content">
+      <div class="empty" style="padding:30px;"><div class="ei">🔮</div>Cliquez "Générer" pour obtenir les prévisions IA</div>
+    </div>
+  </div>
 </div><!-- /main -->
 </div><!-- /app -->
 
@@ -1480,7 +1565,28 @@ canvas.chart-canvas{display:block;width:100%!important;}
   </div>
 </div>
 
-<!-- PANEL NOTIFICATIONS -->
+<!-- MODAL SCANNER CODE-BARRES -->
+<div class="overlay" id="modal-scanner">
+  <div class="modal sm">
+    <div class="mtitle"><span>📷 Scanner Code-Barres</span><span class="mclose" onclick="closeScanner()">✕</span></div>
+    <div style="padding:11px;">
+      <video id="scanner-video" class="scanner-modal-video" autoplay playsinline muted></video>
+      <canvas id="scanner-canvas" style="display:none;"></canvas>
+      <div id="scanner-status" style="text-align:center;font-size:11px;color:var(--text2);margin-top:7px;">📷 Pointez vers le code-barres</div>
+      <div style="margin-top:9px;">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:5px;">Ou saisir manuellement :</div>
+        <div class="barcode-input-wrap">
+          <input type="text" id="barcode-manual" placeholder="Code-barres / Référence" onkeydown="if(event.key==='Enter')searchBarcode(this.value)">
+          <button class="btn btn-gold btn-sm" onclick="searchBarcode(document.getElementById('barcode-manual').value)">🔍</button>
+        </div>
+      </div>
+      <div id="scanner-result" style="display:none;" class="scanner-result"></div>
+    </div>
+    <div class="mfooter">
+      <button class="btn btn-ghost" onclick="closeScanner()">Fermer</button>
+    </div>
+  </div>
+</div>
 <div id="notif-panel" class="notif-panel" style="display:none;" onclick="event.stopPropagation()">
   <div class="notif-hdr">
     <h4>🔔 Notifications</h4>
@@ -1768,17 +1874,76 @@ function startApp(){
 }
 
 function applyNavPerms(){
-  // Affiche/masque les liens selon perms
-  const navMap={
-    'ni-factures':'factures','ni-devis':'devis','ni-retours':'retours',
-    'ni-depenses':'depenses','ni-produits':'produits','ni-fournisseurs':'fournisseurs','ni-clients':'clients'
+  if(isAdmin())return; // Admin voit tout
+
+  const perms=session.user?.perms||[];
+  const role=session.user?.role;
+
+  // Masquer les éléments admin par défaut
+  document.querySelectorAll('.admin-nav').forEach(el=>{
+    // Superviseur voit certains menus admin
+    if(role==='superviseur'){
+      el.style.display='flex';
+    } else {
+      el.style.display='none';
+    }
+  });
+
+  // Masquer les stats admin
+  document.querySelectorAll('.admin-stat').forEach(el=>{
+    el.style.display=(perms.includes('benefices')||role==='superviseur')?'flex':'none';
+  });
+
+  // Gestion nav selon permissions
+  const permNavMap={
+    'factures':   ['factures','ni-factures'],
+    'devis':      ['devis'],
+    'retours':    ['retours'],
+    'depenses':   ['depenses'],
+    'produits':   ['produits'],
+    'fournisseurs':['fournisseurs'],
+    'clients':    ['clients'],
   };
-  // Produits: bouton ajouter
+
+  // Masquer menus selon perms
+  document.querySelectorAll('.ni').forEach(el=>{
+    const onclick=el.getAttribute('onclick')||'';
+    const m=onclick.match(/nav\('([^']+)'\)/);
+    if(!m)return;
+    const page=m[1];
+    // Pages toujours visibles
+    const alwaysVisible=['accueil','caisse','chat'];
+    if(alwaysVisible.includes(page)){el.style.display='flex';return;}
+    // Pages admin seulement
+    const adminOnly=['users','caisses-config','salaires','parametres'];
+    if(adminOnly.includes(page)){
+      el.style.display=role==='superviseur'?'flex':'none';
+      return;
+    }
+    // Pages selon permissions
+    const permMap={
+      'factures':'factures','devis':'devis','retours':'retours',
+      'depenses':'depenses','produits':'produits','fournisseurs':'fournisseurs',
+      'clients':'clients','dashboard':'dashboard','benefice':'benefices',
+      'inventaire':'inventaire','rapports':'rapports','creances':'clients',
+      'heures-fortes':'dashboard','produits-lents':'produits',
+      'ventes-jour':'ventes_jour','ia-centre':'ia','agenda':'agenda',
+    };
+    const requiredPerm=permMap[page];
+    if(requiredPerm){
+      el.style.display=(perms.includes(requiredPerm)||role==='superviseur')?'flex':'none';
+    } else {
+      el.style.display='flex';
+    }
+  });
+
+  // Bouton ajouter produit
   const addProd=document.getElementById('btn-add-prod');
-  if(addProd)addProd.style.display=(hasPerm('produits_edit')||isAdmin())?'flex':'none';
+  if(addProd)addProd.style.display=(perms.includes('produits_edit')||role==='superviseur')?'flex':'none';
+
   // Colonne prix achat
   const thAchat=document.getElementById('th-achat');
-  if(thAchat)thAchat.style.display=hasPerm('prix_achat')||isAdmin()?'':'none';
+  if(thAchat)thAchat.style.display=(perms.includes('prix_achat')||role==='superviseur')?'':'none';
 }
 
 function logout(){
@@ -1791,8 +1956,8 @@ function updCSig(){document.getElementById('csig-label').textContent=session.cai
 function changeBoutique(b){session.boutique=b;updCSig();renderGrid();}
 
 // ══ NAV ══
-const TITLES={accueil:'<span>Accueil</span>',caisse:'Caisse / <span>POS</span>','ventes-jour':'Ventes du <span>Jour</span>',factures:'Historique <span>Factures</span>',devis:'<span>Devis</span>',retours:'<span>Retours</span>',depenses:'<span>Dépenses</span>',produits:'Gestion <span>Produits</span>',fournisseurs:'<span>Fournisseurs</span>',clients:'Gestion <span>Clients</span>',dashboard:'Tableau de <span>Bord</span>',benefice:'Bénéfice <span>Journalier</span>',inventaire:'Inventaire & <span>Analyses</span>','ia-centre':'Centre <span>IA</span>',agenda:'<span>Agenda</span> & Rappels',creances:'<span>Créances</span> & Relances','heures-fortes':'🔥 Heures <span>Fortes</span>','produits-lents':'🐢 Produits <span>Lents</span>',chat:'💬 Chat <span>Personnel</span>',users:'Utilisateurs & <span>Rôles</span>','caisses-config':'Config <span>Caisses</span>',salaires:'<span>Salaires</span>',rapports:'<span>Rapports</span>',parametres:'<span>Paramètres</span>'};
-const RENDERS={accueil:renderAccueil,caisse:renderGrid,'ventes-jour':renderVentesJour,factures:renderFactures,devis:renderDevis,retours:renderRetours,depenses:renderDepenses,produits:renderProduits,fournisseurs:renderFourn,clients:renderClients,dashboard:renderDash,benefice:renderBenefice,inventaire:renderInventaire,'ia-centre':renderIACentre,agenda:renderAgenda,creances:renderCreances,'heures-fortes':renderHeuresFortes,'produits-lents':renderProduitsLents,chat:renderChat,users:renderUsers,'caisses-config':renderCaissesConfig,salaires:renderSalaires,rapports:renderRapports,parametres:loadSettings};
+const TITLES={accueil:'<span>Accueil</span>',caisse:'Caisse / <span>POS</span>','ventes-jour':'Ventes du <span>Jour</span>',factures:'Historique <span>Factures</span>',devis:'<span>Devis</span>',retours:'<span>Retours</span>',depenses:'<span>Dépenses</span>',produits:'Gestion <span>Produits</span>',fournisseurs:'<span>Fournisseurs</span>',clients:'Gestion <span>Clients</span>',dashboard:'Tableau de <span>Bord</span>',benefice:'Bénéfice <span>Journalier</span>',inventaire:'Inventaire & <span>Analyses</span>','ia-centre':'Centre <span>IA</span>',agenda:'<span>Agenda</span> & Rappels',creances:'<span>Créances</span> & Relances','heures-fortes':'🔥 Heures <span>Fortes</span>','produits-lents':'🐢 Produits <span>Lents</span>',chat:'💬 Chat <span>Personnel</span>',comparaison:'📊 Comparaison <span>Boutiques</span>',previsions:'🤖 IA <span>Prévisions</span>',users:'Utilisateurs & <span>Rôles</span>','caisses-config':'Config <span>Caisses</span>',salaires:'<span>Salaires</span>',rapports:'<span>Rapports</span>',parametres:'<span>Paramètres</span>'};
+const RENDERS={accueil:renderAccueil,caisse:renderGrid,'ventes-jour':renderVentesJour,factures:renderFactures,devis:renderDevis,retours:renderRetours,depenses:renderDepenses,produits:renderProduits,fournisseurs:renderFourn,clients:renderClients,dashboard:renderDash,benefice:renderBenefice,inventaire:renderInventaire,'ia-centre':renderIACentre,agenda:renderAgenda,creances:renderCreances,'heures-fortes':renderHeuresFortes,'produits-lents':renderProduitsLents,chat:renderChat,comparaison:renderComparaison,previsions:()=>{},users:renderUsers,'caisses-config':renderCaissesConfig,salaires:renderSalaires,rapports:renderRapports,parametres:loadSettings};
 
 function nav(page){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -1945,7 +2110,13 @@ function renderVentesJour(){
 // ══ FACTURES ══
 function renderFactures(){
   const q=(document.getElementById('srch-f')?.value||'').toLowerCase();const bf=document.getElementById('fil-b')?.value||'';const df=document.getElementById('fil-d-from')?.value||'';const dt=document.getElementById('fil-d-to')?.value||'';
-  const list=[...DB.factures].reverse().filter(f=>{const fd=f.date.slice(0,10);return(!q||f.id.toLowerCase().includes(q)||f.client.toLowerCase().includes(q))&&(!bf||f.boutique===bf)&&(!df||fd>=df)&&(!dt||fd<=dt);});
+  const userBoutique=session.user?.boutique;
+  const canSeeAll=isAdmin()||(userBoutique==='all')||(userBoutique==='Les deux')||!userBoutique;
+  const list=[...DB.factures].reverse().filter(f=>{
+    const fd=f.date.slice(0,10);
+    const boutiqueMatch=canSeeAll?(!bf||f.boutique===bf):(f.boutique===userBoutique&&(!bf||f.boutique===bf));
+    return(!q||f.id.toLowerCase().includes(q)||f.client.toLowerCase().includes(q))&&boutiqueMatch&&(!df||fd>=df)&&(!dt||fd<=dt);
+  });
   const canDel=hasPerm('del_facture')||isAdmin();
   document.getElementById('tb-f').innerHTML=list.length?list.map(f=>`<tr>
     <td><span class="mono" style="color:var(--gold);font-weight:700;font-size:11px;">${f.id}</span></td>
@@ -1958,7 +2129,7 @@ function renderFactures(){
     <td style="font-size:10px;">${new Date(f.date).toLocaleDateString('fr-FR')}</td>
     <td style="display:flex;gap:3px;flex-wrap:wrap;">
       <button class="btn btn-ghost btn-xs" onclick="openFactDetail('${f.id}')">👁</button>
-      <button class="btn btn-blue btn-xs" onclick="currentFact=DB.factures.find(x=>x.id==='${f.id}');genererFacturePDF()">📄</button>
+      <button class="btn btn-blue btn-xs" onclick="(function(){const f=DB.factures.find(x=>x.id==='${f.id}');if(f){currentFact=JSON.parse(JSON.stringify(f));genererFacturePDF();}})()">📄</button>
       <button class="wabtn" style="padding:2px 5px;font-size:10px;" onclick="waShareId('${f.id}')">📲</button>
       ${canDel?`<button class="btn btn-red btn-xs" onclick="openDelFact('${f.id}')">🗑</button>`:''}
     </td>
@@ -2264,10 +2435,16 @@ function saveUser(){
   const u={id:id2,nom,pwd,role:document.getElementById('mu-role').value,boutique:document.getElementById('mu-boutique').value,caisse:document.getElementById('mu-caisse').value||'',actif:true,perms};
   if(eid){const i=DB.users.findIndex(x=>x.id===eid);DB.users[i]={...DB.users[i],...u,id:eid};}else DB.users.push(u);
   save();
-  // Pousser immédiatement sur Firebase
+  // Pousser immédiatement sur Firebase — les nouvelles permissions seront actives dès la prochaine connexion
   if(fbConnected) pushUsersToFirebase();
   closeModal('modal-user');renderUsers();['mu-nom','mu-id2','mu-pwd'].forEach(i=>document.getElementById(i).value='');document.getElementById('mu-eid').value='';
-  toast('Utilisateur enregistré ✅ et synchronisé','ok');
+  toast('✅ Utilisateur enregistré et synchronisé — actif à la prochaine connexion','ok');
+  // Si on modifie l'utilisateur connecté, appliquer immédiatement
+  if(eid===session.user?.id){
+    session.user={...session.user,...u,id:eid};
+    applyNavPerms();
+    toast('✅ Vos permissions ont été mises à jour !','ok');
+  }
 }
 function renderUsers(){
   const rl={admin:'👑 Admin',superviseur:'🔑 Superviseur',vendeur:'🧑 Vendeur',caissier:'💵 Caissier'};const rc={admin:'by',superviseur:'bb',vendeur:'bg',caissier:'bgr'};
@@ -3015,6 +3192,161 @@ function startUsersSync(){
     SS('users',DB.users);
     console.log('Users mis à jour depuis Firebase');
   });
+}
+
+// ══ SCANNER CODE-BARRES ══
+let scannerStream=null,scannerInterval=null;
+function openScanner(){
+  openModal('modal-scanner');
+  document.getElementById('barcode-manual').value='';
+  document.getElementById('scanner-result').style.display='none';
+  document.getElementById('scanner-status').textContent='📷 Démarrage caméra...';
+  startCamera();
+}
+async function startCamera(){
+  try{
+    scannerStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const video=document.getElementById('scanner-video');
+    video.srcObject=scannerStream;video.play();
+    document.getElementById('scanner-status').textContent='📷 Pointez vers le code-barres';
+    if('BarcodeDetector' in window){
+      const detector=new BarcodeDetector({formats:['ean_13','ean_8','code_128','code_39','qr_code','upc_a','upc_e']});
+      scannerInterval=setInterval(async()=>{
+        try{const barcodes=await detector.detect(video);if(barcodes.length>0){clearInterval(scannerInterval);searchBarcode(barcodes[0].rawValue);}}catch(e){}
+      },500);
+    } else {document.getElementById('scanner-status').textContent='Saisie manuelle uniquement';}
+  }catch(e){document.getElementById('scanner-status').textContent='❌ Caméra non accessible';console.error(e);}
+}
+function closeScanner(){
+  if(scannerInterval)clearInterval(scannerInterval);
+  if(scannerStream){scannerStream.getTracks().forEach(t=>t.stop());scannerStream=null;}
+  closeModal('modal-scanner');
+}
+function searchBarcode(code){
+  if(!code||!code.trim())return;
+  code=code.trim();
+  const p=DB.produits.find(x=>(x.ref||'').toLowerCase()===code.toLowerCase()||(x.barcode||'')===code||x.id.toLowerCase()===code.toLowerCase());
+  const resultEl=document.getElementById('scanner-result');resultEl.style.display='block';
+  if(p){
+    const stk=session.boutique==='B1'?p.s1:p.s2;
+    resultEl.innerHTML=`<div style="font-size:13px;font-weight:900;color:var(--gold);margin-bottom:5px;">✅ ${p.nom}</div><div style="font-size:11px;color:var(--text2);">Réf: ${p.ref||code} · Prix: ${fmt(p.prix)} · Stock: ${stk}</div><button class="btn btn-gold" style="margin-top:9px;width:100%;" onclick="addCart('${p.id}');closeScanner();toast('Ajouté ✅','ok')">🛒 Ajouter au panier</button>`;
+    soundOk();document.getElementById('scanner-status').textContent='✅ Produit trouvé !';
+  } else {
+    resultEl.innerHTML=`<div style="color:var(--red);font-weight:700;margin-bottom:5px;">❌ Non trouvé : ${code}</div><button class="btn btn-ghost btn-sm" style="margin-top:7px;" onclick="closeScanner();openAddProd()">➕ Créer ce produit</button>`;
+    soundErr();document.getElementById('scanner-status').textContent='❌ Non trouvé';
+  }
+  document.getElementById('barcode-manual').value=code;
+}
+
+// ══ COMPARAISON BOUTIQUES ══
+let COMP_PERIOD='mois';
+function setCompPeriod(p){
+  COMP_PERIOD=p;
+  ['jour','semaine','mois','annee'].forEach(k=>{const el=document.getElementById('comp-tab-'+k);if(el)el.className='tab-btn'+(k===p?' active':'');});
+  renderComparaison();
+}
+function renderComparaison(){
+  const now=new Date();const todayStr=now.toISOString().slice(0,10);
+  let from;
+  if(COMP_PERIOD==='jour')from=todayStr;
+  else if(COMP_PERIOD==='semaine'){const d=new Date();d.setDate(d.getDate()-6);from=d.toISOString().slice(0,10);}
+  else if(COMP_PERIOD==='mois')from=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  else from=`${now.getFullYear()}-01-01`;
+  const to=todayStr;
+  const facts=DB.factures.filter(f=>f.date.slice(0,10)>=from&&f.date.slice(0,10)<=to);
+  const b1F=facts.filter(f=>f.boutique==='B1'),b2F=facts.filter(f=>f.boutique==='B2');
+  const b1CA=b1F.reduce((s,f)=>s+f.total,0),b2CA=b2F.reduce((s,f)=>s+f.total,0);
+  const b1Ben=b1F.reduce((s,f)=>s+f.items.reduce((ss,i)=>ss+(i.prix-(i.achat||0))*i.qty,0),0);
+  const b2Ben=b2F.reduce((s,f)=>s+f.items.reduce((ss,i)=>ss+(i.prix-(i.achat||0))*i.qty,0),0);
+  const totalCA=b1CA+b2CA,totalNb=b1F.length+b2F.length;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('comp-ca-total',fmt(totalCA));set('comp-best',b1CA>=b2CA?DB.settings.B1.nom.substring(0,12):DB.settings.B2.nom.substring(0,12));set('comp-nb-total',totalNb);set('comp-panier',fmt(totalNb?totalCA/totalNb:0));
+  const buildCard=(bF,bCA,bBen,bName,bColor,bClass)=>{
+    const nbV=bF.length,panier=nbV?bCA/nbV:0;
+    const pay={};bF.forEach(f=>pay[f.mode]=(pay[f.mode]||0)+f.total);
+    const topPay=Object.entries(pay).sort((a,b)=>b[1]-a[1])[0];
+    return`<div class="comp-card ${bClass}"><div class="cc-title"><span style="color:${bColor}">${bName}</span></div>
+      <div class="comp-kpi"><span class="ck-label">CA</span><span class="ck-val ${bCA>=b2CA&&bClass==='b1-card'?'comp-winner':bCA<b2CA&&bClass==='b1-card'?'comp-loser':bCA>=b1CA&&bClass==='b2-card'?'comp-winner':'comp-loser'}">${fmt(bCA)}</span></div>
+      <div class="comp-kpi"><span class="ck-label">Bénéfice</span><span class="ck-val" style="color:var(--green)">${fmt(bBen)}</span></div>
+      <div class="comp-kpi"><span class="ck-label">Ventes</span><span class="ck-val">${nbV}</span></div>
+      <div class="comp-kpi"><span class="ck-label">Panier moyen</span><span class="ck-val">${fmt(panier)}</span></div>
+      <div class="comp-kpi"><span class="ck-label">Top paiement</span><span class="ck-val">${topPay?topPay[0]:'—'}</span></div>
+      <div style="margin-top:7px;"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-bottom:3px;"><span>Part du CA</span><span style="color:${bColor};font-weight:700">${totalCA?Math.round(bCA/totalCA*100):0}%</span></div>
+      <div class="comp-bar-track"><div style="height:100%;background:${bColor};width:${totalCA?bCA/totalCA*100:0}%;transition:width .5s;"></div></div></div>
+    </div>`;
+  };
+  document.getElementById('comp-boutiques-grid').innerHTML=buildCard(b1F,b1CA,b1Ben,DB.settings.B1.nom,'var(--gold)','b1-card')+buildCard(b2F,b2CA,b2Ben,DB.settings.B2.nom,'var(--blue)','b2-card');
+  // Top produits
+  const topB1={},topB2={};
+  b1F.forEach(f=>f.items.forEach(i=>topB1[i.nom]=(topB1[i.nom]||0)+i.qty));
+  b2F.forEach(f=>f.items.forEach(i=>topB2[i.nom]=(topB2[i.nom]||0)+i.qty));
+  const t1=Object.entries(topB1).sort((a,b)=>b[1]-a[1]).slice(0,5),t2=Object.entries(topB2).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  document.getElementById('comp-top-prods').innerHTML=`<div style="margin-bottom:6px;font-size:11px;font-weight:700;color:var(--gold);">${DB.settings.B1.nom}</div>${t1.length?t1.map(([n,q],i)=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--border);"><span>${i+1}. ${n.substring(0,20)}</span><span class="mono" style="color:var(--gold)">${q}</span></div>`).join(''):'<div style="color:var(--text3);font-size:11px;">Aucune vente</div>'}<div style="margin:9px 0 5px;font-size:11px;font-weight:700;color:var(--blue);">${DB.settings.B2.nom}</div>${t2.length?t2.map(([n,q],i)=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--border);"><span>${i+1}. ${n.substring(0,20)}</span><span class="mono" style="color:var(--blue)">${q}</span></div>`).join(''):'<div style="color:var(--text3);font-size:11px;">Aucune vente</div>'}`;
+  setTimeout(()=>{
+    const daysCount=COMP_PERIOD==='jour'?1:COMP_PERIOD==='semaine'?7:COMP_PERIOD==='mois'?30:12;
+    if(COMP_PERIOD==='annee'){
+      const months=[],labels=[];
+      for(let i=0;i<12;i++){const d=new Date(now.getFullYear(),i,1);months.push(d.toISOString().slice(0,7));labels.push(['J','F','M','A','M','J','J','A','S','O','N','D'][i]);}
+      drawBarChart('chart-comp-ca',labels,[{data:months.map(m=>b1F.filter(f=>f.date.startsWith(m)).reduce((s,f)=>s+f.total,0)),color:'#f0a500',label:DB.settings.B1.nom.substring(0,8)},{data:months.map(m=>b2F.filter(f=>f.date.startsWith(m)).reduce((s,f)=>s+f.total,0)),color:'#3b82f6',label:DB.settings.B2.nom.substring(0,8)}]);
+    } else {
+      const days=[],labels=[];
+      for(let i=daysCount-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const ds=d.toISOString().slice(0,10);days.push(ds);labels.push(d.getDate()+'/'+(d.getMonth()+1));}
+      drawBarChart('chart-comp-ca',labels,[{data:days.map(ds=>b1F.filter(f=>f.date.startsWith(ds)).reduce((s,f)=>s+f.total,0)),color:'#f0a500',label:DB.settings.B1.nom.substring(0,8)},{data:days.map(ds=>b2F.filter(f=>f.date.startsWith(ds)).reduce((s,f)=>s+f.total,0)),color:'#3b82f6',label:DB.settings.B2.nom.substring(0,8)}]);
+    }
+  },80);
+}
+
+// ══ IA PRÉVISIONS ══
+async function genererPrevisions(){
+  const el=document.getElementById('previsions-content');
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:7px;padding:20px;color:var(--text2);font-size:11px;"><div class="ia-loading"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div></div><span>L'IA analyse vos données...</span></div>`;
+  const apiKey=DB.settings.apiKey;
+  if(!apiKey){el.innerHTML=`<div class="empty"><div class="ei">🔑</div>Clé API Claude requise<br><small>Ajoutez votre clé dans Paramètres</small></div>`;return;}
+  const now=new Date();const last30=new Date();last30.setDate(last30.getDate()-30);
+  const last60=new Date();last60.setDate(last60.getDate()-60);
+  const facts30=DB.factures.filter(f=>new Date(f.date)>=last30);
+  const facts60=DB.factures.filter(f=>new Date(f.date)>=last60&&new Date(f.date)<last30);
+  const ca30=facts30.reduce((s,f)=>s+f.total,0),ca60=facts60.reduce((s,f)=>s+f.total,0);
+  const topProds={};facts30.forEach(f=>f.items.forEach(i=>topProds[i.nom]=(topProds[i.nom]||0)+i.qty));
+  const topList=Object.entries(topProds).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const stockCrit=DB.produits.filter(p=>p.s1<=2||p.s2<=2).map(p=>p.nom);
+  const prompt=`Tu es expert en commerce de télécommunications au Sénégal. Analyse ces données et génère des prévisions en JSON UNIQUEMENT:
+CA 30j: ${_fmtBase(ca30)} FCFA | CA 30j précédents: ${_fmtBase(ca60)} FCFA | Ventes: ${facts30.length}
+Top produits: ${topList.map(([n,q])=>`${n}(${q})`).join(', ')} | Stocks critiques: ${stockCrit.slice(0,5).join(', ')||'Aucun'}
+Réponds UNIQUEMENT avec ce JSON: {"tendance":"hausse|baisse|stable","prevision_ca_30j":nombre,"prevision_ca_mois":nombre,"recommandations":["rec1","rec2","rec3"],"produits_a_reapprovisionner":["p1","p2"],"produits_a_promouvoir":["p1","p2"],"alerte":"message ou null","score_sante":0-100}`;
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    const data=await resp.json();
+    const text=data.content?.[0]?.text||'';
+    const result=JSON.parse(text.replace(/```json|```/g,'').trim());
+    const evolution=ca60>0?Math.round((ca30-ca60)/ca60*100):0;
+    const tendanceIcon=result.tendance==='hausse'?'📈':result.tendance==='baisse'?'📉':'➡️';
+    const tendanceCss=result.tendance==='hausse'?'trend-up':result.tendance==='baisse'?'trend-down':'trend-stable';
+    const scoreColor=result.score_sante>=70?'var(--green)':result.score_sante>=40?'var(--gold)':'var(--red)';
+    el.innerHTML=`
+      <div class="prevision-card" style="background:linear-gradient(135deg,rgba(139,92,246,.05),var(--surf));">
+        <div class="pc-title">🏥 Score de santé</div>
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="font-size:48px;font-weight:900;color:${scoreColor};">${result.score_sante}</div>
+          <div><div style="font-size:11px;color:var(--text2);">Score sur 100</div><span class="${tendanceCss}" style="display:inline-block;margin-top:4px;">${tendanceIcon} Tendance ${result.tendance}</span><div style="font-size:10px;color:var(--text2);margin-top:3px;">Évolution CA : ${evolution>0?'+':''}${evolution}%</div></div>
+        </div>
+        ${result.alerte?`<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:8px;margin-top:9px;font-size:11px;color:var(--red);">⚠️ ${result.alerte}</div>`:''}
+      </div>
+      <div class="prevision-card">
+        <div class="pc-title">💰 Prévisions de CA</div>
+        <div class="prevision-item"><div class="pi-icon">📅</div><div class="pi-body"><div class="pi-title">30 prochains jours</div><div class="pi-val">${fmt(result.prevision_ca_30j)}</div></div></div>
+        <div class="prevision-item"><div class="pi-icon">🗓️</div><div class="pi-body"><div class="pi-title">Ce mois</div><div class="pi-val">${fmt(result.prevision_ca_mois)}</div></div></div>
+      </div>
+      <div class="prevision-card">
+        <div class="pc-title">💡 Recommandations IA</div>
+        ${(result.recommandations||[]).map((rec,i)=>`<div class="prevision-item"><div class="pi-icon">${['🎯','📦','💳','🔥','⚡'][i]||'💡'}</div><div class="pi-body"><div class="pi-title">${rec}</div></div></div>`).join('')}
+      </div>
+      <div class="row">
+        <div class="col prevision-card"><div class="pc-title">🛒 À réapprovisionner</div>${(result.produits_a_reapprovisionner||[]).map(p=>`<div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;"><span style="color:var(--red)">📦</span>${p}</div>`).join('')||'<div style="color:var(--text3);font-size:11px;">Aucun</div>'}</div>
+        <div class="col prevision-card"><div class="pc-title">🔥 À promouvoir</div>${(result.produits_a_promouvoir||[]).map(p=>`<div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;"><span style="color:var(--gold)">⭐</span>${p}</div>`).join('')||'<div style="color:var(--text3);font-size:11px;">Aucun</div>'}</div>
+      </div>
+      <div style="text-align:right;font-size:9px;color:var(--text3);margin-top:7px;">Généré par Claude IA · ${new Date().toLocaleString('fr-FR')}</div>`;
+  }catch(e){el.innerHTML=`<div class="empty"><div class="ei">❌</div>Erreur: ${e.message}</div>`;}
 }
 
 // Users sync actif — pushUsersToFirebase() appelé directement dans saveUser() et doResetPassword()
