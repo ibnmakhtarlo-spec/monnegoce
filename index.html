@@ -644,7 +644,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="sec" id="sec-produits">
     <div style="display:flex;gap:6px;margin-bottom:11px;">
       <input class="srch" style="flex:1" placeholder="🔍 Nom, référence..." id="srch-p" oninput="renderProduits()">
-      <button class="btn btn-gold btn-sm" id="btn-add-prod" style="display:none" onclick="openModalProd()">+ Ajouter</button>
+      <button class="btn btn-gold btn-sm" id="btn-add-prod" onclick="openModalProd()">+ Ajouter</button>
     </div>
     <div class="card"><div class="twrap">
       <table><thead><tr><th></th><th>Réf.</th><th>Produit</th><th>Catégorie</th><th>P. Vente</th><th id="th-achat" style="display:none">P. Achat</th><th>Stock B1</th><th>Stock B2</th><th>Alerte</th><th>Statut</th><th>Actions</th></tr></thead>
@@ -3122,9 +3122,14 @@ function pushToFirebase(){
   fbPushTimer=setTimeout(async()=>{
     fbSyncing=true;updateSyncUI('syncing');
     try{
+      // D'abord lire les factures existantes sur Firebase pour les fusionner
+      const snap=await fbDB.ref('negoce/shared/data/factures').once('value');
+      const cloudFactures=snap.val()||[];
+      const mergedFactures=mergeFactures(DB.factures||[],cloudFactures);
+      DB.factures=mergedFactures;
+
       const dbClean=JSON.parse(JSON.stringify(DB));
       dbClean.produits=dbClean.produits.map(p=>({...p,photo:p.photo?.startsWith('http')?p.photo:''}));
-      // Exclure les users du sync principal — gérés via negoce_users
       delete dbClean.users;
       await fbDB.ref('negoce/shared/data').set({...dbClean,_syncTime:Date.now(),_device:navigator.userAgent.substring(0,50)});
       updateSyncUI('connected');
