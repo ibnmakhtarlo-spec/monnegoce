@@ -2110,8 +2110,9 @@ function renderVentesJour(){
 // ══ FACTURES ══
 function renderFactures(){
   const q=(document.getElementById('srch-f')?.value||'').toLowerCase();const bf=document.getElementById('fil-b')?.value||'';const df=document.getElementById('fil-d-from')?.value||'';const dt=document.getElementById('fil-d-to')?.value||'';
-  const userBoutique=session.user?.boutique;
-  const canSeeAll=isAdmin()||(userBoutique==='all')||(userBoutique==='Les deux')||!userBoutique;
+  const userBoutique=session.user?.boutique||'';
+  // Admin, superviseur, "all", "Les deux" voient tout
+  const canSeeAll=isAdmin()||userBoutique==='all'||userBoutique==='Les deux'||userBoutique===''||session.user?.role==='superviseur';
   const list=[...DB.factures].reverse().filter(f=>{
     const fd=f.date.slice(0,10);
     const boutiqueMatch=canSeeAll?(!bf||f.boutique===bf):(f.boutique===userBoutique&&(!bf||f.boutique===bf));
@@ -2208,9 +2209,20 @@ async function buildPDFBytes(f){
   doc.setFontSize(6);doc.setFont('helvetica','normal');doc.text(`Généré le ${new Date().toLocaleString('fr-FR')}`,W/2,fY+16,{align:'center'});
   return doc.output('arraybuffer');
 }
-async function genererFacturePDF(){if(!currentFact)return;const bytes=await buildPDFBytes(currentFact);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));a.download=`Facture_${currentFact.id}.pdf`;a.click();toast('📄 PDF téléchargé ✅','ok');}
+async function genererFacturePDF(){
+  if(!currentFact)return;
+  const fCopy=JSON.parse(JSON.stringify(currentFact));
+  const bytes=await buildPDFBytes(fCopy);
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+  a.download=`Facture_${currentFact.id}.pdf`;
+  a.click();
+  toast('📄 PDF téléchargé ✅','ok');
+}
 function openFactDetail(id){
-  const f=DB.factures.find(x=>x.id===id);if(!f)return;currentFact=f;const s=DB.settings[f.boutique]||{};
+  const fOrig=DB.factures.find(x=>x.id===id);if(!fOrig)return;
+  const f=JSON.parse(JSON.stringify(fOrig)); // Copie pour éviter mutation
+  currentFact=f;const s=DB.settings[f.boutique]||{};
   document.getElementById('mfd-num').textContent=`Facture ${f.id}`;
   document.getElementById('mfd-content').innerHTML=`<div style="background:var(--surf2);border-radius:7px;padding:9px;margin-bottom:9px;font-size:11px;"><div style="font-weight:800;font-size:12px;color:var(--gold);">${s.logo||'🏪'} ${s.nom||getBName(f.boutique)}</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:9px;font-size:11px;"><div><span style="color:var(--text2)">Facture :</span> <b>${f.id}</b></div><div><span style="color:var(--text2)">Date :</span> ${new Date(f.date).toLocaleString('fr-FR')}</div><div><span style="color:var(--text2)">Client :</span> ${f.client}</div><div><span style="color:var(--text2)">Caisse :</span> <span style="color:var(--cyan)">${f.caisse}</span></div><div><span style="color:var(--text2)">Vendeur :</span> ${f.vendeur||'—'}</div><div><span style="color:var(--text2)">Mode :</span> ${f.mode}</div></div><div class="twrap"><table><thead><tr><th>Produit</th><th>Qté</th><th>P.U.</th><th>Total</th></tr></thead><tbody>${f.items.map(i=>`<tr><td><b>${i.nom}</b></td><td>${i.qty}</td><td class="mono" style="color:var(--text2)">${fmt(i.prix)}</td><td class="mono" style="color:var(--gold);font-weight:700">${fmt(i.prix*i.qty)}</td></tr>`).join('')}</tbody></table></div><div style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px;">${f.remise>0?`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--red);margin-bottom:3px;"><span>Remise -${f.remise}%</span><span>-${fmt(f.sousTotal*f.remise/100)}</span></div>`:''}<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:900;"><span>TOTAL</span><span class="mono" style="color:var(--green)">${fmt(f.total)}</span></div></div>`;
   switchTab('apercu');openModal('modal-fdet');
@@ -3112,6 +3124,8 @@ function pushToFirebase(){
     try{
       const dbClean=JSON.parse(JSON.stringify(DB));
       dbClean.produits=dbClean.produits.map(p=>({...p,photo:p.photo?.startsWith('http')?p.photo:''}));
+      // Exclure les users du sync principal — gérés via negoce_users
+      delete dbClean.users;
       await fbDB.ref('negoce/shared/data').set({...dbClean,_syncTime:Date.now(),_device:navigator.userAgent.substring(0,50)});
       updateSyncUI('connected');
       const el=document.getElementById('last-save-time');if(el)el.textContent=new Date().toLocaleTimeString('fr-FR');
@@ -3128,9 +3142,14 @@ async function pullFromFirebase(){
     if(!cloudData){toast('☁️ Première sync — envoi local...','info');pushToFirebase();return;}
     const localTime=DB._syncTime||0,cloudTime=cloudData._syncTime||0;
     if(cloudTime>localTime){
-      const{_syncTime,_device,...cleanCloud}=cloudData;
+      const{_syncTime,_device,users:cloudUsers,...cleanCloud}=cloudData;
+      // NE PAS écraser les users — gérés séparément via negoce_users
       if(cleanCloud.produits&&DB.produits){cleanCloud.produits=cleanCloud.produits.map(cp=>{const lp=DB.produits.find(p=>p.id===cp.id);if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;return cp;});}
-      Object.assign(DB,cleanCloud);(window._origSave||save)();
+      const currentUsers=DB.users; // Sauvegarder les users actuels
+      Object.assign(DB,cleanCloud);
+      DB.users=currentUsers; // Restaurer les users
+      DB._syncTime=cloudTime;
+      (window._origSave||save)();
       addNotif('Données mises à jour','Sync cloud réussie','ok');
       toast('✅ Données récupérées du cloud','ok');
       const active=document.querySelector('.ni.active');if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m)nav(m[1]);}
@@ -3145,9 +3164,14 @@ function startRealtimeSync(){
     const cloudData=snap.val();if(!cloudData)return;
     const cloudTime=cloudData._syncTime||0,localTime=DB._syncTime||0;
     if(cloudTime>localTime+2000){
-      const{_syncTime,_device,...cleanCloud}=cloudData;
+      const{_syncTime,_device,users:cloudUsers,...cleanCloud}=cloudData;
+      // NE PAS écraser les users — gérés séparément
       if(cleanCloud.produits&&DB.produits){cleanCloud.produits=cleanCloud.produits.map(cp=>{const lp=DB.produits.find(p=>p.id===cp.id);if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;return cp;});}
-      Object.assign(DB,cleanCloud);DB._syncTime=cloudTime;(window._origSave||save)();
+      const currentUsers=DB.users;
+      Object.assign(DB,cleanCloud);
+      DB.users=currentUsers; // Restaurer les users
+      DB._syncTime=cloudTime;
+      (window._origSave||save)();
       toast('🔄 Mise à jour depuis un autre appareil','info');
     }
   });
