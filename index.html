@@ -3140,21 +3140,55 @@ async function pullFromFirebase(){
     const snap=await fbDB.ref('negoce/shared/data').once('value');
     const cloudData=snap.val();
     if(!cloudData){toast('☁️ Première sync — envoi local...','info');pushToFirebase();return;}
-    const localTime=DB._syncTime||0,cloudTime=cloudData._syncTime||0;
+    const{_syncTime,_device,users:cloudUsers,...cleanCloud}=cloudData;
+    const cloudTime=_syncTime||0;
+    const localTime=DB._syncTime||0;
+
+    // Toujours fusionner les factures — jamais écraser
+    const mergedFactures=mergeFactures(DB.factures||[],cleanCloud.factures||[]);
+
     if(cloudTime>localTime){
-      const{_syncTime,_device,users:cloudUsers,...cleanCloud}=cloudData;
-      // NE PAS écraser les users — gérés séparément via negoce_users
-      if(cleanCloud.produits&&DB.produits){cleanCloud.produits=cleanCloud.produits.map(cp=>{const lp=DB.produits.find(p=>p.id===cp.id);if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;return cp;});}
-      const currentUsers=DB.users; // Sauvegarder les users actuels
+      // Cloud plus récent — prendre tout sauf users et factures
+      if(cleanCloud.produits&&DB.produits){
+        cleanCloud.produits=cleanCloud.produits.map(cp=>{
+          const lp=DB.produits.find(p=>p.id===cp.id);
+          if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;
+          return cp;
+        });
+      }
+      const currentUsers=DB.users;
       Object.assign(DB,cleanCloud);
-      DB.users=currentUsers; // Restaurer les users
+      DB.users=currentUsers;
+      DB.factures=mergedFactures;
       DB._syncTime=cloudTime;
       (window._origSave||save)();
       addNotif('Données mises à jour','Sync cloud réussie','ok');
       toast('✅ Données récupérées du cloud','ok');
-      const active=document.querySelector('.ni.active');if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m)nav(m[1]);}
-    } else pushToFirebase();
+      const active=document.querySelector('.ni.active');
+      if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m)nav(m[1]);}
+    } else {
+      // Local plus récent — fusionner quand même les factures
+      const localFactures=DB.factures||[];
+      DB.factures=mergedFactures;
+      if(mergedFactures.length>localFactures.length){
+        (window._origSave||save)();
+        toast('🔄 Nouvelles ventes récupérées','info');
+      }
+      pushToFirebase();
+    }
   }catch(e){console.error('Pull:',e);}
+}
+
+function mergeFactures(local,cloud){
+  // Fusionner sans doublons — prendre toutes les factures des deux sources
+  const all=[...local];
+  cloud.forEach(cf=>{
+    if(!all.find(lf=>lf.id===cf.id)){
+      all.push(cf);
+    }
+  });
+  // Trier par date décroissante
+  return all.sort((a,b)=>new Date(b.date)-new Date(a.date));
 }
 
 function startRealtimeSync(){
@@ -3162,17 +3196,28 @@ function startRealtimeSync(){
   fbDB.ref('negoce/shared/data').on('value',snap=>{
     if(fbSyncing)return;
     const cloudData=snap.val();if(!cloudData)return;
-    const cloudTime=cloudData._syncTime||0,localTime=DB._syncTime||0;
+    const{_syncTime,_device,users:cloudUsers,...cleanCloud}=cloudData;
+    const cloudTime=_syncTime||0,localTime=DB._syncTime||0;
     if(cloudTime>localTime+2000){
-      const{_syncTime,_device,users:cloudUsers,...cleanCloud}=cloudData;
-      // NE PAS écraser les users — gérés séparément
-      if(cleanCloud.produits&&DB.produits){cleanCloud.produits=cleanCloud.produits.map(cp=>{const lp=DB.produits.find(p=>p.id===cp.id);if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;return cp;});}
+      if(cleanCloud.produits&&DB.produits){
+        cleanCloud.produits=cleanCloud.produits.map(cp=>{
+          const lp=DB.produits.find(p=>p.id===cp.id);
+          if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;
+          return cp;
+        });
+      }
       const currentUsers=DB.users;
+      // Fusionner les factures
+      const mergedFactures=mergeFactures(DB.factures||[],cleanCloud.factures||[]);
       Object.assign(DB,cleanCloud);
-      DB.users=currentUsers; // Restaurer les users
+      DB.users=currentUsers;
+      DB.factures=mergedFactures;
       DB._syncTime=cloudTime;
       (window._origSave||save)();
       toast('🔄 Mise à jour depuis un autre appareil','info');
+      // Rafraîchir la page active
+      const active=document.querySelector('.ni.active');
+      if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m&&['factures','ventes-jour','dashboard','accueil'].includes(m[1]))nav(m[1]);}
     }
   });
 }
