@@ -3123,22 +3123,33 @@ function pushToFirebase(){
     fbSyncing=true;updateSyncUI('syncing');
     try{
       const userId=session.user?.id||'default';
-      // Chaque utilisateur écrit dans son propre nœud
-      // Données partagées (produits, clients, etc.) dans /shared
-      // Factures dans /factures/{userId}
-      const dbClean=JSON.parse(JSON.stringify(DB));
-      dbClean.produits=dbClean.produits.map(p=>({...p,photo:p.photo?.startsWith('http')?p.photo:''}));
-      delete dbClean.users;
-      delete dbClean.factures; // Factures gérées séparément
+      const boutique=session.boutique||'B1';
 
-      // 1. Pousser données partagées
+      // 1. Données communes (produits noms/prix, fournisseurs, settings, caisses, devis, retours, salaires, depenses, nextIds)
+      const produitsSansStock=DB.produits.map(p=>({...p,s1:undefined,s2:undefined,photo:p.photo?.startsWith('http')?p.photo:''}));
       await fbDB.ref('negoce/shared/data').set({
-        ...dbClean,
-        _syncTime:Date.now(),
-        _device:navigator.userAgent.substring(0,50)
+        produits: produitsSansStock,
+        fournisseurs: DB.fournisseurs,
+        settings: DB.settings,
+        caisses: DB.caisses,
+        devis: DB.devis,
+        retours: DB.retours,
+        salaires: DB.salaires,
+        depenses: DB.depenses,
+        nextIds: DB.nextIds,
+        _syncTime: Date.now(),
+        _device: navigator.userAgent.substring(0,50)
       });
 
-      // 2. Pousser UNIQUEMENT les factures de CET utilisateur
+      // 2. Stocks séparés par boutique
+      const stocks={};
+      DB.produits.forEach(p=>{stocks[p.id]={s1:p.s1||0,s2:p.s2||0};});
+      await fbDB.ref(`negoce/stocks/${boutique}`).set({stocks,_syncTime:Date.now()});
+
+      // 3. Clients séparés par boutique
+      await fbDB.ref(`negoce/clients/${boutique}`).set(DB.clients||[]);
+
+      // 4. Factures de CET utilisateur uniquement
       DB.factures.forEach(f=>{if(!f._author)f._author=userId;});
       const myFactures=DB.factures.filter(f=>f._author===userId);
       await fbDB.ref(`negoce/factures/${userId}`).set(myFactures.length>0?myFactures:null);
@@ -3153,11 +3164,26 @@ function pushToFirebase(){
 async function pullFromFirebase(){
   if(!fbInitialized||!fbDB)return;
   try{
-    // 1. Récupérer données partagées
+    const boutique=session.boutique||'B1';
+
+    // 1. Données communes
     const snap=await fbDB.ref('negoce/shared/data').once('value');
     const cloudData=snap.val();
 
-    // 2. Récupérer TOUTES les factures de TOUS les utilisateurs
+    // 2. Stocks de la boutique courante
+    const stocksSnap=await fbDB.ref(`negoce/stocks/${boutique}`).once('value');
+    const stocksCloud=stocksSnap.val()?.stocks||null;
+
+    // 3. Stocks de l'autre boutique (pour avoir s1 et s2 complets)
+    const autreBoutique=boutique==='B1'?'B2':'B1';
+    const stocksAutreSnap=await fbDB.ref(`negoce/stocks/${autreBoutique}`).once('value');
+    const stocksAutre=stocksAutreSnap.val()?.stocks||null;
+
+    // 4. Clients de la boutique courante
+    const clientsSnap=await fbDB.ref(`negoce/clients/${boutique}`).once('value');
+    const clientsCloud=clientsSnap.val()||null;
+
+    // 5. Toutes les factures
     const factSnap=await fbDB.ref('negoce/factures').once('value');
     const allFacturesObj=factSnap.val()||{};
     if(allFacturesObj['default']){await fbDB.ref('negoce/factures/default').remove();delete allFacturesObj['default'];}
@@ -3176,13 +3202,17 @@ async function pullFromFirebase(){
 
     const currentUsers=DB.users;
     if(cloudData){
-      const{_syncTime,_device,users:cloudUsers,...cleanCloud}=cloudData;
+      const{_syncTime,_device,...cleanCloud}=cloudData;
       const cloudTime=_syncTime||0,localTime=DB._syncTime||0;
       if(cloudTime>localTime){
+        // Restaurer photos locales
         if(cleanCloud.produits&&DB.produits){
           cleanCloud.produits=cleanCloud.produits.map(cp=>{
             const lp=DB.produits.find(p=>p.id===cp.id);
             if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;
+            // Réinjecter les stocks depuis les nœuds dédiés
+            cp.s1=lp?lp.s1:0;
+            cp.s2=lp?lp.s2:0;
             return cp;
           });
         }
@@ -3191,18 +3221,31 @@ async function pullFromFirebase(){
       }
     }
 
-    // Toujours mettre à jour les factures avec TOUTES les factures
-    if(allFactures.length>0){
-      DB.factures=allFactures;
+    // Appliquer stocks cloud par boutique
+    if(stocksCloud||stocksAutre){
+      DB.produits=DB.produits.map(p=>{
+        if(stocksCloud&&stocksCloud[p.id]!==undefined){
+          if(boutique==='B1')p.s1=stocksCloud[p.id].s1??p.s1;
+          else p.s2=stocksCloud[p.id].s2??p.s2;
+        }
+        if(stocksAutre&&stocksAutre[p.id]!==undefined){
+          if(autreBoutique==='B1')p.s1=stocksAutre[p.id].s1??p.s1;
+          else p.s2=stocksAutre[p.id].s2??p.s2;
+        }
+        return p;
+      });
     }
+
+    // Appliquer clients de la boutique
+    if(clientsCloud&&Array.isArray(clientsCloud))DB.clients=clientsCloud;
+
+    // Appliquer toutes les factures
+    if(allFactures.length>0)DB.factures=allFactures;
+
     DB.users=currentUsers;
     (window._origSave||save)();
 
-    if(allFactures.length>0)
-      toast('✅ Toutes les ventes synchronisées','ok');
-    else
-      toast('✅ Données récupérées du cloud','ok');
-
+    toast('✅ Synchronisation réussie','ok');
     addNotif('Données mises à jour','Sync cloud réussie','ok');
     const active=document.querySelector('.ni.active');
     if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m)nav(m[1]);}
@@ -3211,32 +3254,74 @@ async function pullFromFirebase(){
 
 function startRealtimeSync(){
   if(!fbInitialized||!fbDB)return;
+  const boutique=session.boutique||'B1';
+  const autreBoutique=boutique==='B1'?'B2':'B1';
 
-  // Écouter les changements de données partagées
+  // Écouter données communes (produits noms/prix, settings, etc.)
   fbDB.ref('negoce/shared/data').on('value',snap=>{
     if(fbSyncing)return;
     const cloudData=snap.val();if(!cloudData)return;
     const cloudTime=cloudData._syncTime||0,localTime=DB._syncTime||0;
     if(cloudTime>localTime+2000){
-      const{_syncTime,_device,users:cloudUsers,...cleanCloud}=cloudData;
+      const{_syncTime,_device,...cleanCloud}=cloudData;
       if(cleanCloud.produits&&DB.produits){
         cleanCloud.produits=cleanCloud.produits.map(cp=>{
           const lp=DB.produits.find(p=>p.id===cp.id);
           if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;
+          // Préserver les stocks locaux
+          cp.s1=lp?lp.s1:0;
+          cp.s2=lp?lp.s2:0;
           return cp;
         });
       }
       const currentUsers=DB.users;
       const currentFactures=DB.factures;
+      const currentClients=DB.clients;
       Object.assign(DB,cleanCloud);
       DB.users=currentUsers;
-      DB.factures=currentFactures; // Garder les factures locales
+      DB.factures=currentFactures;
+      DB.clients=currentClients; // Clients gérés séparément par boutique
       DB._syncTime=cloudTime;
       (window._origSave||save)();
     }
   });
 
-  // Écouter les changements de TOUTES les factures
+  // Écouter stocks de la boutique courante
+  fbDB.ref(`negoce/stocks/${boutique}`).on('value',snap=>{
+    if(fbSyncing)return;
+    const data=snap.val();if(!data||!data.stocks)return;
+    DB.produits=DB.produits.map(p=>{
+      if(data.stocks[p.id]!==undefined){
+        if(boutique==='B1')p.s1=data.stocks[p.id].s1??p.s1;
+        else p.s2=data.stocks[p.id].s2??p.s2;
+      }
+      return p;
+    });
+    (window._origSave||save)();
+  });
+
+  // Écouter stocks de l'autre boutique
+  fbDB.ref(`negoce/stocks/${autreBoutique}`).on('value',snap=>{
+    if(fbSyncing)return;
+    const data=snap.val();if(!data||!data.stocks)return;
+    DB.produits=DB.produits.map(p=>{
+      if(data.stocks[p.id]!==undefined){
+        if(autreBoutique==='B1')p.s1=data.stocks[p.id].s1??p.s1;
+        else p.s2=data.stocks[p.id].s2??p.s2;
+      }
+      return p;
+    });
+    (window._origSave||save)();
+  });
+
+  // Écouter clients de la boutique courante
+  fbDB.ref(`negoce/clients/${boutique}`).on('value',snap=>{
+    if(fbSyncing)return;
+    const data=snap.val();
+    if(data&&Array.isArray(data)){DB.clients=data;(window._origSave||save)();}
+  });
+
+  // Écouter toutes les factures
   fbDB.ref('negoce/factures').on('value',snap=>{
     if(fbSyncing)return;
     const allFacturesObj=snap.val()||{};
