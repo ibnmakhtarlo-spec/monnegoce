@@ -3141,9 +3141,8 @@ function pushToFirebase(){
         _device: navigator.userAgent.substring(0,50)
       });
 
-      // 2. Stocks séparés par boutique
-      const stocks={};
-      DB.produits.forEach(p=>{stocks[p.id]={s1:p.s1||0,s2:p.s2||0};});
+      // 2. Stocks séparés par boutique (tableau indexé par position pour éviter corruption)
+      const stocks=DB.produits.map(p=>({id:p.id,s1:p.s1||0,s2:p.s2||0}));
       await fbDB.ref(`negoce/stocks/${boutique}`).set({stocks,_syncTime:Date.now()});
 
       // 3. Clients séparés par boutique
@@ -3216,25 +3215,35 @@ async function pullFromFirebase(){
             return cp;
           });
         }
+        delete cleanCloud.factures; // Factures gérées séparément
+        delete cleanCloud.clients;   // Clients gérés séparément par boutique
+        const savedFactures=DB.factures;
+        const savedClients=DB.clients;
         Object.assign(DB,cleanCloud);
+        DB.factures=savedFactures;
+        DB.clients=savedClients;
         DB._syncTime=cloudTime;
       }
     }
 
-    // Appliquer stocks cloud par boutique
-    if(stocksCloud||stocksAutre){
+    // Appliquer stocks cloud par boutique (format tableau)
+    const applyStocks=(stocksArr,bq)=>{
+      if(!stocksArr)return;
+      // Supporter les deux formats: tableau [{id,s1,s2}] ou objet {id:{s1,s2}}
+      const map={};
+      if(Array.isArray(stocksArr)){stocksArr.forEach(s=>{if(s&&s.id)map[s.id]=s;});}
+      else{Object.entries(stocksArr).forEach(([k,v])=>{if(v&&v.id)map[v.id]=v;else if(v)map[k]=v;});}
       DB.produits=DB.produits.map(p=>{
-        if(stocksCloud&&stocksCloud[p.id]!==undefined){
-          if(boutique==='B1')p.s1=stocksCloud[p.id].s1??p.s1;
-          else p.s2=stocksCloud[p.id].s2??p.s2;
-        }
-        if(stocksAutre&&stocksAutre[p.id]!==undefined){
-          if(autreBoutique==='B1')p.s1=stocksAutre[p.id].s1??p.s1;
-          else p.s2=stocksAutre[p.id].s2??p.s2;
+        const s=map[p.id];
+        if(s){
+          if(bq==='B1')p.s1=s.s1??p.s1;
+          else p.s2=s.s2??p.s2;
         }
         return p;
       });
-    }
+    };
+    applyStocks(stocksCloud,boutique);
+    applyStocks(stocksAutre,autreBoutique);
 
     // Appliquer clients de la boutique
     if(clientsCloud&&Array.isArray(clientsCloud))DB.clients=clientsCloud;
@@ -3277,26 +3286,35 @@ function startRealtimeSync(){
       const currentUsers=DB.users;
       const currentFactures=DB.factures;
       const currentClients=DB.clients;
+      delete cleanCloud.factures;
+      delete cleanCloud.clients;
       Object.assign(DB,cleanCloud);
       DB.users=currentUsers;
       DB.factures=currentFactures;
-      DB.clients=currentClients; // Clients gérés séparément par boutique
+      DB.clients=currentClients;
       DB._syncTime=cloudTime;
       (window._origSave||save)();
     }
   });
 
+  // Helper pour appliquer stocks (supporte tableau et objet)
+  const applyStocksRT=(stocksData,bq)=>{
+    if(!stocksData)return;
+    const map={};
+    if(Array.isArray(stocksData)){stocksData.forEach(s=>{if(s&&s.id)map[s.id]=s;});}
+    else{Object.entries(stocksData).forEach(([k,v])=>{if(v&&v.id)map[v.id]=v;else if(v)map[k]=v;});}
+    DB.produits=DB.produits.map(p=>{
+      const s=map[p.id];
+      if(s){if(bq==='B1')p.s1=s.s1??p.s1;else p.s2=s.s2??p.s2;}
+      return p;
+    });
+  };
+
   // Écouter stocks de la boutique courante
   fbDB.ref(`negoce/stocks/${boutique}`).on('value',snap=>{
     if(fbSyncing)return;
     const data=snap.val();if(!data||!data.stocks)return;
-    DB.produits=DB.produits.map(p=>{
-      if(data.stocks[p.id]!==undefined){
-        if(boutique==='B1')p.s1=data.stocks[p.id].s1??p.s1;
-        else p.s2=data.stocks[p.id].s2??p.s2;
-      }
-      return p;
-    });
+    applyStocksRT(data.stocks,boutique);
     (window._origSave||save)();
   });
 
@@ -3304,13 +3322,7 @@ function startRealtimeSync(){
   fbDB.ref(`negoce/stocks/${autreBoutique}`).on('value',snap=>{
     if(fbSyncing)return;
     const data=snap.val();if(!data||!data.stocks)return;
-    DB.produits=DB.produits.map(p=>{
-      if(data.stocks[p.id]!==undefined){
-        if(autreBoutique==='B1')p.s1=data.stocks[p.id].s1??p.s1;
-        else p.s2=data.stocks[p.id].s2??p.s2;
-      }
-      return p;
-    });
+    applyStocksRT(data.stocks,autreBoutique);
     (window._origSave||save)();
   });
 
