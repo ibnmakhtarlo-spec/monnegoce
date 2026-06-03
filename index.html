@@ -3369,18 +3369,31 @@ function startRealtimeSync(){
   fbDB.ref('negoce/factures').on('value',snap=>{
     if(fbSyncing)return;
     const allFacturesObj=snap.val()||{};
-    let allFactures=[];
+    let newFactures=[];
     Object.entries(allFacturesObj).forEach(([uid,userFacts])=>{
       if(uid==='default')return;
-      if(Array.isArray(userFacts)){userFacts.forEach(f=>{if(!f._author)f._author=uid;});allFactures=[...allFactures,...userFacts];}
+      if(Array.isArray(userFacts)){userFacts.forEach(f=>{if(!f._author)f._author=uid;});newFactures=[...newFactures,...userFacts];}
     });
-    if(allFactures.length===0)return;
+    if(newFactures.length===0)return;
+
+    // FUSIONNER avec les factures existantes (ne pas perdre les anciennes de monnegoce)
+    const merged=[...DB.factures];
+    newFactures.forEach(f=>{
+      if(!merged.find(x=>x.id===f.id))merged.push(f);
+      else{
+        // Mettre à jour si la facture existe déjà
+        const idx=merged.findIndex(x=>x.id===f.id);
+        if(idx>=0)merged[idx]=f;
+      }
+    });
     const seen=new Set();
-    allFactures=allFactures.filter(f=>{if(seen.has(f.id))return false;seen.add(f.id);return true;});
+    const allFactures=merged.filter(f=>{if(seen.has(f.id))return false;seen.add(f.id);return true;});
     allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
-    if(allFactures.length!==DB.factures.length||allFactures.some(cf=>!DB.factures.find(lf=>lf.id===cf.id))){
-      console.log('🔄 Factures listener: count=',allFactures.length,'auteurs:',
-        Object.entries(allFactures.reduce((acc,f)=>{acc[f._author||'?']=(acc[f._author||'?']||0)+1;return acc;},{})).join(', '));
+
+    // Mettre à jour seulement si nouvelles factures détectées
+    const hasNew=newFactures.some(cf=>!DB.factures.find(lf=>lf.id===cf.id));
+    if(hasNew){
+      console.log('🔄 Nouvelles factures détectées:',newFactures.length,'total:',allFactures.length);
       fbLoading=true;DB.factures=allFactures;
       if(window._origSave)window._origSave();else save();
       fbLoading=false;
