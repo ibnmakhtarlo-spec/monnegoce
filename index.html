@@ -3138,12 +3138,13 @@ function pushToFirebase(){
         _device:navigator.userAgent.substring(0,50)
       });
 
-      // 2. Pousser factures de CET utilisateur
-      if(DB.factures&&DB.factures.length>0){
-        const myFactures=DB.factures.filter(f=>!f._author||f._author===userId||f._author===session.user?.nom);
-        // Taguer les nouvelles factures avec l'auteur
-        DB.factures.forEach(f=>{if(!f._author)f._author=userId;});
-        await fbDB.ref(`negoce/factures/${userId}`).set(DB.factures);
+      // 2. Pousser UNIQUEMENT les factures de CET utilisateur
+      // Taguer d'abord les factures sans auteur
+      DB.factures.forEach(f=>{if(!f._author)f._author=userId;});
+      // Filtrer strictement : uniquement celles créées par cet utilisateur
+      const myFactures=DB.factures.filter(f=>f._author===userId||f._author===session.user?.nom);
+      if(myFactures.length>0){
+        await fbDB.ref(`negoce/factures/${userId}`).set(myFactures);
       }
 
       updateSyncUI('connected');
