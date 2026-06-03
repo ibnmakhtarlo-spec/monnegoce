@@ -1866,7 +1866,7 @@ function startApp(){
     // Override save to also push
     const _origSaveLocal=save;
     window._origSave=_origSaveLocal;
-    save=function(){_origSaveLocal();DB._syncTime=Date.now();if(fbConnected)pushToFirebase();};
+    save=function(){_origSaveLocal();DB._syncTime=Date.now();if(fbConnected&&!fbLoading)pushToFirebase();};
     initFirebase();
     setTimeout(startRealtimeSync,3000);
     setTimeout(()=>{pullUsersFromFirebase();startUsersSync();},4000);
@@ -3087,7 +3087,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "926691564469",
   appId: "1:926691564469:web:6a52bbce94c84ed50a57fc"
 };
-let fbApp=null,fbDB=null,fbConnected=false,fbSyncing=false,fbInitialized=false;
+let fbApp=null,fbDB=null,fbConnected=false,fbSyncing=false,fbInitialized=false,fbLoading=false;
 
 function initFirebase(){
   try{
@@ -3162,6 +3162,7 @@ function pushToFirebase(){
 
 async function pullFromFirebase(){
   if(!fbInitialized||!fbDB)return;
+  fbLoading=true; // Empêcher push pendant le chargement
   try{
     const boutique=session.boutique||'B1';
 
@@ -3252,13 +3253,13 @@ async function pullFromFirebase(){
     if(allFactures.length>0)DB.factures=allFactures;
 
     DB.users=currentUsers;
-    (window._origSave||save)();
+    if(window._origSave)window._origSave();else save();
 
     toast('✅ Synchronisation réussie','ok');
     addNotif('Données mises à jour','Sync cloud réussie','ok');
     const active=document.querySelector('.ni.active');
     if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m)nav(m[1]);}
-  }catch(e){console.error('Pull:',e);}
+  }catch(e){console.error('Pull:',e);}finally{fbLoading=false;}
 }
 
 function startRealtimeSync(){
@@ -3293,7 +3294,7 @@ function startRealtimeSync(){
       DB.factures=currentFactures;
       DB.clients=currentClients;
       DB._syncTime=cloudTime;
-      (window._origSave||save)();
+      fbLoading=true;if(window._origSave)window._origSave();else save();fbLoading=false;
     }
   });
 
@@ -3314,23 +3315,25 @@ function startRealtimeSync(){
   fbDB.ref(`negoce/stocks/${boutique}`).on('value',snap=>{
     if(fbSyncing)return;
     const data=snap.val();if(!data||!data.stocks)return;
-    applyStocksRT(data.stocks,boutique);
-    (window._origSave||save)();
+    fbLoading=true;applyStocksRT(data.stocks,boutique);
+    if(window._origSave)window._origSave();else save();
+    fbLoading=false;
   });
 
   // Écouter stocks de l'autre boutique
   fbDB.ref(`negoce/stocks/${autreBoutique}`).on('value',snap=>{
     if(fbSyncing)return;
     const data=snap.val();if(!data||!data.stocks)return;
-    applyStocksRT(data.stocks,autreBoutique);
-    (window._origSave||save)();
+    fbLoading=true;applyStocksRT(data.stocks,autreBoutique);
+    if(window._origSave)window._origSave();else save();
+    fbLoading=false;
   });
 
   // Écouter clients de la boutique courante
   fbDB.ref(`negoce/clients/${boutique}`).on('value',snap=>{
     if(fbSyncing)return;
     const data=snap.val();
-    if(data&&Array.isArray(data)){DB.clients=data;(window._origSave||save)();}
+    if(data&&Array.isArray(data)){fbLoading=true;DB.clients=data;if(window._origSave)window._origSave();else save();fbLoading=false;}
   });
 
   // Écouter toutes les factures
@@ -3347,8 +3350,9 @@ function startRealtimeSync(){
     allFactures=allFactures.filter(f=>{if(seen.has(f.id))return false;seen.add(f.id);return true;});
     allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
     if(allFactures.length!==DB.factures.length||allFactures.some(cf=>!DB.factures.find(lf=>lf.id===cf.id))){
-      DB.factures=allFactures;
-      (window._origSave||save)();
+      fbLoading=true;DB.factures=allFactures;
+      if(window._origSave)window._origSave();else save();
+      fbLoading=false;
       toast('🔄 Nouvelles ventes reçues !','ok');
       const active=document.querySelector('.ni.active');
       if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m&&['factures','ventes-jour','dashboard','accueil'].includes(m[1]))nav(m[1]);}
