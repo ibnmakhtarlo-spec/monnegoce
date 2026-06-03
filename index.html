@@ -1723,7 +1723,7 @@ function save(){
 }
 function startAutoSave(){if(autoSaveTimer)clearInterval(autoSaveTimer);autoSaveTimer=setInterval(save,30000);}
 
-const _fmtBase=n=>Number(n||0).toLocaleString('fr-FR');
+const _fmtBase=n=>{const num=Number(n||0);return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g,' ');};
 let fmt=n=>_fmtBase(n)+' FCFA';
 const today=()=>new Date().toISOString().slice(0,10);
 const getBName=b=>DB.settings[b]?.nom||b;
@@ -3143,6 +3143,7 @@ function pushToFirebase(){
 
       // 2. Stocks séparés par boutique (tableau indexé par position pour éviter corruption)
       const stocks=DB.produits.map(p=>({id:p.id,s1:p.s1||0,s2:p.s2||0}));
+      if(typeof stocksPushTime!=='undefined')stocksPushTime=Date.now();
       await fbDB.ref(`negoce/stocks/${boutique}`).set({stocks,_syncTime:Date.now()});
 
       // 3. Clients séparés par boutique
@@ -3249,9 +3250,26 @@ async function pullFromFirebase(){
     // Appliquer clients de la boutique
     if(clientsCloud&&Array.isArray(clientsCloud))DB.clients=clientsCloud;
 
+    // Récupérer les anciennes factures depuis monnegoce (migration)
+    if(!DB._migratedOldFactures){
+      try{
+        const oldSnap=await fbDB.ref('monnegoce/factures').once('value');
+        const oldFacts=oldSnap.val();
+        if(oldFacts&&Array.isArray(oldFacts)&&oldFacts.length>0){
+          console.log('📦 Migration anciennes factures:',oldFacts.length);
+          oldFacts.forEach(f=>{if(!f._author)f._author=f.userId||'ADM01';});
+          allFactures=[...allFactures,...oldFacts];
+          // Dédoublonner
+          const seen2=new Set();
+          allFactures=allFactures.filter(f=>{if(seen2.has(f.id))return false;seen2.add(f.id);return true;});
+          allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
+          DB._migratedOldFactures=true;
+        }
+      }catch(e){console.log('Migration skip:',e);}
+    }
+
     // Appliquer toutes les factures
-    console.log('📊 Pull: allFactures count=',allFactures.length,'par auteur:',
-      Object.entries(allFactures.reduce((acc,f)=>{acc[f._author||'?']=(acc[f._author||'?']||0)+1;return acc;},{})).join(', '));
+    console.log('📊 Pull: allFactures count=',allFactures.length);
     if(allFactures.length>0)DB.factures=allFactures;
 
     DB.users=currentUsers;
@@ -3308,14 +3326,23 @@ function startRealtimeSync(){
     else{Object.entries(stocksData).forEach(([k,v])=>{if(v&&v.id)map[v.id]=v;else if(v)map[k]=v;});}
     DB.produits=DB.produits.map(p=>{
       const s=map[p.id];
-      if(s){if(bq==='B1')p.s1=s.s1??p.s1;else p.s2=s.s2??p.s2;}
+      if(s){
+        // Uniquement mettre à jour si la valeur Firebase est différente
+        // et seulement la boutique concernée
+        if(bq==='B1'&&s.s1!==undefined)p.s1=s.s1;
+        else if(bq==='B2'&&s.s2!==undefined)p.s2=s.s2;
+      }
       return p;
     });
   };
 
+  let stocksPushTime=0; // Timestamp du dernier push de stocks
+
   // Écouter stocks de la boutique courante
   fbDB.ref(`negoce/stocks/${boutique}`).on('value',snap=>{
     if(fbSyncing)return;
+    // Ignorer si on vient de pousser nous-mêmes (évite boucle)
+    if(Date.now()-stocksPushTime<3000)return;
     const data=snap.val();if(!data||!data.stocks)return;
     fbLoading=true;applyStocksRT(data.stocks,boutique);
     if(window._origSave)window._origSave();else save();
@@ -3370,9 +3397,11 @@ function syncNow(){if(!fbConnected){toast('📴 Pas de connexion','err');return;
 // ══ SYNC USERS SUR FIREBASE ══
 function pushUsersToFirebase(){
   if(!fbInitialized||!fbDB||!fbConnected)return;
+  const ts=Date.now();
+  DB._usersUpdated=ts;
   fbDB.ref('negoce_users').set({
     users: DB.users.map(u=>({...u})),
-    _updated: Date.now()
+    _updated: ts
   }).then(()=>console.log('✅ Users poussés sur Firebase'))
     .catch(e=>console.error('Users push:',e));
 }
@@ -3399,10 +3428,14 @@ function startUsersSync(){
   fbDB.ref('negoce_users').on('value', snap=>{
     const data=snap.val();
     if(!data||!data.users)return;
-    // Mettre à jour DB.users depuis Firebase
-    DB.users=data.users;
-    SS('users',DB.users);
-    console.log('Users mis à jour depuis Firebase');
+    // Fusionner: garder les perms locales si plus récentes
+    const localUpdated=DB._usersUpdated||0;
+    const cloudUpdated=data._updated||0;
+    if(cloudUpdated>localUpdated){
+      DB.users=data.users;
+      SS('users',DB.users);
+      console.log('Users mis à jour depuis Firebase');
+    }
   });
 }
 
