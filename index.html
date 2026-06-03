@@ -2053,7 +2053,7 @@ function validerVente(){
   const cid=document.getElementById('pos-cl-id').value||'';const client=DB.clients.find(c=>c.id===cid);
   cart.forEach(item=>{const p=DB.produits.find(x=>x.id===item.id);if(p){if(session.boutique==='B1')p.s1-=item.qty;else p.s2-=item.qty;}});
   if(mode==='credit'&&client)client.credit=(client.credit||0)+total;
-  const fac={id:'F'+String(DB.nextIds.f++).padStart(4,'0'),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:cart.map(i=>({...i})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
+  const fac={id:'F'+String(DB.nextIds.f++).padStart(4,'0'),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:cart.map(i=>({...i})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;}
   save();currentFact=fac;lastFactId=fac.id;cart=[];document.getElementById('p-rem').value='0';clearPOSClientSel();
   soundOk();renderCart();renderGrid();
@@ -2278,7 +2278,7 @@ function nfValider(){
   const cid=document.getElementById('nf-cl-id').value||'';const client=DB.clients.find(c=>c.id===cid);const mode=document.getElementById('nf-pay').value;
   nfLignes.forEach(l=>{const p=DB.produits.find(x=>x.id===l.id);if(p){if(session.boutique==='B1')p.s1-=l.qty;else p.s2-=l.qty;}});
   if(mode==='credit'&&client)client.credit=(client.credit||0)+total;
-  const fac={id:'F'+String(DB.nextIds.f++).padStart(4,'0'),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:nfLignes.map(l=>({...l})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
+  const fac={id:'F'+String(DB.nextIds.f++).padStart(4,'0'),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:nfLignes.map(l=>({...l})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;}
   save();currentFact=fac;lastFactId=fac.id;soundOk();closeModal('modal-nf');renderFactures();
   toast(`✅ Facture ${fac.id} — ${fmt(total)}`,'ok');setTimeout(()=>openFactDetail(fac.id),350);
@@ -3138,14 +3138,12 @@ function pushToFirebase(){
         _device:navigator.userAgent.substring(0,50)
       });
 
-      // 2. Pousser UNIQUEMENT les factures de CET utilisateur
-      // Taguer d'abord les factures sans auteur
+      // 2. Pousser UNIQUEMENT les factures créées par CET utilisateur
+      // Taguer d'abord toute facture sans auteur avec l'userId courant
       DB.factures.forEach(f=>{if(!f._author)f._author=userId;});
-      // Filtrer strictement : uniquement celles créées par cet utilisateur
-      const myFactures=DB.factures.filter(f=>f._author===userId||f._author===session.user?.nom);
-      if(myFactures.length>0){
-        await fbDB.ref(`negoce/factures/${userId}`).set(myFactures);
-      }
+      // Filtrer strictement : seulement celles qui appartiennent à cet utilisateur
+      const myFactures=DB.factures.filter(f=>f._author===userId);
+      await fbDB.ref(`negoce/factures/${userId}`).set(myFactures.length>0?myFactures:null);
 
       updateSyncUI('connected');
       const el=document.getElementById('last-save-time');if(el)el.textContent=new Date().toLocaleTimeString('fr-FR');
@@ -3165,8 +3163,18 @@ async function pullFromFirebase(){
     const factSnap=await fbDB.ref('negoce/factures').once('value');
     const allFacturesObj=factSnap.val()||{};
     let allFactures=[];
-    Object.values(allFacturesObj).forEach(userFacts=>{
-      if(Array.isArray(userFacts))allFactures=[...allFactures,...userFacts];
+    // Nettoyer le nœud 'default' parasite si présent
+    if(allFacturesObj['default']){
+      console.warn('⚠️ Nœud default détecté — nettoyage...');
+      await fbDB.ref('negoce/factures/default').remove();
+      delete allFacturesObj['default'];
+    }
+    Object.entries(allFacturesObj).forEach(([uid,userFacts])=>{
+      if(Array.isArray(userFacts)){
+        // Taguer les factures avec leur auteur si pas déjà fait
+        userFacts.forEach(f=>{if(!f._author)f._author=uid;});
+        allFactures=[...allFactures,...userFacts];
+      }
     });
     // Dédoublonner par ID
     const seen=new Set();
@@ -3245,8 +3253,12 @@ function startRealtimeSync(){
     if(fbSyncing)return;
     const allFacturesObj=snap.val()||{};
     let allFactures=[];
-    Object.values(allFacturesObj).forEach(userFacts=>{
-      if(Array.isArray(userFacts))allFactures=[...allFactures,...userFacts];
+    Object.entries(allFacturesObj).forEach(([uid,userFacts])=>{
+      if(uid==='default')return; // Ignorer le nœud parasite
+      if(Array.isArray(userFacts)){
+        userFacts.forEach(f=>{if(!f._author)f._author=uid;});
+        allFactures=[...allFactures,...userFacts];
+      }
     });
     if(allFactures.length===0)return;
     // Dédoublonner
