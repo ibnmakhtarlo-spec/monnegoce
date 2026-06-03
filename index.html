@@ -3257,7 +3257,13 @@ async function pullFromFirebase(){
         const oldFacts=oldSnap.val();
         if(oldFacts&&Array.isArray(oldFacts)&&oldFacts.length>0){
           console.log('📦 Migration anciennes factures:',oldFacts.length);
-          oldFacts.forEach(f=>{if(!f._author)f._author=f.userId||'ADM01';});
+          // Préfixer les IDs anciens avec OLD_ pour éviter conflits avec nouveaux IDs
+          const newIds=new Set(allFactures.map(f=>f.id));
+          oldFacts.forEach(f=>{
+            if(!f._author)f._author=f.userId||'ADM01';
+            // Renommer si l'ID existe déjà dans les nouvelles factures
+            if(newIds.has(f.id))f.id='OLD_'+f.id;
+          });
           allFactures=[...allFactures,...oldFacts];
           // Dédoublonner
           const seen2=new Set();
@@ -3376,28 +3382,19 @@ function startRealtimeSync(){
     });
     if(newFactures.length===0)return;
 
-    // FUSIONNER avec les factures existantes (ne pas perdre les anciennes de monnegoce)
-    const merged=[...DB.factures];
-    newFactures.forEach(f=>{
-      if(!merged.find(x=>x.id===f.id))merged.push(f);
-      else{
-        // Mettre à jour si la facture existe déjà
-        const idx=merged.findIndex(x=>x.id===f.id);
-        if(idx>=0)merged[idx]=f;
-      }
-    });
-    const seen=new Set();
-    const allFactures=merged.filter(f=>{if(seen.has(f.id))return false;seen.add(f.id);return true;});
-    allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
+    // Vérifier si une nouvelle facture est arrivée (pas encore dans DB.factures)
+    const existingIds=new Set(DB.factures.map(f=>f.id));
+    const brandNew=newFactures.filter(f=>!existingIds.has(f.id));
 
-    // Mettre à jour seulement si nouvelles factures détectées
-    const hasNew=newFactures.some(cf=>!DB.factures.find(lf=>lf.id===cf.id));
-    if(hasNew){
-      console.log('🔄 Nouvelles factures détectées:',newFactures.length,'total:',allFactures.length);
-      fbLoading=true;DB.factures=allFactures;
+    if(brandNew.length>0){
+      console.log('🔄 Nouvelles factures reçues:',brandNew.length,'IDs:',brandNew.map(f=>f.id).join(','));
+      // Fusionner: ajouter les nouvelles aux existantes
+      const merged=[...DB.factures,...brandNew];
+      merged.sort((a,b)=>new Date(b.date)-new Date(a.date));
+      fbLoading=true;DB.factures=merged;
       if(window._origSave)window._origSave();else save();
       fbLoading=false;
-      toast('🔄 Nouvelles ventes reçues !','ok');
+      toast('🔄 Nouvelle vente reçue !','ok');
       const active=document.querySelector('.ni.active');
       if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m&&['factures','ventes-jour','dashboard','accueil'].includes(m[1]))nav(m[1]);}
     }
