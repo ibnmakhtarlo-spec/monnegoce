@@ -3138,10 +3138,8 @@ function pushToFirebase(){
         _device:navigator.userAgent.substring(0,50)
       });
 
-      // 2. Pousser UNIQUEMENT les factures créées par CET utilisateur
-      // Taguer d'abord toute facture sans auteur avec l'userId courant
+      // 2. Pousser UNIQUEMENT les factures de CET utilisateur
       DB.factures.forEach(f=>{if(!f._author)f._author=userId;});
-      // Filtrer strictement : seulement celles qui appartiennent à cet utilisateur
       const myFactures=DB.factures.filter(f=>f._author===userId);
       await fbDB.ref(`negoce/factures/${userId}`).set(myFactures.length>0?myFactures:null);
 
@@ -3162,21 +3160,11 @@ async function pullFromFirebase(){
     // 2. Récupérer TOUTES les factures de TOUS les utilisateurs
     const factSnap=await fbDB.ref('negoce/factures').once('value');
     const allFacturesObj=factSnap.val()||{};
+    if(allFacturesObj['default']){await fbDB.ref('negoce/factures/default').remove();delete allFacturesObj['default'];}
     let allFactures=[];
-    // Nettoyer le nœud 'default' parasite si présent
-    if(allFacturesObj['default']){
-      console.warn('⚠️ Nœud default détecté — nettoyage...');
-      await fbDB.ref('negoce/factures/default').remove();
-      delete allFacturesObj['default'];
-    }
     Object.entries(allFacturesObj).forEach(([uid,userFacts])=>{
-      if(Array.isArray(userFacts)){
-        // Taguer les factures avec leur auteur si pas déjà fait
-        userFacts.forEach(f=>{if(!f._author)f._author=uid;});
-        allFactures=[...allFactures,...userFacts];
-      }
+      if(Array.isArray(userFacts)){userFacts.forEach(f=>{if(!f._author)f._author=uid;});allFactures=[...allFactures,...userFacts];}
     });
-    // Dédoublonner par ID
     const seen=new Set();
     allFactures=allFactures.filter(f=>{if(seen.has(f.id))return false;seen.add(f.id);return true;});
     allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -3254,116 +3242,23 @@ function startRealtimeSync(){
     const allFacturesObj=snap.val()||{};
     let allFactures=[];
     Object.entries(allFacturesObj).forEach(([uid,userFacts])=>{
-      if(uid==='default')return; // Ignorer le nœud parasite
-      if(Array.isArray(userFacts)){
-        userFacts.forEach(f=>{if(!f._author)f._author=uid;});
-        allFactures=[...allFactures,...userFacts];
-      }
+      if(uid==='default')return;
+      if(Array.isArray(userFacts)){userFacts.forEach(f=>{if(!f._author)f._author=uid;});allFactures=[...allFactures,...userFacts];}
     });
     if(allFactures.length===0)return;
-    // Dédoublonner
     const seen=new Set();
     allFactures=allFactures.filter(f=>{if(seen.has(f.id))return false;seen.add(f.id);return true;});
     allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
-    // Mettre à jour si nouvelles factures
     if(allFactures.length!==DB.factures.length||allFactures.some(cf=>!DB.factures.find(lf=>lf.id===cf.id))){
       DB.factures=allFactures;
       (window._origSave||save)();
       toast('🔄 Nouvelles ventes reçues !','ok');
-      // Rafraîchir page active si factures/ventes
       const active=document.querySelector('.ni.active');
       if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m&&['factures','ventes-jour','dashboard','accueil'].includes(m[1]))nav(m[1]);}
     }
   });
 }
 
-async function pullFromFirebase(){
-  if(!fbInitialized||!fbDB)return;
-  try{
-    const snap=await fbDB.ref('negoce/shared/data').once('value');
-    const cloudData=snap.val();
-    if(!cloudData){toast('☁️ Première sync — envoi local...','info');pushToFirebase();return;}
-    const{_syncTime,_device,users:cloudUsers,...cleanCloud}=cloudData;
-    const cloudTime=_syncTime||0;
-    const localTime=DB._syncTime||0;
-
-    // Toujours fusionner les factures — jamais écraser
-    const mergedFactures=mergeFactures(DB.factures||[],cleanCloud.factures||[]);
-
-    if(cloudTime>localTime){
-      // Cloud plus récent — prendre tout sauf users et factures
-      if(cleanCloud.produits&&DB.produits){
-        cleanCloud.produits=cleanCloud.produits.map(cp=>{
-          const lp=DB.produits.find(p=>p.id===cp.id);
-          if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;
-          return cp;
-        });
-      }
-      const currentUsers=DB.users;
-      Object.assign(DB,cleanCloud);
-      DB.users=currentUsers;
-      DB.factures=mergedFactures;
-      DB._syncTime=cloudTime;
-      (window._origSave||save)();
-      addNotif('Données mises à jour','Sync cloud réussie','ok');
-      toast('✅ Données récupérées du cloud','ok');
-      const active=document.querySelector('.ni.active');
-      if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m)nav(m[1]);}
-    } else {
-      // Local plus récent — fusionner quand même les factures
-      const localFactures=DB.factures||[];
-      DB.factures=mergedFactures;
-      if(mergedFactures.length>localFactures.length){
-        (window._origSave||save)();
-        toast('🔄 Nouvelles ventes récupérées','info');
-      }
-      pushToFirebase();
-    }
-  }catch(e){console.error('Pull:',e);}
-}
-
-function mergeFactures(local,cloud){
-  // Fusionner sans doublons — prendre toutes les factures des deux sources
-  const all=[...local];
-  cloud.forEach(cf=>{
-    if(!all.find(lf=>lf.id===cf.id)){
-      all.push(cf);
-    }
-  });
-  // Trier par date décroissante
-  return all.sort((a,b)=>new Date(b.date)-new Date(a.date));
-}
-
-function startRealtimeSync(){
-  if(!fbInitialized||!fbDB)return;
-  fbDB.ref('negoce/shared/data').on('value',snap=>{
-    if(fbSyncing)return;
-    const cloudData=snap.val();if(!cloudData)return;
-    const{_syncTime,_device,users:cloudUsers,...cleanCloud}=cloudData;
-    const cloudTime=_syncTime||0,localTime=DB._syncTime||0;
-    if(cloudTime>localTime+2000){
-      if(cleanCloud.produits&&DB.produits){
-        cleanCloud.produits=cleanCloud.produits.map(cp=>{
-          const lp=DB.produits.find(p=>p.id===cp.id);
-          if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;
-          return cp;
-        });
-      }
-      const currentUsers=DB.users;
-      // Fusionner les factures
-      const mergedFactures=mergeFactures(DB.factures||[],cleanCloud.factures||[]);
-      Object.assign(DB,cleanCloud);
-      DB.users=currentUsers;
-      DB.factures=mergedFactures;
-      DB._syncTime=cloudTime;
-      (window._origSave||save)();
-      toast('🔄 Mise à jour depuis un autre appareil','info');
-      // Rafraîchir la page active
-      const active=document.querySelector('.ni.active');
-      if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m&&['factures','ventes-jour','dashboard','accueil'].includes(m[1]))nav(m[1]);}
-    }
-  });
-}
 
 function syncNow(){if(!fbConnected){toast('📴 Pas de connexion','err');return;}pullFromFirebase();}
 
