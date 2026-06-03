@@ -3250,6 +3250,8 @@ async function pullFromFirebase(){
     if(clientsCloud&&Array.isArray(clientsCloud))DB.clients=clientsCloud;
 
     // Appliquer toutes les factures
+    console.log('📊 Pull: allFactures count=',allFactures.length,'par auteur:',
+      Object.entries(allFactures.reduce((acc,f)=>{acc[f._author||'?']=(acc[f._author||'?']||0)+1;return acc;},{})).join(', '));
     if(allFactures.length>0)DB.factures=allFactures;
 
     DB.users=currentUsers;
@@ -3350,6 +3352,8 @@ function startRealtimeSync(){
     allFactures=allFactures.filter(f=>{if(seen.has(f.id))return false;seen.add(f.id);return true;});
     allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
     if(allFactures.length!==DB.factures.length||allFactures.some(cf=>!DB.factures.find(lf=>lf.id===cf.id))){
+      console.log('🔄 Factures listener: count=',allFactures.length,'auteurs:',
+        Object.entries(allFactures.reduce((acc,f)=>{acc[f._author||'?']=(acc[f._author||'?']||0)+1;return acc;},{})).join(', '));
       fbLoading=true;DB.factures=allFactures;
       if(window._origSave)window._origSave();else save();
       fbLoading=false;
