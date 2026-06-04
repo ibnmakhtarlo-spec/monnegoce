@@ -3166,7 +3166,7 @@ function pushToFirebase(){
       // 5. Pousser dans all_factures SEULEMENT si vendeur/caissier (jamais admin)
       // L'admin ne doit JAMAIS ecraser all_factures sinon il efface les ventes des vendeurs
       const myRole=session.user?.role||'vendeur';
-      if(myRole==='vendeur'||myRole==='caissier'){
+      if(myRole==='vendeur'||myRole==='caissier'||myRole==='superviseur'){
         const existingSnap=await fbDB.ref('negoce/all_factures').once('value');
         const existing=existingSnap.val();
         let mergedAll=Array.isArray(existing)?[...existing]:[];
