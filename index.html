@@ -3098,11 +3098,17 @@ function initFirebase(){
     fbApp=firebase.initializeApp(FIREBASE_CONFIG);
     fbDB=firebase.database();
     fbInitialized=true;
+    let fbFirstConnect=true;
     fbDB.ref('.info/connected').on('value',snap=>{
       fbConnected=snap.val()===true;
       updateSyncUI(fbConnected?'connected':'offline');
-      if(fbConnected){toast('☁️ Firebase connecté !','ok');addNotif('Cloud connecté','Synchronisation active','ok');pullFromFirebase();}
-      else toast('📴 Hors ligne — données locales','warn');
+      if(fbConnected){
+        if(fbFirstConnect){
+          fbFirstConnect=false;
+          toast('☁️ Firebase connecté !','ok');
+          pullFromFirebase();
+        }
+      } else toast('📴 Hors ligne — données locales','warn');
     });
   }catch(e){console.error('Firebase:',e);updateSyncUI('error');}
 }
@@ -3141,10 +3147,10 @@ function pushToFirebase(){
         _device: navigator.userAgent.substring(0,50)
       });
 
-      // 2. Stocks séparés par boutique (tableau indexé par position pour éviter corruption)
+      // 2. Stocks séparés par boutique
       const stocks=DB.produits.map(p=>({id:p.id,s1:p.s1||0,s2:p.s2||0}));
-      if(typeof stocksPushTime!=='undefined')stocksPushTime=Date.now();
-      await fbDB.ref(`negoce/stocks/${boutique}`).set({stocks,_syncTime:Date.now()});
+      window._stocksPushTime=Date.now();
+      await fbDB.ref(`negoce/stocks/${boutique}`).set({stocks,_syncTime:window._stocksPushTime});
 
       // 3. Clients séparés par boutique
       await fbDB.ref(`negoce/clients/${boutique}`).set(DB.clients||[]);
@@ -3251,25 +3257,24 @@ async function pullFromFirebase(){
     if(clientsCloud&&Array.isArray(clientsCloud))DB.clients=clientsCloud;
 
     // Récupérer les anciennes factures depuis monnegoce (migration)
-    if(!DB._migratedOldFactures){
+    // Migration anciennes factures (une seule fois, stocké dans localStorage)
+    const migDone=localStorage.getItem('_migOldFacts');
+    if(!migDone){
       try{
         const oldSnap=await fbDB.ref('monnegoce/factures').once('value');
         const oldFacts=oldSnap.val();
         if(oldFacts&&Array.isArray(oldFacts)&&oldFacts.length>0){
           console.log('📦 Migration anciennes factures:',oldFacts.length);
-          // Préfixer les IDs anciens avec OLD_ pour éviter conflits avec nouveaux IDs
           const newIds=new Set(allFactures.map(f=>f.id));
           oldFacts.forEach(f=>{
-            if(!f._author)f._author=f.userId||'ADM01';
-            // Renommer si l'ID existe déjà dans les nouvelles factures
-            if(newIds.has(f.id))f.id='OLD_'+f.id;
+            if(!f._author)f._author=f.userId||f.vendeur||'ADM01';
+            if(newIds.has(f.id)){f.id='OLD_'+f.id;}
           });
           allFactures=[...allFactures,...oldFacts];
-          // Dédoublonner
           const seen2=new Set();
           allFactures=allFactures.filter(f=>{if(seen2.has(f.id))return false;seen2.add(f.id);return true;});
           allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
-          DB._migratedOldFactures=true;
+          localStorage.setItem('_migOldFacts','1');
         }
       }catch(e){console.log('Migration skip:',e);}
     }
@@ -3342,13 +3347,11 @@ function startRealtimeSync(){
     });
   };
 
-  let stocksPushTime=0; // Timestamp du dernier push de stocks
-
   // Écouter stocks de la boutique courante
   fbDB.ref(`negoce/stocks/${boutique}`).on('value',snap=>{
     if(fbSyncing)return;
-    // Ignorer si on vient de pousser nous-mêmes (évite boucle)
-    if(Date.now()-stocksPushTime<3000)return;
+    // Ignorer si on vient de pousser nous-mêmes dans les 5 dernières secondes
+    if(window._stocksPushTime&&Date.now()-window._stocksPushTime<5000)return;
     const data=snap.val();if(!data||!data.stocks)return;
     fbLoading=true;applyStocksRT(data.stocks,boutique);
     if(window._origSave)window._origSave();else save();
