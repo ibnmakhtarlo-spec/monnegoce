@@ -2192,16 +2192,16 @@ async function buildPDFBytes(f){
   doc.text('PRODUIT',14,y+6);doc.text('QTÉ',118,y+6);doc.text('P.U.',133,y+6);doc.text('TOTAL',173,y+6,{align:'right'});y+=9;
   f.items.forEach((item,idx)=>{
     doc.setFillColor(...(idx%2===0?white:[248,249,252]));doc.rect(10,y,190,8,'F');doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(40,40,55);
-    doc.text(item.nom.substring(0,44),14,y+5.5);doc.text(`${item.qty} ${item.unite}`,118,y+5.5);doc.text(item.prix.toLocaleString('fr-FR')+' FCFA',133,y+5.5);
-    doc.setFont('helvetica','bold');doc.text((item.prix*item.qty).toLocaleString('fr-FR')+' FCFA',197,y+5.5,{align:'right'});y+=8;
+    doc.text(item.nom.substring(0,44),14,y+5.5);doc.text(`${item.qty} ${item.unite}`,118,y+5.5);doc.text(_fmtBase(item.prix)+' FCFA',133,y+5.5);
+    doc.setFont('helvetica','bold');doc.text(_fmtBase(item.prix*item.qty)+' FCFA',197,y+5.5,{align:'right'});y+=8;
   });
   doc.setDrawColor(...gold);doc.setLineWidth(0.3);doc.rect(10,97,190,y-97);y+=8;
   doc.setFillColor(...lg);doc.roundedRect(110,y,90,f.remise>0?28:20,3,3,'F');
   doc.setFontSize(8.5);doc.setFont('helvetica','normal');doc.setTextColor(...gray);
-  doc.text('Sous-total :',114,y+7);doc.setTextColor(40,40,55);doc.text(f.sousTotal.toLocaleString('fr-FR')+' FCFA',197,y+7,{align:'right'});
-  if(f.remise>0){doc.setTextColor(...gray);doc.text(`Remise (-${f.remise}%) :`,114,y+14);doc.setTextColor(...red);doc.text('-'+(f.sousTotal*f.remise/100).toLocaleString('fr-FR')+' FCFA',197,y+14,{align:'right'});y+=7;}
+  doc.text('Sous-total :',114,y+7);doc.setTextColor(40,40,55);doc.text(_fmtBase(f.sousTotal)+' FCFA',197,y+7,{align:'right'});
+  if(f.remise>0){doc.setTextColor(...gray);doc.text(`Remise (-${f.remise}%) :`,114,y+14);doc.setTextColor(...red);doc.text('-'+_fmtBase(f.sousTotal*f.remise/100)+' FCFA',197,y+14,{align:'right'});y+=7;}
   const tY=y+(f.remise>0?14:12);doc.setFillColor(...gold);doc.roundedRect(110,tY,90,12,2,2,'F');doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(...dark);
-  doc.text('TOTAL :',114,tY+8);doc.text(f.total.toLocaleString('fr-FR')+' FCFA',197,tY+8,{align:'right'});
+  doc.text('TOTAL :',114,tY+8);doc.text(_fmtBase(f.total)+' FCFA',197,tY+8,{align:'right'});
   const fY=H-25;doc.setDrawColor(...gold);doc.setLineWidth(0.5);doc.line(10,fY,W-10,fY);
   doc.setFontSize(7);doc.setFont('helvetica','italic');doc.setTextColor(...gray);
   doc.text('Merci pour votre confiance !',W/2,fY+6,{align:'center'});
@@ -2229,7 +2229,7 @@ function openFactDetail(id){
 }
 function waShare(){if(currentFact)waShareId(currentFact.id);}
 function waShareId(id){const f=DB.factures.find(x=>x.id===id);const s=DB.settings[f.boutique]||{};const txt=encodeURIComponent(`🧾 *FACTURE ${f.id}*\n🏪 ${s.nom||getBName(f.boutique)}\n📅 ${new Date(f.date).toLocaleDateString('fr-FR')}\n👤 ${f.client}\n\n${f.items.map(i=>`• ${i.nom} x${i.qty} = ${fmt(i.prix*i.qty)}`).join('\n')}${f.remise>0?`\n🏷️ -${f.remise}%`:''}\n\n*💰 TOTAL: ${fmt(f.total)}*\n💳 ${f.mode}\n\nMerci 🙏`);window.open(`https://wa.me/?text=${txt}`,'_blank');}
-function printFact(){if(!currentFact)return;const f=currentFact;const s=DB.settings[f.boutique]||{};document.getElementById('print-area').innerHTML=`<div style="max-width:360px;margin:0 auto;font-family:sans-serif;padding:16px;"><div style="text-align:center;margin-bottom:14px;border-bottom:2px solid #000;padding-bottom:11px;"><div style="font-size:22px;">${s.logo||'🏪'}</div><h2>${s.nom||'Mon Négoce'}</h2>${s.adr?`<p style="font-size:10px;color:#666;">${s.adr}</p>`:''}</div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:9px;"><div><b>Facture:</b> ${f.id}<br><b>Date:</b> ${new Date(f.date).toLocaleString('fr-FR')}</div><div><b>Client:</b> ${f.client}<br><b>Mode:</b> ${f.mode}</div></div><table style="width:100%;font-size:11px;border-collapse:collapse;margin-bottom:9px;"><thead><tr style="border-bottom:2px solid #000;"><th style="text-align:left;padding:2px 0">Produit</th><th>Qté</th><th style="text-align:right">Total</th></tr></thead><tbody>${f.items.map(i=>`<tr style="border-bottom:1px solid #eee;"><td style="padding:2px 0">${i.nom}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right;font-weight:700">${(i.prix*i.qty).toLocaleString()}</td></tr>`).join('')}</tbody></table>${f.remise>0?`<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;"><span>Remise -${f.remise}%</span><span>-${(f.sousTotal*f.remise/100).toLocaleString()} FCFA</span></div>`:''}<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:900;border-top:2px solid #000;padding-top:6px;"><span>TOTAL</span><span>${f.total.toLocaleString()} FCFA</span></div><p style="text-align:center;margin-top:12px;font-size:10px;color:#999;">Merci !</p></div>`;window.print();}
+function printFact(){if(!currentFact)return;const f=currentFact;const s=DB.settings[f.boutique]||{};document.getElementById('print-area').innerHTML=`<div style="max-width:360px;margin:0 auto;font-family:sans-serif;padding:16px;"><div style="text-align:center;margin-bottom:14px;border-bottom:2px solid #000;padding-bottom:11px;"><div style="font-size:22px;">${s.logo||'🏪'}</div><h2>${s.nom||'Mon Négoce'}</h2>${s.adr?`<p style="font-size:10px;color:#666;">${s.adr}</p>`:''}</div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:9px;"><div><b>Facture:</b> ${f.id}<br><b>Date:</b> ${new Date(f.date).toLocaleString('fr-FR')}</div><div><b>Client:</b> ${f.client}<br><b>Mode:</b> ${f.mode}</div></div><table style="width:100%;font-size:11px;border-collapse:collapse;margin-bottom:9px;"><thead><tr style="border-bottom:2px solid #000;"><th style="text-align:left;padding:2px 0">Produit</th><th>Qté</th><th style="text-align:right">Total</th></tr></thead><tbody>${f.items.map(i=>`<tr style="border-bottom:1px solid #eee;"><td style="padding:2px 0">${i.nom}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right;font-weight:700">${_fmtBase(i.prix*i.qty)}</td></tr>`).join('')}</tbody></table>${f.remise>0?`<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;"><span>Remise -${f.remise}%</span><span>-${_fmtBase(f.sousTotal*f.remise/100)} FCFA</span></div>`:''}<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:900;border-top:2px solid #000;padding-top:6px;"><span>TOTAL</span><span>${_fmtBase(f.total)} FCFA</span></div><p style="text-align:center;margin-top:12px;font-size:10px;color:#999;">Merci !</p></div>`;window.print();}
 
 // ══ NOUVELLE FACTURE ══
 function openNouvelleFacture(){
@@ -3257,29 +3257,39 @@ async function pullFromFirebase(){
     if(clientsCloud&&Array.isArray(clientsCloud))DB.clients=clientsCloud;
 
     // Récupérer les anciennes factures depuis monnegoce (migration)
-    // Migration anciennes factures (une seule fois, stocké dans localStorage)
-    const migDone=localStorage.getItem('_migOldFacts');
-    if(!migDone){
-      try{
-        const oldSnap=await fbDB.ref('monnegoce/factures').once('value');
-        const oldFacts=oldSnap.val();
-        if(oldFacts&&Array.isArray(oldFacts)&&oldFacts.length>0){
-          console.log('📦 Migration anciennes factures:',oldFacts.length);
-          const newIds=new Set(allFactures.map(f=>f.id));
-          oldFacts.forEach(f=>{
-            if(!f._author)f._author=f.userId||f.vendeur||'ADM01';
-            if(newIds.has(f.id)){f.id='OLD_'+f.id;}
-          });
-          allFactures=[...allFactures,...oldFacts];
-          const seen2=new Set();
-          allFactures=allFactures.filter(f=>{if(seen2.has(f.id))return false;seen2.add(f.id);return true;});
-          allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
-          localStorage.setItem('_migOldFacts','1');
-        }
-      }catch(e){console.log('Migration skip:',e);}
-    }
+    // Migration anciennes factures depuis monnegoce (sans doublons, définitive)
+    try{
+      const oldSnap=await fbDB.ref('monnegoce/factures').once('value');
+      const oldFacts=oldSnap.val();
+      if(oldFacts&&Array.isArray(oldFacts)&&oldFacts.length>0){
+        // IDs déjà présents dans les nouvelles factures
+        const existingIds=new Set(allFactures.map(f=>f.id));
+        let added=0;
+        oldFacts.forEach(f=>{
+          if(!f._author)f._author=f.userId||f.vendeur||'ADM01';
+          // Éviter les doublons: si l'ID existe déjà, ne pas ajouter
+          if(!existingIds.has(f.id)&&!existingIds.has('OLD_'+f.id)){
+            existingIds.add(f.id);
+            allFactures.push(f);
+            added++;
+          }
+        });
+        if(added>0)console.log('📦 Migration:',added,'anciennes factures ajoutées');
+        allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
+      }
+    }catch(e){console.log('Migration skip:',e);}
 
-    // Appliquer toutes les factures
+    // Dédoublonner: supprimer OLD_XXXX si XXXX existe déjà
+    const cleanIds=new Set(allFactures.filter(f=>!f.id.startsWith('OLD_')).map(f=>f.id));
+    allFactures=allFactures.filter(f=>{
+      if(f.id.startsWith('OLD_')&&cleanIds.has(f.id.substring(4)))return false;
+      return true;
+    });
+    // Déduplication finale
+    const finalSeen=new Set();
+    allFactures=allFactures.filter(f=>{if(finalSeen.has(f.id))return false;finalSeen.add(f.id);return true;});
+    allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
+
     console.log('📊 Pull: allFactures count=',allFactures.length);
     if(allFactures.length>0)DB.factures=allFactures;
 
@@ -3376,25 +3386,26 @@ function startRealtimeSync(){
 
   // Écouter toutes les factures
   fbDB.ref('negoce/factures').on('value',snap=>{
-    if(fbSyncing)return;
+    if(fbSyncing||fbLoading)return;
     const allFacturesObj=snap.val()||{};
     let newFactures=[];
     Object.entries(allFacturesObj).forEach(([uid,userFacts])=>{
       if(uid==='default')return;
-      if(Array.isArray(userFacts)){userFacts.forEach(f=>{if(!f._author)f._author=uid;});newFactures=[...newFactures,...userFacts];}
+      if(Array.isArray(userFacts)){
+        userFacts.forEach(f=>{if(!f._author)f._author=uid;});
+        newFactures=[...newFactures,...userFacts];
+      }
     });
     if(newFactures.length===0)return;
-
-    // Vérifier si une nouvelle facture est arrivée (pas encore dans DB.factures)
+    // Ajouter uniquement les factures avec un nouvel ID
     const existingIds=new Set(DB.factures.map(f=>f.id));
     const brandNew=newFactures.filter(f=>!existingIds.has(f.id));
-
     if(brandNew.length>0){
-      console.log('🔄 Nouvelles factures reçues:',brandNew.length,'IDs:',brandNew.map(f=>f.id).join(','));
-      // Fusionner: ajouter les nouvelles aux existantes
+      console.log('🔄 Nouvelles factures:',brandNew.map(f=>f.id).join(','));
       const merged=[...DB.factures,...brandNew];
       merged.sort((a,b)=>new Date(b.date)-new Date(a.date));
-      fbLoading=true;DB.factures=merged;
+      fbLoading=true;
+      DB.factures=merged;
       if(window._origSave)window._origSave();else save();
       fbLoading=false;
       toast('🔄 Nouvelle vente reçue !','ok');
