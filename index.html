@@ -1866,7 +1866,8 @@ function startApp(){
     // Override save to also push
     const _origSaveLocal=save;
     window._origSave=_origSaveLocal;
-    save=function(){_origSaveLocal();DB._syncTime=Date.now();if(fbConnected&&!fbLoading)pushToFirebase();};
+    save=function(){_origSaveLocal();DB._syncTime=Date.now();if(fbConnected&&!fbLoading&&window._fbPushEnabled!==false)pushToFirebase();};
+    window._fbPushEnabled=true;
     initFirebase();
     setTimeout(startRealtimeSync,3000);
     setTimeout(()=>{pullUsersFromFirebase();startUsersSync();},4000);
@@ -2053,7 +2054,7 @@ function validerVente(){
   const cid=document.getElementById('pos-cl-id').value||'';const client=DB.clients.find(c=>c.id===cid);
   cart.forEach(item=>{const p=DB.produits.find(x=>x.id===item.id);if(p){if(session.boutique==='B1')p.s1-=item.qty;else p.s2-=item.qty;}});
   if(mode==='credit'&&client)client.credit=(client.credit||0)+total;
-  const fac={id:'F'+String(DB.nextIds.f++).padStart(4,'0'),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:cart.map(i=>({...i})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
+  const fac={id:'F'+String(DB.nextIds.f++).padStart(4,'0'),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:cart.map(i=>({id:i.id,nom:String(i.nom),prix:Number(i.prix),achat:Number(i.achat||0),qty:Number(i.qty),unite:String(i.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;}
   window._stocksPushTime=Date.now();save();currentFact=fac;lastFactId=fac.id;cart=[];document.getElementById('p-rem').value='0';clearPOSClientSel();
   soundOk();renderCart();renderGrid();
@@ -2221,7 +2222,9 @@ async function genererFacturePDF(){
 }
 function openFactDetail(id){
   const fOrig=DB.factures.find(x=>x.id===id);if(!fOrig)return;
-  const f=JSON.parse(JSON.stringify(fOrig)); // Copie pour éviter mutation
+  const f=JSON.parse(JSON.stringify(fOrig)); // Copie profonde — protège les items du PDF
+  // Vérifier intégrité des items
+  if(f.items)f.items=f.items.map(i=>({id:i.id,nom:String(i.nom||'?'),prix:Number(i.prix||0),achat:Number(i.achat||0),qty:Number(i.qty||1),unite:String(i.unite||'pièce')}));
   currentFact=f;const s=DB.settings[f.boutique]||{};
   document.getElementById('mfd-num').textContent=`Facture ${f.id}`;
   document.getElementById('mfd-content').innerHTML=`<div style="background:var(--surf2);border-radius:7px;padding:9px;margin-bottom:9px;font-size:11px;"><div style="font-weight:800;font-size:12px;color:var(--gold);">${s.logo||'🏪'} ${s.nom||getBName(f.boutique)}</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:9px;font-size:11px;"><div><span style="color:var(--text2)">Facture :</span> <b>${f.id}</b></div><div><span style="color:var(--text2)">Date :</span> ${new Date(f.date).toLocaleString('fr-FR')}</div><div><span style="color:var(--text2)">Client :</span> ${f.client}</div><div><span style="color:var(--text2)">Caisse :</span> <span style="color:var(--cyan)">${f.caisse}</span></div><div><span style="color:var(--text2)">Vendeur :</span> ${f.vendeur||'—'}</div><div><span style="color:var(--text2)">Mode :</span> ${f.mode}</div></div><div class="twrap"><table><thead><tr><th>Produit</th><th>Qté</th><th>P.U.</th><th>Total</th></tr></thead><tbody>${f.items.map(i=>`<tr><td><b>${i.nom}</b></td><td>${i.qty}</td><td class="mono" style="color:var(--text2)">${fmt(i.prix)}</td><td class="mono" style="color:var(--gold);font-weight:700">${fmt(i.prix*i.qty)}</td></tr>`).join('')}</tbody></table></div><div style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px;">${f.remise>0?`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--red);margin-bottom:3px;"><span>Remise -${f.remise}%</span><span>-${fmt(f.sousTotal*f.remise/100)}</span></div>`:''}<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:900;"><span>TOTAL</span><span class="mono" style="color:var(--green)">${fmt(f.total)}</span></div></div>`;
@@ -2278,7 +2281,7 @@ function nfValider(){
   const cid=document.getElementById('nf-cl-id').value||'';const client=DB.clients.find(c=>c.id===cid);const mode=document.getElementById('nf-pay').value;
   nfLignes.forEach(l=>{const p=DB.produits.find(x=>x.id===l.id);if(p){if(session.boutique==='B1')p.s1-=l.qty;else p.s2-=l.qty;}});
   if(mode==='credit'&&client)client.credit=(client.credit||0)+total;
-  const fac={id:'F'+String(DB.nextIds.f++).padStart(4,'0'),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:nfLignes.map(l=>({...l})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
+  const fac={id:'F'+String(DB.nextIds.f++).padStart(4,'0'),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:nfLignes.map(l=>({id:l.id,nom:String(l.nom),prix:Number(l.prix),achat:Number(l.achat||0),qty:Number(l.qty),unite:String(l.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;}
   save();currentFact=fac;lastFactId=fac.id;soundOk();closeModal('modal-nf');renderFactures();
   toast(`✅ Facture ${fac.id} — ${fmt(total)}`,'ok');setTimeout(()=>openFactDetail(fac.id),350);
@@ -2444,7 +2447,7 @@ function saveUser(){
   if(!nom||!id2||!pwd){soundErr();toast('Tous les champs requis','err');return;}
   const eid=document.getElementById('mu-eid').value;if(!eid&&DB.users.find(u=>u.id===id2)){soundErr();toast('Identifiant déjà pris','err');return;}
   const perms=getSelectedPerms();
-  const u={id:id2,nom,pwd,role:document.getElementById('mu-role').value,boutique:document.getElementById('mu-boutique').value,caisse:document.getElementById('mu-caisse').value||'',actif:true,perms};
+  const u={id:id2,nom,pwd,role:document.getElementById('mu-role').value,boutique:document.getElementById('mu-boutique').value,caisse:document.getElementById('mu-caisse').value||'',actif:true,perms,_updated:Date.now()};
   if(eid){const i=DB.users.findIndex(x=>x.id===eid);DB.users[i]={...DB.users[i],...u,id:eid};}else DB.users.push(u);
   save();
   // Pousser immédiatement sur Firebase — les nouvelles permissions seront actives dès la prochaine connexion
@@ -3160,9 +3163,18 @@ function pushToFirebase(){
       const myFactures=DB.factures.filter(f=>f._author===userId&&!f.id.startsWith('OLD_'));
       await fbDB.ref(`negoce/factures/${userId}`).set(myFactures.length>0?myFactures:null);
 
-      // 5. AUSSI pousser TOUTES les factures dans un nœud commun lisible par l'admin en temps réel
-      const allFacturesClean=DB.factures.filter(f=>!f.id.startsWith('OLD_'));
-      await fbDB.ref('negoce/all_factures').set(allFacturesClean.length>0?allFacturesClean:null);
+      // 5. Pousser dans all_factures SEULEMENT si vendeur/caissier (jamais admin)
+      // L'admin ne doit JAMAIS ecraser all_factures sinon il efface les ventes des vendeurs
+      const myRole=session.user?.role||'vendeur';
+      if(myRole==='vendeur'||myRole==='caissier'){
+        const existingSnap=await fbDB.ref('negoce/all_factures').once('value');
+        const existing=existingSnap.val();
+        let mergedAll=Array.isArray(existing)?[...existing]:[];
+        myFactures.forEach(f=>{const idx=mergedAll.findIndex(x=>x.id===f.id);if(idx>=0)mergedAll[idx]=f;else mergedAll.push(f);});
+        mergedAll=mergedAll.filter(f=>f&&f.id&&!f.id.startsWith('OLD_'));
+        mergedAll.sort((a,b)=>new Date(b.date)-new Date(a.date));
+        await fbDB.ref('negoce/all_factures').set(mergedAll.length>0?mergedAll:null);
+      }
 
       updateSyncUI('connected');
       const el=document.getElementById('last-save-time');if(el)el.textContent=new Date().toLocaleTimeString('fr-FR');
@@ -3305,7 +3317,9 @@ async function pullFromFirebase(){
     if(allFactures.length>0)DB.factures=allFactures;
 
     DB.users=currentUsers;
-    if(window._origSave)window._origSave();else save();
+    // Sauvegarder localement SEULEMENT — jamais pushToFirebase après un pull
+    if(window._origSave)window._origSave();
+    else{const _bkp=window._fbPushEnabled;window._fbPushEnabled=false;save();window._fbPushEnabled=_bkp;}
 
     toast('✅ Synchronisation réussie','ok');
     addNotif('Données mises à jour','Sync cloud réussie','ok');
@@ -3422,7 +3436,7 @@ function startRealtimeSync(){
 }
 
 
-function syncNow(){if(!fbConnected){toast('📴 Pas de connexion','err');return;}pullFromFirebase();}
+function syncNow(){if(!fbConnected){toast('📴 Pas de connexion','err');return;}window._fbPushEnabled=false;pullFromFirebase().finally(()=>{window._fbPushEnabled=true;});}
 
 // ══ SYNC USERS SUR FIREBASE ══
 function pushUsersToFirebase(){
@@ -3430,7 +3444,7 @@ function pushUsersToFirebase(){
   const ts=Date.now();
   DB._usersUpdated=ts;
   fbDB.ref('negoce_users').set({
-    users: DB.users.map(u=>({...u})),
+    users: DB.users.map(u=>({...u,_updated:u._updated||ts})),
     _updated: ts
   }).then(()=>console.log('✅ Users poussés sur Firebase'))
     .catch(e=>console.error('Users push:',e));
@@ -3458,11 +3472,23 @@ function startUsersSync(){
   fbDB.ref('negoce_users').on('value', snap=>{
     const data=snap.val();
     if(!data||!data.users)return;
-    // Fusionner: garder les perms locales si plus récentes
+    // Comparer timestamps: ne remplacer que si Firebase EST plus récent
+    // ET que ce n'est pas nous qui venons de pousser (évite écrasement immédiat)
     const localUpdated=DB._usersUpdated||0;
     const cloudUpdated=data._updated||0;
+    // Si on vient de pousser (moins de 5 secondes), ignorer le retour Firebase
+    if(Date.now()-localUpdated<5000)return;
     if(cloudUpdated>localUpdated){
-      DB.users=data.users;
+      // Fusionner: préserver les perms locales plus récentes user par user
+      const merged=data.users.map(cloudUser=>{
+        const localUser=DB.users.find(u=>u.id===cloudUser.id);
+        // Si l'utilisateur local a été modifié après le cloud, garder le local
+        if(localUser&&(localUser._updated||0)>(cloudUser._updated||0))return localUser;
+        return cloudUser;
+      });
+      // Ajouter les users locaux absents du cloud
+      DB.users.forEach(lu=>{if(!merged.find(u=>u.id===lu.id))merged.push(lu);});
+      DB.users=merged;
       SS('users',DB.users);
       console.log('Users mis à jour depuis Firebase');
     }
