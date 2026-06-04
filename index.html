@@ -2055,7 +2055,7 @@ function validerVente(){
   if(mode==='credit'&&client)client.credit=(client.credit||0)+total;
   const fac={id:'F'+String(DB.nextIds.f++).padStart(4,'0'),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:cart.map(i=>({...i})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;}
-  save();currentFact=fac;lastFactId=fac.id;cart=[];document.getElementById('p-rem').value='0';clearPOSClientSel();
+  window._stocksPushTime=Date.now();save();currentFact=fac;lastFactId=fac.id;cart=[];document.getElementById('p-rem').value='0';clearPOSClientSel();
   soundOk();renderCart();renderGrid();
   const btnF=document.getElementById('btn-voir-fact');btnF.style.display='block';btnF.textContent=`🧾 Facture ${fac.id}`;
   toast(`✅ ${fac.id} — ${fmt(total)}`,'ok');
@@ -3157,7 +3157,8 @@ function pushToFirebase(){
 
       // 4. Factures de CET utilisateur uniquement
       DB.factures.forEach(f=>{if(!f._author)f._author=userId;});
-      const myFactures=DB.factures.filter(f=>f._author===userId);
+      // Ne pousser que les factures de cet utilisateur, sans les OLD_ (anciennes migrées)
+      const myFactures=DB.factures.filter(f=>f._author===userId&&!f.id.startsWith('OLD_'));
       await fbDB.ref(`negoce/factures/${userId}`).set(myFactures.length>0?myFactures:null);
 
       updateSyncUI('connected');
@@ -3360,8 +3361,8 @@ function startRealtimeSync(){
   // Écouter stocks de la boutique courante
   fbDB.ref(`negoce/stocks/${boutique}`).on('value',snap=>{
     if(fbSyncing)return;
-    // Ignorer si on vient de pousser nous-mêmes dans les 5 dernières secondes
-    if(window._stocksPushTime&&Date.now()-window._stocksPushTime<5000)return;
+    // Ignorer si on vient de faire une vente dans les 10 dernières secondes
+    if(window._stocksPushTime&&Date.now()-window._stocksPushTime<10000)return;
     const data=snap.val();if(!data||!data.stocks)return;
     fbLoading=true;applyStocksRT(data.stocks,boutique);
     if(window._origSave)window._origSave();else save();
@@ -3397,9 +3398,13 @@ function startRealtimeSync(){
       }
     });
     if(newFactures.length===0)return;
-    // Ajouter uniquement les factures avec un nouvel ID
+    // Ignorer les OLD_ (anciennes migrées) - ne garder que les vraies nouvelles
     const existingIds=new Set(DB.factures.map(f=>f.id));
-    const brandNew=newFactures.filter(f=>!existingIds.has(f.id));
+    const brandNew=newFactures.filter(f=>
+      !existingIds.has(f.id) &&           // Pas déjà en mémoire
+      !f.id.startsWith('OLD_') &&         // Pas une ancienne migrée
+      !existingIds.has(f.id.replace(/^OLD_/,''))  // Pas une variante OLD_ d'une existante
+    );
     if(brandNew.length>0){
       console.log('🔄 Nouvelles factures:',brandNew.map(f=>f.id).join(','));
       const merged=[...DB.factures,...brandNew];
