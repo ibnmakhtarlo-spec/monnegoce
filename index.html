@@ -3155,11 +3155,14 @@ function pushToFirebase(){
       // 3. Clients séparés par boutique
       await fbDB.ref(`negoce/clients/${boutique}`).set(DB.clients||[]);
 
-      // 4. Factures de CET utilisateur uniquement
+      // 4. Factures de CET utilisateur — push sous son nœud propre
       DB.factures.forEach(f=>{if(!f._author)f._author=userId;});
-      // Ne pousser que les factures de cet utilisateur, sans les OLD_ (anciennes migrées)
       const myFactures=DB.factures.filter(f=>f._author===userId&&!f.id.startsWith('OLD_'));
       await fbDB.ref(`negoce/factures/${userId}`).set(myFactures.length>0?myFactures:null);
+
+      // 5. AUSSI pousser TOUTES les factures dans un nœud commun lisible par l'admin en temps réel
+      const allFacturesClean=DB.factures.filter(f=>!f.id.startsWith('OLD_'));
+      await fbDB.ref('negoce/all_factures').set(allFacturesClean.length>0?allFacturesClean:null);
 
       updateSyncUI('connected');
       const el=document.getElementById('last-save-time');if(el)el.textContent=new Date().toLocaleTimeString('fr-FR');
@@ -3191,14 +3194,21 @@ async function pullFromFirebase(){
     const clientsSnap=await fbDB.ref(`negoce/clients/${boutique}`).once('value');
     const clientsCloud=clientsSnap.val()||null;
 
-    // 5. Toutes les factures
-    const factSnap=await fbDB.ref('negoce/factures').once('value');
-    const allFacturesObj=factSnap.val()||{};
-    if(allFacturesObj['default']){await fbDB.ref('negoce/factures/default').remove();delete allFacturesObj['default'];}
+    // 5. Toutes les factures — nœud commun (prioritaire) + fallback par utilisateur
     let allFactures=[];
-    Object.entries(allFacturesObj).forEach(([uid,userFacts])=>{
-      if(Array.isArray(userFacts)){userFacts.forEach(f=>{if(!f._author)f._author=uid;});allFactures=[...allFactures,...userFacts];}
-    });
+    const allFactSnap=await fbDB.ref('negoce/all_factures').once('value');
+    const allFactFlat=allFactSnap.val();
+    if(allFactFlat&&Array.isArray(allFactFlat)&&allFactFlat.length>0){
+      allFactures=allFactFlat;
+    } else {
+      // Fallback: assembler depuis les nœuds par utilisateur
+      const factSnap=await fbDB.ref('negoce/factures').once('value');
+      const allFacturesObj=factSnap.val()||{};
+      if(allFacturesObj['default']){await fbDB.ref('negoce/factures/default').remove();delete allFacturesObj['default'];}
+      Object.entries(allFacturesObj).forEach(([uid,userFacts])=>{
+        if(Array.isArray(userFacts)){userFacts.forEach(f=>{if(!f._author)f._author=uid;});allFactures=[...allFactures,...userFacts];}
+      });
+    }
     const seen=new Set();
     allFactures=allFactures.filter(f=>{if(seen.has(f.id))return false;seen.add(f.id);return true;});
     allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -3385,35 +3395,26 @@ function startRealtimeSync(){
     if(data&&Array.isArray(data)){fbLoading=true;DB.clients=data;if(window._origSave)window._origSave();else save();fbLoading=false;}
   });
 
-  // Écouter toutes les factures
-  fbDB.ref('negoce/factures').on('value',snap=>{
+  // Écouter toutes les factures — nœud commun (mis à jour à chaque vente)
+  fbDB.ref('negoce/all_factures').on('value',snap=>{
     if(fbSyncing||fbLoading)return;
-    const allFacturesObj=snap.val()||{};
-    let newFactures=[];
-    Object.entries(allFacturesObj).forEach(([uid,userFacts])=>{
-      if(uid==='default')return;
-      if(Array.isArray(userFacts)){
-        userFacts.forEach(f=>{if(!f._author)f._author=uid;});
-        newFactures=[...newFactures,...userFacts];
-      }
+    const newFactures=snap.val();
+    if(!newFactures||!Array.isArray(newFactures)||newFactures.length===0)return;
+    // Remplacer complètement DB.factures par la version cloud (source de vérité)
+    const seen=new Set();
+    const deduped=newFactures.filter(f=>{
+      if(!f||!f.id||f.id.startsWith('OLD_'))return false;
+      if(seen.has(f.id))return false;
+      seen.add(f.id);return true;
     });
-    if(newFactures.length===0)return;
-    // Ignorer les OLD_ (anciennes migrées) - ne garder que les vraies nouvelles
-    const existingIds=new Set(DB.factures.map(f=>f.id));
-    const brandNew=newFactures.filter(f=>
-      !existingIds.has(f.id) &&           // Pas déjà en mémoire
-      !f.id.startsWith('OLD_') &&         // Pas une ancienne migrée
-      !existingIds.has(f.id.replace(/^OLD_/,''))  // Pas une variante OLD_ d'une existante
-    );
-    if(brandNew.length>0){
-      console.log('🔄 Nouvelles factures:',brandNew.map(f=>f.id).join(','));
-      const merged=[...DB.factures,...brandNew];
-      merged.sort((a,b)=>new Date(b.date)-new Date(a.date));
+    deduped.sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const currentCount=DB.factures.filter(f=>!f.id.startsWith('OLD_')).length;
+    if(deduped.length!==currentCount||deduped.some(f=>!DB.factures.find(x=>x.id===f.id))){
       fbLoading=true;
-      DB.factures=merged;
+      DB.factures=deduped;
       if(window._origSave)window._origSave();else save();
       fbLoading=false;
-      toast('🔄 Nouvelle vente reçue !','ok');
+      if(deduped.length>currentCount)toast('🔄 Nouvelle vente reçue !','ok');
       const active=document.querySelector('.ni.active');
       if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m&&['factures','ventes-jour','dashboard','accueil'].includes(m[1]))nav(m[1]);}
     }
