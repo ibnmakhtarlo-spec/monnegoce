@@ -2059,7 +2059,10 @@ function validerVente(){
   const cid=document.getElementById('pos-cl-id').value||'';const client=DB.clients.find(c=>c.id===cid);
   cart.forEach(item=>{const p=DB.produits.find(x=>x.id===item.id);if(p){if(session.boutique==='B1')p.s1-=item.qty;else p.s2-=item.qty;}});
   if(mode==='credit'&&client)client.credit=(client.credit||0)+total;
-  const fac={id:'F'+String(DB.nextIds.f++).padStart(4,'0'),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:cart.map(i=>({id:i.id,nom:String(i.nom),prix:Number(i.prix),achat:Number(i.achat||0),qty:Number(i.qty),unite:String(i.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
+  // ID unique: préfixe utilisateur + timestamp pour éviter collisions entre appareils
+  const _fid='F'+session.user.id.replace(/[^A-Z0-9]/g,'').substring(0,3)+Date.now().toString(36).toUpperCase().slice(-5);
+  DB.nextIds.f++;
+  const fac={id:_fid,boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:cart.map(i=>({id:i.id,nom:String(i.nom),prix:Number(i.prix),achat:Number(i.achat||0),qty:Number(i.qty),unite:String(i.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;}
   window._stocksPushTime=Date.now();save();currentFact=JSON.parse(JSON.stringify(fac));lastFactId=fac.id;cart=[];document.getElementById('p-rem').value='0';clearPOSClientSel();
   soundOk();renderCart();renderGrid();
@@ -2121,7 +2124,7 @@ function renderFactures(){
   const userBoutique=session.user?.boutique||'';
   // Admin, superviseur, "all", "Les deux" voient tout
   const canSeeAll=isAdmin()||userBoutique==='all'||userBoutique==='Les deux'||userBoutique===''||session.user?.role==='superviseur';
-  const list=[...DB.factures].reverse().filter(f=>{
+  const list=[...DB.factures].sort((a,b)=>new Date(b.date)-new Date(a.date)).filter(f=>{
     const fd=f.date.slice(0,10);
     const boutiqueMatch=canSeeAll?(!bf||f.boutique===bf):(f.boutique===userBoutique&&(!bf||f.boutique===bf));
     return(!q||f.id.toLowerCase().includes(q)||f.client.toLowerCase().includes(q))&&boutiqueMatch&&(!df||fd>=df)&&(!dt||fd<=dt);
@@ -2288,7 +2291,10 @@ function nfValider(){
   const cid=document.getElementById('nf-cl-id').value||'';const client=DB.clients.find(c=>c.id===cid);const mode=document.getElementById('nf-pay').value;
   nfLignes.forEach(l=>{const p=DB.produits.find(x=>x.id===l.id);if(p){if(session.boutique==='B1')p.s1-=l.qty;else p.s2-=l.qty;}});
   if(mode==='credit'&&client)client.credit=(client.credit||0)+total;
-  const fac={id:'F'+String(DB.nextIds.f++).padStart(4,'0'),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:nfLignes.map(l=>({id:l.id,nom:String(l.nom),prix:Number(l.prix),achat:Number(l.achat||0),qty:Number(l.qty),unite:String(l.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
+  // ID unique: préfixe utilisateur + timestamp pour éviter collisions entre appareils
+  const _fid='F'+session.user.id.replace(/[^A-Z0-9]/g,'').substring(0,3)+Date.now().toString(36).toUpperCase().slice(-5);
+  DB.nextIds.f++;
+  const fac={id:_fid,boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:nfLignes.map(l=>({id:l.id,nom:String(l.nom),prix:Number(l.prix),achat:Number(l.achat||0),qty:Number(l.qty),unite:String(l.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;}
   save();currentFact=JSON.parse(JSON.stringify(fac));lastFactId=fac.id;soundOk();closeModal('modal-nf');renderFactures();
   toast(`✅ Facture ${fac.id} — ${fmt(total)}`,'ok');setTimeout(()=>openFactDetail(fac.id),350);
@@ -2455,6 +2461,8 @@ function saveUser(){
   const eid=document.getElementById('mu-eid').value;if(!eid&&DB.users.find(u=>u.id===id2)){soundErr();toast('Identifiant déjà pris','err');return;}
   const perms=getSelectedPerms();
   const u={id:id2,nom,pwd,role:document.getElementById('mu-role').value,boutique:document.getElementById('mu-boutique').value,caisse:document.getElementById('mu-caisse').value||'',actif:true,perms,_updated:Date.now()};
+  // Marquer le timestamp global pour bloquer le listener users pendant 10s
+  DB._usersUpdated=Date.now();
   if(eid){const i=DB.users.findIndex(x=>x.id===eid);DB.users[i]={...DB.users[i],...u,id:eid};}else DB.users.push(u);
   save();
   // Pousser immédiatement sur Firebase — les nouvelles permissions seront actives dès la prochaine connexion
@@ -3515,7 +3523,7 @@ function startUsersSync(){
     const localUpdated=DB._usersUpdated||0;
     const cloudUpdated=data._updated||0;
     // Si on vient de pousser (moins de 5 secondes), ignorer le retour Firebase
-    if(Date.now()-localUpdated<5000)return;
+    if(Date.now()-localUpdated<15000)return; // Bloquer 15s après une modif locale
     if(cloudUpdated>localUpdated){
       // Fusionner: préserver les perms locales plus récentes user par user
       const merged=data.users.map(cloudUser=>{
