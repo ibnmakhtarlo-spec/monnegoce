@@ -2061,7 +2061,7 @@ function validerVente(){
   if(mode==='credit'&&client)client.credit=(client.credit||0)+total;
   const fac={id:'F'+String(DB.nextIds.f++).padStart(4,'0'),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:cart.map(i=>({id:i.id,nom:String(i.nom),prix:Number(i.prix),achat:Number(i.achat||0),qty:Number(i.qty),unite:String(i.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;}
-  window._stocksPushTime=Date.now();save();currentFact=fac;lastFactId=fac.id;cart=[];document.getElementById('p-rem').value='0';clearPOSClientSel();
+  window._stocksPushTime=Date.now();save();currentFact=JSON.parse(JSON.stringify(fac));lastFactId=fac.id;cart=[];document.getElementById('p-rem').value='0';clearPOSClientSel();
   soundOk();renderCart();renderGrid();
   const btnF=document.getElementById('btn-voir-fact');btnF.style.display='block';btnF.textContent=`🧾 Facture ${fac.id}`;
   toast(`✅ ${fac.id} — ${fmt(total)}`,'ok');
@@ -2290,7 +2290,7 @@ function nfValider(){
   if(mode==='credit'&&client)client.credit=(client.credit||0)+total;
   const fac={id:'F'+String(DB.nextIds.f++).padStart(4,'0'),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:nfLignes.map(l=>({id:l.id,nom:String(l.nom),prix:Number(l.prix),achat:Number(l.achat||0),qty:Number(l.qty),unite:String(l.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;}
-  save();currentFact=fac;lastFactId=fac.id;soundOk();closeModal('modal-nf');renderFactures();
+  save();currentFact=JSON.parse(JSON.stringify(fac));lastFactId=fac.id;soundOk();closeModal('modal-nf');renderFactures();
   toast(`✅ Facture ${fac.id} — ${fmt(total)}`,'ok');setTimeout(()=>openFactDetail(fac.id),350);
 }
 
