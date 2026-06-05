@@ -1831,7 +1831,10 @@ function doLogin(){
   }
   session.user=u;
   session.boutique=document.getElementById('l-boutique').value;
+  // Si caisse vide (admin/superviseur), utiliser la caisse du select login
   session.caisse=u.caisse||document.getElementById('l-caisse').value||'C1';
+  // Forcer une caisse valide si toujours vide
+  if(!session.caisse)session.caisse=DB.caisses.find(c=>c.boutique===session.boutique)?.id||'C1';
   soundLogin();setTimeout(startApp,400);
 }
 
@@ -1866,8 +1869,10 @@ function startApp(){
     // Override save to also push
     const _origSaveLocal=save;
     window._origSave=_origSaveLocal;
-    save=function(){_origSaveLocal();DB._syncTime=Date.now();if(fbConnected&&!fbLoading&&window._fbPushEnabled!==false)pushToFirebase();};
-    window._fbPushEnabled=true;
+    const myRoleForPush=session.user?.role||'vendeur';
+    // Admin ne pousse jamais — il ne fait que recevoir
+    window._fbPushEnabled=(myRoleForPush!=='admin');
+    save=function(){_origSaveLocal();DB._syncTime=Date.now();if(fbConnected&&!fbLoading&&window._fbPushEnabled===true)pushToFirebase();};
     initFirebase();
     setTimeout(startRealtimeSync,3000);
     setTimeout(()=>{pullUsersFromFirebase();startUsersSync();},4000);
@@ -2074,8 +2079,10 @@ function renderVentesJour(){
   const payHTML=Object.entries(payG).map(([m,v])=>`<div class="mini-kpi"><div class="mk-label">${IC[m]||'💰'} ${m}</div><div class="mk-val mk-g" style="font-size:12px;">${fmt(v)}</div></div>`).join('');
   const bHTML=['B1','B2'].map(b=>{
     const bV=allV.filter(f=>f.boutique===b);const bCA=bV.reduce((s,f)=>s+f.total,0);
+    const knownCaisseIds=DB.caisses.map(c=>c.id);const bVautres=bV.filter(f=>!knownCaisseIds.includes(f.caisse));
     const caisses=DB.caisses.map(c=>{const cv=bV.filter(f=>f.caisse===c.id);if(!cv.length)return`<div style="font-size:10px;color:var(--text3);padding:2px 0;">💰 ${c.nom} — Aucune</div>`;const cCA=cv.reduce((s,f)=>s+f.total,0);const cBen=cv.reduce((s,f)=>s+f.items.reduce((ss,i)=>ss+(i.prix-(i.achat||0))*i.qty,0),0);return`<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);font-size:10px;"><span style="color:var(--cyan);font-weight:700;">💰 ${c.nom}</span><span style="color:var(--text2)">${cv.length} ventes</span><span class="mono" style="color:var(--gold);font-weight:700;">${fmt(cCA)}</span><span class="mono" style="color:var(--green);font-size:9px;">+${fmt(cBen)}</span></div>`;}).join('');
-    return`<div class="boutiqueSection"><div class="boutiqueSectionHdr"><h3>${b==='B1'?'🏪':'🏬'} ${getBName(b)}</h3><div style="display:flex;gap:5px;align-items:center;"><span class="badge ${b==='B1'?'bb':'bo'}">${bV.length}</span><span class="mono" style="font-size:12px;font-weight:900;color:var(--gold)">${fmt(bCA)}</span></div></div><div style="padding:9px 13px;">${caisses}</div></div>`;
+    const autresBlock=bVautres.length?`<div style="font-size:10px;color:var(--text2);padding:4px 0;border-top:1px solid var(--border);">📋 Autres vendeurs: ${bVautres.length} vente(s) — ${fmt(bVautres.reduce((s,f)=>s+f.total,0))}</div>`:'';
+    return`<div class="boutiqueSection"><div class="boutiqueSectionHdr"><h3>${b==='B1'?'🏪':'🏬'} ${getBName(b)}</h3><div style="display:flex;gap:5px;align-items:center;"><span class="badge ${b==='B1'?'bb':'bo'}">${bV.length}</span><span class="mono" style="font-size:12px;font-weight:900;color:var(--gold)">${fmt(bCA)}</span></div></div><div style="padding:9px 13px;">${caisses}${autresBlock}</div></div>`;
   }).join('');
   const tP={};allV.forEach(f=>f.items.forEach(i=>tP[i.nom]=(tP[i.nom]||0)+i.qty));const topArr=Object.entries(tP).sort((a,b)=>b[1]-a[1]).slice(0,5);const mx=Math.max(...topArr.map(x=>x[1]),1);
   const topHTML=topArr.length?topArr.map(([n,q],i)=>`<div style="margin-bottom:6px;"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;"><span>${['🥇','🥈','🥉'][i]||'▫️'} ${n}</span><span class="mono" style="color:var(--gold)">${q}</span></div><div style="background:var(--surf2);border-radius:2px;height:4px;"><div style="width:${(q/mx)*100}%;height:100%;background:var(--gold);border-radius:2px;"></div></div></div>`).join(''):`<div class="empty"><div class="ei">📊</div>Aucune vente</div>`;
@@ -3163,18 +3170,28 @@ function pushToFirebase(){
       const myFactures=DB.factures.filter(f=>f._author===userId&&!f.id.startsWith('OLD_'));
       await fbDB.ref(`negoce/factures/${userId}`).set(myFactures.length>0?myFactures:null);
 
-      // 5. Pousser dans all_factures SEULEMENT si vendeur/caissier (jamais admin)
-      // L'admin ne doit JAMAIS ecraser all_factures sinon il efface les ventes des vendeurs
+      // 5. Pousser dans all_factures — JAMAIS si admin, et seulement si on a des factures à pousser
       const myRole=session.user?.role||'vendeur';
-      if(myRole==='vendeur'||myRole==='caissier'||myRole==='superviseur'){
-        const existingSnap=await fbDB.ref('negoce/all_factures').once('value');
-        const existing=existingSnap.val();
-        let mergedAll=Array.isArray(existing)?[...existing]:[];
-        myFactures.forEach(f=>{const idx=mergedAll.findIndex(x=>x.id===f.id);if(idx>=0)mergedAll[idx]=f;else mergedAll.push(f);});
+      const canPushFact=(myRole==='vendeur'||myRole==='caissier'||myRole==='superviseur');
+      if(canPushFact&&myFactures.length>0){
+        // Lire d'abord pour fusionner sans jamais effacer les factures des autres
+        let mergedAll=[];
+        try{
+          const existingSnap=await fbDB.ref('negoce/all_factures').once('value');
+          const existing=existingSnap.val();
+          mergedAll=Array.isArray(existing)?[...existing]:[];
+        }catch(e){}
+        // Ajouter/mettre à jour seulement MES factures
+        myFactures.forEach(f=>{
+          const idx=mergedAll.findIndex(x=>x.id===f.id);
+          if(idx>=0)mergedAll[idx]=f;
+          else mergedAll.push(f);
+        });
         mergedAll=mergedAll.filter(f=>f&&f.id&&!f.id.startsWith('OLD_'));
         mergedAll.sort((a,b)=>new Date(b.date)-new Date(a.date));
-        await fbDB.ref('negoce/all_factures').set(mergedAll.length>0?mergedAll:null);
+        await fbDB.ref('negoce/all_factures').set(mergedAll);
       }
+      // Admin : ne touche JAMAIS all_factures (ni en lecture-écriture)
 
       updateSyncUI('connected');
       const el=document.getElementById('last-save-time');if(el)el.textContent=new Date().toLocaleTimeString('fr-FR');
@@ -3414,29 +3431,44 @@ function startRealtimeSync(){
     if(fbSyncing||fbLoading)return;
     const newFactures=snap.val();
     if(!newFactures||!Array.isArray(newFactures)||newFactures.length===0)return;
-    // Remplacer complètement DB.factures par la version cloud (source de vérité)
+    // Dédupliquer les factures du cloud
     const seen=new Set();
-    const deduped=newFactures.filter(f=>{
+    const cloudFacts=newFactures.filter(f=>{
       if(!f||!f.id||f.id.startsWith('OLD_'))return false;
       if(seen.has(f.id))return false;
       seen.add(f.id);return true;
     });
-    deduped.sort((a,b)=>new Date(b.date)-new Date(a.date));
-    const currentCount=DB.factures.filter(f=>!f.id.startsWith('OLD_')).length;
-    if(deduped.length!==currentCount||deduped.some(f=>!DB.factures.find(x=>x.id===f.id))){
-      fbLoading=true;
-      DB.factures=deduped;
-      if(window._origSave)window._origSave();else save();
-      fbLoading=false;
-      if(deduped.length>currentCount)toast('🔄 Nouvelle vente reçue !','ok');
-      const active=document.querySelector('.ni.active');
-      if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m&&['factures','ventes-jour','dashboard','accueil'].includes(m[1]))nav(m[1]);}
-    }
+    // FUSION intelligente: ne jamais perdre une facture locale récente
+    // Les factures locales gagnent toujours sur le cloud (elles viennent d'être créées)
+    const localFacts=DB.factures.filter(f=>f&&f.id&&!f.id.startsWith('OLD_'));
+    const localIds=new Set(localFacts.map(f=>f.id));
+    // Ajouter les factures cloud absentes localement
+    const cloudOnly=cloudFacts.filter(f=>!localIds.has(f.id));
+    if(cloudOnly.length===0)return; // Rien de nouveau depuis le cloud
+    // Fusionner: local + nouvelles du cloud uniquement
+    const merged=[...localFacts,...cloudOnly];
+    merged.sort((a,b)=>new Date(b.date)-new Date(a.date));
+    fbLoading=true;
+    DB.factures=merged;
+    if(window._origSave)window._origSave();else save();
+    fbLoading=false;
+    toast('🔄 '+cloudOnly.length+' nouvelle(s) vente(s) reçue(s) !','ok');
+    const active=document.querySelector('.ni.active');
+    if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m&&['factures','ventes-jour','dashboard','accueil'].includes(m[1]))nav(m[1]);}
   });
 }
 
 
-function syncNow(){if(!fbConnected){toast('📴 Pas de connexion','err');return;}window._fbPushEnabled=false;pullFromFirebase().finally(()=>{window._fbPushEnabled=true;});}
+function syncNow(){
+  if(!fbConnected){toast('📴 Pas de connexion','err');return;}
+  // Bloquer TOUT push pendant et après la synchronisation admin
+  window._fbPushEnabled=false;
+  pullFromFirebase().finally(()=>{
+    // Remettre push seulement si pas admin
+    const role=session.user?.role||'vendeur';
+    if(role!=='admin')window._fbPushEnabled=true;
+  });
+}
 
 // ══ SYNC USERS SUR FIREBASE ══
 function pushUsersToFirebase(){
