@@ -3165,9 +3165,15 @@ function pushToFirebase(){
       // 3. Clients séparés par boutique
       await fbDB.ref(`negoce/clients/${boutique}`).set(DB.clients||[]);
 
-      // 4. Factures de CET utilisateur — push sous son nœud propre
-      DB.factures.forEach(f=>{if(!f._author)f._author=userId;});
-      const myFactures=DB.factures.filter(f=>f._author===userId&&!f.id.startsWith('OLD_'));
+      // 4. Factures de CET utilisateur — assigner _author à TOUTES les factures sans auteur
+      DB.factures.forEach(f=>{
+        if(!f._author||f._author==='')f._author=userId;
+        // Aussi assigner si userId correspond au vendeur (userId stocké dans la facture)
+        if(f.userId===userId&&!f._author)f._author=userId;
+      });
+      const myFactures=DB.factures.filter(f=>
+        (f._author===userId||f.userId===userId)&&!f.id.startsWith('OLD_')
+      );
       await fbDB.ref(`negoce/factures/${userId}`).set(myFactures.length>0?myFactures:null);
 
       // 5. Pousser dans all_factures — JAMAIS si admin, et seulement si on a des factures à pousser
