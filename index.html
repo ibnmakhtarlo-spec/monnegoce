@@ -3283,6 +3283,9 @@ async function pullFromFirebase(){
       if(cloudTime>localTime){
         // Restaurer photos locales
         if(cleanCloud.produits&&DB.produits){
+          // Fusionner: garder les produits locaux absents du cloud (nouveaux ajoutés)
+          const cloudIds=new Set(cleanCloud.produits.map(p=>p.id));
+          const localOnly=DB.produits.filter(p=>!cloudIds.has(p.id));
           cleanCloud.produits=cleanCloud.produits.map(cp=>{
             const lp=DB.produits.find(p=>p.id===cp.id);
             if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;
@@ -3291,6 +3294,11 @@ async function pullFromFirebase(){
             cp.s2=lp?lp.s2:0;
             return cp;
           });
+          // Ajouter les produits locaux nouveaux (pas encore sur Firebase)
+          if(localOnly.length>0){
+            cleanCloud.produits=[...cleanCloud.produits,...localOnly];
+            console.log('Produits locaux conservés:',localOnly.map(p=>p.nom));
+          }
         }
         delete cleanCloud.factures; // Factures gérées séparément
         delete cleanCloud.clients;   // Clients gérés séparément par boutique
