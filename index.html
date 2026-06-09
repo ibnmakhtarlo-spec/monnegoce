@@ -558,6 +558,16 @@ canvas.chart-canvas{display:block;width:100%!important;}
             </div>
             <input type="hidden" id="pay-mode" value="especes">
             <input type="hidden" id="pos-cl-id" value="">
+            <div id="pos-monnaie-zone" style="margin-top:6px;background:var(--surf2);border-radius:8px;padding:7px 10px;">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                <span style="font-size:11px;color:var(--text2);">💵 Montant reçu</span>
+                <input type="number" id="pos-recu" placeholder="0" min="0" style="flex:1;background:var(--surf3);border:1px solid var(--border2);border-radius:5px;padding:4px 7px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;font-weight:700;" oninput="calcMonnaie()">
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:11px;color:var(--text2);">🔄 Monnaie à rendre</span>
+                <span id="pos-monnaie" style="font-size:15px;font-weight:900;color:var(--gold);">—</span>
+              </div>
+            </div>
             <button class="btn btn-gold" style="width:100%;padding:9px;margin-top:7px;font-size:13px;" onclick="validerVente()">✅ Valider & Encaisser</button>
             <button class="btn btn-ghost" id="btn-voir-fact" style="width:100%;padding:6px;margin-top:4px;font-size:12px;display:none;" onclick="openFactDetail(lastFactId)">🧾 Voir / Imprimer Facture</button>
           </div>
@@ -1910,7 +1920,7 @@ function startApp(){
 }
 
 function applyNavPerms(){
-  if(isAdmin())return; // Admin voit tout
+  if(session.user?.role==='admin')return; // Admin voit tout — superviseur est limité
 
   const perms=session.user?.perms||[];
   const role=session.user?.role;
@@ -2069,7 +2079,7 @@ function addCart(id){
   else{
     if(ms<=0){soundErr();toast('Rupture de stock','err');return;}
     if((p.achat||0)===0){toast('⚠️ Prix d\'achat non défini pour '+p.nom,'info');}
-    cart.push({id:p.id,nom:p.nom,prix:p.prix,achat:p.achat||0,unite:p.unite,qty:1,ms});
+    cart.push({id:p.id,nom:p.nom,prix:p.prix,achat:p.achat||0,unite:p.unite,qty:1,ms,_achatZero:(!p.achat||p.achat===0)});
   }
   document.getElementById('btn-voir-fact').style.display='none';pt(660,.08,'sine',.25);renderCart();
 }
@@ -2078,15 +2088,32 @@ function updateCartPrix(id,val){const i=cart.find(x=>x.id===id);if(!i)return;con
 function clearCart(){cart=[];clearPOSClientSel();document.getElementById('btn-voir-fact').style.display='none';renderCart();}
 function renderCart(){
   const body=document.getElementById('pan-body');if(!body)return;
-  body.innerHTML=cart.length?cart.map(i=>`<div class="pi"><div class="piinfo"><div class="piname">${i.nom}</div><div style="font-size:9px;color:var(--text2);display:flex;align-items:center;gap:2px;"><input class="prix-edit" type="number" value="${i.prix}" min="0" onchange="updateCartPrix('${i.id}',this.value)"> FCFA</div></div><div class="piqty"><div class="qb" onclick="changeQty('${i.id}',-1)">−</div><span style="font-size:10px;font-weight:700;min-width:14px;text-align:center">${i.qty}</span><div class="qb" onclick="changeQty('${i.id}',1)">+</div></div><div class="pitot">${fmt(i.prix*i.qty)}</div></div>`).join(''):`<div class="empty"><div class="ei">🛒</div>Panier vide</div>`;
+  body.innerHTML=cart.length?cart.map(i=>`<div class="pi" style="${(!i.achat||i.achat===0)?'border-left:3px solid var(--red);':''}">${(!i.achat||i.achat===0)?'<div style="font-size:9px;color:var(--red);font-weight:800;padding:1px 6px;">⚠️ Prix achat = 0</div>':''}<div class="piinfo"><div class="piname">${i.nom}</div><div style="font-size:9px;color:var(--text2);display:flex;align-items:center;gap:2px;"><input class="prix-edit" type="number" value="${i.prix}" min="0" onchange="updateCartPrix('${i.id}',this.value)"> FCFA</div></div><div class="piqty"><div class="qb" onclick="changeQty('${i.id}',-1)">−</div><span style="font-size:10px;font-weight:700;min-width:14px;text-align:center">${i.qty}</span><div class="qb" onclick="changeQty('${i.id}',1)">+</div></div><div class="pitot">${fmt(i.prix*i.qty)}</div></div>`).join(''):`<div class="empty"><div class="ei">🛒</div>Panier vide</div>`;
   calcCart();
 }
 function calcCart(){
   const sub=cart.reduce((s,i)=>s+i.prix*i.qty,0);const r=parseFloat(document.getElementById('p-rem')?.value)||0;const disc=sub*r/100;
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
-  set('p-sub',fmt(sub));set('p-rem-v','-'+fmt(disc));set('p-tot',fmt(sub-disc));
+  set('p-sub',fmt(sub));set('p-rem-v','-'+fmt(disc));set('p-tot',fmt(sub-disc));calcMonnaie();
 }
-function setPay(el,mode){document.querySelectorAll('.paybtn').forEach(b=>b.classList.remove('active'));el.classList.add('active');document.getElementById('pay-mode').value=mode;}
+function calcMonnaie(){
+  const recu=parseFloat(document.getElementById('pos-recu')?.value)||0;
+  const total=cart.reduce((s,i)=>s+i.prix*i.qty,0)*(1-(parseFloat(document.getElementById('p-rem')?.value)||0)/100);
+  const monnaie=recu-total;
+  const el=document.getElementById('pos-monnaie');
+  if(!el)return;
+  if(recu<=0){el.textContent='—';el.style.color='var(--gold)';}
+  else if(monnaie<0){el.textContent='-'+fmt(Math.abs(monnaie));el.style.color='var(--red)';}
+  else{el.textContent=fmt(monnaie);el.style.color=monnaie===0?'var(--green)':'var(--gold)';}
+}
+function setPay(el,mode){
+  document.querySelectorAll('.paybtn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('pay-mode').value=mode;
+  // Afficher zone monnaie seulement pour espèces
+  const z=document.getElementById('pos-monnaie-zone');
+  if(z)z.style.display=(mode==='especes')?'block':'none';
+}
 function validerVente(){
   if(!cart.length){soundErr();toast('Panier vide !','err');return;}
   const sub=cart.reduce((s,i)=>s+i.prix*i.qty,0);const r=parseFloat(document.getElementById('p-rem').value)||0;const total=sub*(1-r/100);const mode=document.getElementById('pay-mode').value;
@@ -2103,7 +2130,7 @@ function validerVente(){
     client.points=(client.points||0)+newPoints;
     if(newPoints>0)toast('🎁 '+client.nom+' gagne '+newPoints+' point(s) fidélité !','info');}
   logAction('Vente','Facture '+fac.id+' — '+fmt(total)+' — '+mode);
-  window._stocksPushTime=Date.now();save();currentFact=JSON.parse(JSON.stringify(fac));lastFactId=fac.id;cart=[];document.getElementById('p-rem').value='0';clearPOSClientSel();
+  window._stocksPushTime=Date.now();save();currentFact=JSON.parse(JSON.stringify(fac));lastFactId=fac.id;cart=[];document.getElementById('p-rem').value='0';const pr=document.getElementById('pos-recu');if(pr)pr.value='';calcMonnaie();clearPOSClientSel();
   soundOk();renderCart();renderGrid();
   const btnF=document.getElementById('btn-voir-fact');btnF.style.display='block';btnF.textContent=`🧾 Facture ${fac.id}`;
   toast(`✅ ${fac.id} — ${fmt(total)}`,'ok');
@@ -2130,7 +2157,7 @@ function renderVentesJour(){
   }).join('');
   const tP={};allV.forEach(f=>f.items.forEach(i=>tP[i.nom]=(tP[i.nom]||0)+i.qty));const topArr=Object.entries(tP).sort((a,b)=>b[1]-a[1]).slice(0,5);const mx=Math.max(...topArr.map(x=>x[1]),1);
   const topHTML=topArr.length?topArr.map(([n,q],i)=>`<div style="margin-bottom:6px;"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;"><span>${['🥇','🥈','🥉'][i]||'▫️'} ${n}</span><span class="mono" style="color:var(--gold)">${q}</span></div><div style="background:var(--surf2);border-radius:2px;height:4px;"><div style="width:${(q/mx)*100}%;height:100%;background:var(--gold);border-radius:2px;"></div></div></div>`).join(''):`<div class="empty"><div class="ei">📊</div>Aucune vente</div>`;
-  const txHTML=[...allV].reverse().map(f=>`<tr><td class="mono" style="color:var(--gold);font-size:10px;cursor:pointer;" onclick="openFactDetail('${f.id}')">${f.id}</td><td><span class="badge ${f.boutique==='B1'?'bb':'bo'}" style="font-size:8px;">${getBName(f.boutique).substring(0,8)}</span></td><td><span class="badge bcy" style="font-size:8px;">${f.caisse}</span></td><td style="font-size:10px;color:var(--cyan);">${f.vendeur||f.userId||'?'}</td><td style="font-size:10px;">${f.client}</td><td class="mono" style="color:var(--green);font-weight:700;font-size:11px;">${fmt(f.total)}</td><td style="font-size:10px;">${IC[f.mode]||''} ${f.mode}</td><td style="font-size:10px;color:var(--text2);">${new Date(f.date).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</td></tr>`).join('');
+  const txHTML=[...allV].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(f=>`<tr><td class="mono" style="color:var(--gold);font-size:10px;cursor:pointer;" onclick="openFactDetail('${f.id}')">${f.id}</td><td><span class="badge ${f.boutique==='B1'?'bb':'bo'}" style="font-size:8px;">${getBName(f.boutique).substring(0,8)}</span></td><td><span class="badge bcy" style="font-size:8px;">${f.caisse}</span></td><td style="font-size:10px;color:var(--cyan);">${f.vendeur||f.userId||'?'}</td><td style="font-size:10px;">${f.client}</td><td class="mono" style="color:var(--green);font-weight:700;font-size:11px;">${fmt(f.total)}</td><td style="font-size:10px;">${IC[f.mode]||''} ${f.mode}</td><td style="font-size:10px;color:var(--text2);">${new Date(f.date).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</td></tr>`).join('');
   document.getElementById('vj-view-global').innerHTML=`
     <div class="global-summary"><h3>🌍 Résumé Global</h3>
       <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:9px;">
@@ -2287,6 +2314,8 @@ function printFact(){if(!currentFact)return;const f=currentFact;const s=DB.setti
 
 // ══ NOUVELLE FACTURE ══
 function openNouvelleFacture(){
+  // Mettre la date d'aujourd'hui par défaut
+  const nfd=document.getElementById('nf-date');if(nfd&&!nfd.value)nfd.value=today();
   nfLignes=[];clearNFClient();
   document.getElementById('nf-cl-srch').value='';document.getElementById('nf-cl-id').value='';
   const sel=document.getElementById('nf-prod-sel');sel.innerHTML='<option value="">— Choisir —</option>'+DB.produits.map(p=>{const stk=session.boutique==='B1'?p.s1:p.s2;return`<option value="${p.id}" data-prix="${p.prix}" ${stk<=0?'disabled':''}>${p.nom} — ${fmt(p.prix)} (${stk<=0?'Rupture':'Stock:'+stk})</option>`;}).join('');
@@ -2929,6 +2958,9 @@ function renderAccueil(){
   // Stats personnelles pour vendeur/caissier/superviseur (sans bénéfices)
   const myRole=session.user?.role||'vendeur';
   const isVendeurOuCaissier=(myRole==='vendeur'||myRole==='caissier'||myRole==='superviseur');
+  // Situation caisse du jour
+  const maCaisseId=session.caisse;
+  const maCaisse=DB.caisses.find(c=>c.id===maCaisseId);
   if(isVendeurOuCaissier){
     const myId=session.user?.id;
     const myNom=session.user?.nom;
@@ -2955,8 +2987,31 @@ function renderAccueil(){
         </div>
       </div>
     </div>`;
+    // Situation caisse
+    const maCaisseVentes=ventesAujourdhui.filter(f=>f.caisse===maCaisseId);
+    const maCaisseCA=maCaisseVentes.reduce((s,f)=>s+f.total,0);
+    const maCaisseByMode={};maCaisseVentes.forEach(f=>maCaisseByMode[f.mode]=(maCaisseByMode[f.mode]||0)+f.total);
+    const fond=maCaisse?.fond||0;
+    const totalEspeces=maCaisseByMode['especes']||0;
+    const caisseStatsHTML=maCaisse?`
+    <div style="background:var(--surf2);border-radius:12px;padding:12px 14px;margin-bottom:14px;border:1px solid var(--border);">
+      <div style="font-size:11px;font-weight:800;color:var(--text2);margin-bottom:10px;">💰 MA CAISSE — ${maCaisse.nom}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="background:var(--surf3);border-radius:8px;padding:8px;text-align:center;">
+          <div style="font-size:9px;color:var(--text2);">Ventes aujourd'hui</div>
+          <div style="font-size:15px;font-weight:900;color:var(--green);">${fmt(maCaisseCA)}</div>
+          <div style="font-size:9px;color:var(--text3);">${maCaisseVentes.length} transaction(s)</div>
+        </div>
+        <div style="background:var(--surf3);border-radius:8px;padding:8px;text-align:center;">
+          <div style="font-size:9px;color:var(--text2);">Fond + Espèces</div>
+          <div style="font-size:15px;font-weight:900;color:var(--gold);">${fmt(fond+totalEspeces)}</div>
+          <div style="font-size:9px;color:var(--text3);">Fond: ${fmt(fond)}</div>
+        </div>
+      </div>
+      ${Object.entries(maCaisseByMode).map(([m,v])=>`<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0;color:var(--text2);"><span>${IC[m]||'💰'} ${m}</span><span class="mono" style="color:var(--gold);">${fmt(v)}</span></div>`).join('')}
+    </div>`:'' ;
     const alertesEl=document.getElementById('accueil-alertes');
-    if(alertesEl)alertesEl.insertAdjacentHTML('beforebegin',mesStatsHTML);
+    if(alertesEl)alertesEl.insertAdjacentHTML('beforebegin',mesStatsHTML+(caisseStatsHTML||''));
   }
   const stockCrit=DB.produits.filter(p=>p.s1<=0&&p.s2<=0).length;
   const stockFaible=DB.produits.filter(p=>(p.s1>0||p.s2>0)&&(p.s1<=(p.alerte||5)||p.s2<=(p.alerte||5))).length;
