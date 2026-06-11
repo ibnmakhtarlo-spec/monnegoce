@@ -2453,6 +2453,9 @@ function saveProd(){
   if(!eid)DB.nextIds.p++;
   const p={id:_pid,nom,ref:document.getElementById('mp-ref').value,cat:document.getElementById('mp-cat').value||'Accessoire High-Tech',fourn:document.getElementById('mp-fourn').value||'',prix,achat:parseFloat(document.getElementById('mp-achat').value)||0,s1:parseInt(document.getElementById('mp-s1').value)||0,s2:parseInt(document.getElementById('mp-s2').value)||0,alerte:parseInt(document.getElementById('mp-al').value)||5,unite:document.getElementById('mp-un').value,desc:document.getElementById('mp-desc').value,photo:document.getElementById('mp-photo-data').value||''};
   if(eid){const i=DB.produits.findIndex(x=>x.id===eid);DB.produits[i]=p;logAction('Modif produit',p.nom);}else{DB.produits.push(p);logAction('Ajout produit',p.nom);}
+  // Forcer push immédiat pour que les autres appareils voient le nouveau produit
+  window._prodUpdated=Date.now();
+  save();
   save();stopCamera();closeModal('modal-prod');renderProduits();refreshAllSelects();toast(eid?'Modifié ✅':'Ajouté ✅','ok');
 }
 function renderProduits(){
@@ -2562,9 +2565,12 @@ function saveUser(){
   // Pousser immédiatement sur Firebase — les nouvelles permissions seront actives dès la prochaine connexion
   if(fbConnected) pushUsersToFirebase();
   closeModal('modal-user');renderUsers();['mu-nom','mu-id2','mu-pwd'].forEach(i=>document.getElementById(i).value='');document.getElementById('mu-eid').value='';
-  DB._usersUpdated=Date.now(); // Bloquer le listener pour 15s
+  const _now=Date.now();
+  DB._usersUpdated=_now;
+  DB.users.forEach(u2=>{if(u2.id===u.id)u2._updated=_now;}); // Forcer timestamp local
   logAction('Modif utilisateur',u?.nom||'?');
-  pushUsersToFirebase(); // Pousser immédiatement
+  SS('users',DB.users); // Sauvegarder localement d'abord
+  pushUsersToFirebase(); // Pousser immédiatement vers Firebase
   toast('✅ Utilisateur enregistré et synchronisé — actif à la prochaine connexion','ok');
   // Si on modifie l'utilisateur connecté, appliquer immédiatement
   if(eid===session.user?.id){
@@ -3529,6 +3535,11 @@ async function pullFromFirebase(){
             cleanCloud.produits=[...cleanCloud.produits,...localOnly];
             console.log('Produits locaux conservés:',localOnly.map(p=>p.nom));
           }
+          // Si on vient d'ajouter un produit (moins de 30s), garder TOUS les produits locaux
+          if(window._prodUpdated&&Date.now()-window._prodUpdated<30000){
+            cleanCloud.produits=DB.produits;
+            console.log('Produits locaux protégés (modif récente)');
+          }
         }
         delete cleanCloud.factures; // Factures gérées séparément
         delete cleanCloud.clients;   // Clients gérés séparément par boutique
@@ -3784,7 +3795,7 @@ function startUsersSync(){
     const localUpdated=DB._usersUpdated||0;
     const cloudUpdated=data._updated||0;
     // Si on vient de pousser (moins de 5 secondes), ignorer le retour Firebase
-    if(Date.now()-localUpdated<15000)return; // Bloquer 15s après une modif locale
+    if(Date.now()-localUpdated<60000)return; // Bloquer 60s après une modif locale
     if(cloudUpdated>localUpdated){
       // Fusionner: préserver les perms locales plus récentes user par user
       const merged=data.users.map(cloudUser=>{
