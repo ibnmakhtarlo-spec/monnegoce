@@ -3611,7 +3611,13 @@ async function pullFromFirebase(){
     console.log('📊 Pull: allFactures count=',allFactures.length);
     if(allFactures.length>0)DB.factures=allFactures;
 
-    DB.users=currentUsers;
+    // Fusion users: ne pas écraser les permissions modifiées récemment
+    const mergedUsers=currentUsers.map(lu=>{
+      const cloudU=(typeof pullCloudUsers!=='undefined'&&pullCloudUsers)?pullCloudUsers.find(u=>u.id===lu.id):null;
+      if(!cloudU)return lu;
+      return (lu._updated||0)>=(cloudU._updated||0)?lu:cloudU;
+    });
+    DB.users=mergedUsers;
     // Sauvegarder localement SEULEMENT — jamais pushToFirebase après un pull
     if(window._origSave)window._origSave();
     else{const _bkp=window._fbPushEnabled;window._fbPushEnabled=false;save();window._fbPushEnabled=_bkp;}
@@ -3636,22 +3642,36 @@ function startRealtimeSync(){
     if(cloudTime>localTime+2000){
       const{_syncTime,_device,...cleanCloud}=cloudData;
       if(cleanCloud.produits&&DB.produits){
-        cleanCloud.produits=cleanCloud.produits.map(cp=>{
-          const lp=DB.produits.find(p=>p.id===cp.id);
-          if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;
-          // Préserver les stocks locaux
-          cp.s1=lp?lp.s1:0;
-          cp.s2=lp?lp.s2:0;
-          return cp;
-        });
+        // Protection produits récents
+        if(window._prodUpdated&&Date.now()-window._prodUpdated<30000){
+          delete cleanCloud.produits; // Ne pas écraser les produits récents
+        } else {
+          const cloudPIds=new Set(cleanCloud.produits.map(p=>p.id));
+          const localOnlyP=DB.produits.filter(p=>!cloudPIds.has(p.id));
+          cleanCloud.produits=cleanCloud.produits.map(cp=>{
+            const lp=DB.produits.find(p=>p.id===cp.id);
+            if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;
+            cp.s1=lp?lp.s1:0;cp.s2=lp?lp.s2:0;
+            return cp;
+          });
+          if(localOnlyP.length>0)cleanCloud.produits=[...cleanCloud.produits,...localOnlyP];
+        }
       }
+      // Sauvegarder users/factures/clients avant assign
       const currentUsers=DB.users;
       const currentFactures=DB.factures;
       const currentClients=DB.clients;
       delete cleanCloud.factures;
       delete cleanCloud.clients;
       Object.assign(DB,cleanCloud);
-      DB.users=currentUsers;
+      // Restaurer users avec fusion intelligente
+      const merged2=currentUsers.map(lu=>{
+        const cu=cleanCloud.users?.find(u=>u.id===lu.id);
+        if(!cu)return lu;
+        return (lu._updated||0)>=(cu._updated||0)?lu:cu;
+      });
+      if(cleanCloud.users)cleanCloud.users.forEach(cu=>{if(!merged2.find(u=>u.id===cu.id))merged2.push(cu);});
+      DB.users=merged2;
       DB.factures=currentFactures;
       DB.clients=currentClients;
       DB._syncTime=cloudTime;
