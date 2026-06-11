@@ -3404,7 +3404,11 @@ function pushToFirebase(){
       const boutique=session.boutique||'B1';
 
       // 1. Données communes (produits noms/prix, fournisseurs, settings, caisses, devis, retours, salaires, depenses, nextIds)
-      const produitsSansStock=DB.produits.map(p=>{const c={...p,photo:p.photo?.startsWith('http')?p.photo:''};delete c.s1;delete c.s2;return c;});
+      const produitsSansStock=DB.produits.map(p=>{const c={...p,photo:p.photo?.startsWith('http')?p.photo:''};delete c.s1;delete c.s2;
+        // Nettoyer les undefined pour Firebase
+        if(c._updated===undefined)c._updated=Date.now();
+        Object.keys(c).forEach(k=>{if(c[k]===undefined)delete c[k];});
+        return c;});
       await fbDB.ref('negoce/shared/data').set({
         produits: produitsSansStock,
         fournisseurs: DB.fournisseurs,
