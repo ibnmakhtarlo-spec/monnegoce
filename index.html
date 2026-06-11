@@ -1915,7 +1915,8 @@ function startApp(){
     save=function(){_origSaveLocal();DB._syncTime=Date.now();if(fbConnected&&!fbLoading&&window._fbPushEnabled===true)pushToFirebase();};
     initFirebase();
     setTimeout(startRealtimeSync,3000);
-    setTimeout(()=>{pullUsersFromFirebase();startUsersSync();},4000);
+    // Pull users seulement si DB.users est vide (premier démarrage)
+    setTimeout(()=>{if(DB.users.length<=1)pullUsersFromFirebase();},4000);
   },800);
 }
 
@@ -3638,7 +3639,8 @@ function startRealtimeSync(){
   const autreBoutique=boutique==='B1'?'B2':'B1';
 
   // Écouter données communes (produits noms/prix, settings, etc.)
-  fbDB.ref('negoce/shared/data').on('value',snap=>{
+  // Listener produits désactivé — sync manuelle uniquement
+  if(false) fbDB.ref('negoce/shared/data').on('value',snap=>{
     if(fbSyncing)return;
     const cloudData=snap.val();if(!cloudData)return;
     const cloudTime=cloudData._syncTime||0,localTime=DB._syncTime||0;
@@ -3811,6 +3813,9 @@ async function pullUsersFromFirebase(){
 }
 
 function startUsersSync(){
+  // Listener désactivé — les permissions sont gérées localement
+  // Push uniquement à la sauvegarde, pull uniquement au login
+  return;
   if(!fbInitialized||!fbDB)return;
   fbDB.ref('negoce_users').on('value', snap=>{
     const data=snap.val();
