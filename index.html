@@ -2562,7 +2562,9 @@ function saveUser(){
   // Pousser immédiatement sur Firebase — les nouvelles permissions seront actives dès la prochaine connexion
   if(fbConnected) pushUsersToFirebase();
   closeModal('modal-user');renderUsers();['mu-nom','mu-id2','mu-pwd'].forEach(i=>document.getElementById(i).value='');document.getElementById('mu-eid').value='';
+  DB._usersUpdated=Date.now(); // Bloquer le listener pour 15s
   logAction('Modif utilisateur',u?.nom||'?');
+  pushUsersToFirebase(); // Pousser immédiatement
   toast('✅ Utilisateur enregistré et synchronisé — actif à la prochaine connexion','ok');
   // Si on modifie l'utilisateur connecté, appliquer immédiatement
   if(eid===session.user?.id){
@@ -3753,10 +3755,18 @@ async function pullUsersFromFirebase(){
     const snap=await fbDB.ref('negoce_users').once('value');
     const data=snap.val();
     if(data&&data.users&&data.users.length){
-      // Firebase est la source de vérité — remplace tout
-      DB.users=data.users;
+      // Fusion intelligente: les permissions locales récentes gagnent toujours
+      const merged=data.users.map(cloudUser=>{
+        const localUser=DB.users.find(u=>u.id===cloudUser.id);
+        // Garder la version locale si elle est plus récente
+        if(localUser&&(localUser._updated||0)>=(cloudUser._updated||0))return localUser;
+        return cloudUser;
+      });
+      // Ajouter les users locaux absents du cloud
+      DB.users.forEach(lu=>{if(!merged.find(u=>u.id===lu.id))merged.push(lu);});
+      DB.users=merged;
       SS('users',DB.users);
-      console.log('✅ Users chargés depuis Firebase');
+      console.log('✅ Users fusionnés depuis Firebase');
     } else {
       // Première fois — envoyer les users locaux vers Firebase
       pushUsersToFirebase();
