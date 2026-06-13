@@ -3507,18 +3507,23 @@ async function pullFromFirebase(){
       const cloudTime=_syncTime||0,localTime=DB._syncTime||0;
       if(cloudTime>localTime){
         // PRODUITS: LOCAL EST TOUJOURS PRIORITAIRE — Firebase ne peut jamais écraser
-        if(DB.produits&&DB.produits.length>0){
-          // Garder TOUS les produits locaux
-          // Ajouter seulement les produits cloud absents localement
-          const localPIds=new Set(DB.produits.map(p=>p.id));
-          const cloudOnlyP=(cleanCloud.produits||[]).filter(cp=>!localPIds.has(cp.id));
-          // Fusionner: local + nouveaux du cloud uniquement
-          cleanCloud.produits=[...DB.produits.map(lp=>{
-            // Réinjecter stocks depuis cloud si disponible
-            const cp=(cleanCloud.produits||[]).find(c=>c.id===lp.id);
-            return {...lp,s1:cp?cp.s1:lp.s1||0,s2:cp?cp.s2:lp.s2||0};
-          }),...cloudOnlyP];
-          console.log('Produits locaux protégés:',DB.produits.length,'+ cloud:',cloudOnlyP.length);
+        if(cleanCloud.produits){
+          const localPIds=new Set((DB.produits||[]).map(p=>p.id));
+          const cloudPIds=new Set(cleanCloud.produits.map(p=>p.id));
+          // Produits cloud absents localement → les ajouter (nouveaux produits admin)
+          const cloudNew=cleanCloud.produits.filter(cp=>!localPIds.has(cp.id));
+          // Produits locaux → toujours garder, mettre à jour stocks depuis cloud
+          const mergedProds=(DB.produits||[]).map(lp=>{
+            const cp=cleanCloud.produits.find(c=>c.id===lp.id);
+            if(!cp)return lp; // Produit local absent du cloud → garder tel quel
+            // Garder la version locale (nom, prix, achat) mais prendre stocks du cloud
+            return {...lp,s1:cp.s1??lp.s1??0,s2:cp.s2??lp.s2??0};
+          });
+          // Produits locaux absents du cloud → garder aussi (nouveaux ajoutés localement)
+          const localNew=(DB.produits||[]).filter(lp=>!cloudPIds.has(lp.id));
+          cleanCloud.produits=[...mergedProds,...cloudNew];
+          if(cloudNew.length)console.log('Nouveaux produits depuis cloud:',cloudNew.map(p=>p.nom));
+          if(localNew.length)console.log('Produits locaux conservés:',localNew.map(p=>p.nom));
         }
         delete cleanCloud.factures; // Factures gérées séparément
         delete cleanCloud.clients;   // Clients gérés séparément par boutique
