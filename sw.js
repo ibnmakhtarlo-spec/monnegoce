@@ -1,4 +1,4 @@
-const CACHE = 'monnegoce-v21';
+const CACHE = 'monnegoce-v22';
 const ASSETS = ['./', './index.html'];
 
 self.addEventListener('install', e => {
