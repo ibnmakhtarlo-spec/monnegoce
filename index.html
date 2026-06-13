@@ -1678,7 +1678,7 @@ const ALL_PERMS=[
 
 const ROLE_PERMS={
   admin:ALL_PERMS.map(p=>p.id),
-  superviseur:['caisse','factures','devis','retours','depenses','produits','produits_edit','fournisseurs','clients','prix_achat','benefices','dashboard','ventes_jour','inventaire','rapports','del_facture'],
+  superviseur:['caisse','factures','devis','retours','depenses','produits','produits_edit','fournisseurs','clients','prix_achat','benefices','dashboard','ventes_jour','inventaire','rapports','del_facture','admin_menus'],
   vendeur:['caisse','factures','devis','retours','produits','clients'],
   caissier:['caisse','factures'],
 };
@@ -1921,36 +1921,15 @@ function startApp(){
 }
 
 function applyNavPerms(){
-  if(session.user?.role==='admin')return; // Admin voit tout — superviseur est limité
+  if(session.user?.role==='admin')return; // Admin voit tout
 
   const perms=session.user?.perms||[];
   const role=session.user?.role;
 
-  // Masquer les éléments admin par défaut
-  document.querySelectorAll('.admin-nav').forEach(el=>{
-    // Superviseur voit certains menus admin
-    if(role==='superviseur'){
-      el.style.display='flex';
-    } else {
-      el.style.display='none';
-    }
-  });
-
-  // Masquer les stats admin
+  // Stats bénéfices — seulement si permission
   document.querySelectorAll('.admin-stat').forEach(el=>{
-    el.style.display=(perms.includes('benefices')||role==='superviseur')?'flex':'none';
+    el.style.display=perms.includes('benefices')?'flex':'none';
   });
-
-  // Gestion nav selon permissions
-  const permNavMap={
-    'factures':   ['factures','ni-factures'],
-    'devis':      ['devis'],
-    'retours':    ['retours'],
-    'depenses':   ['depenses'],
-    'produits':   ['produits'],
-    'fournisseurs':['fournisseurs'],
-    'clients':    ['clients'],
-  };
 
   // Masquer menus selon perms
   document.querySelectorAll('.ni').forEach(el=>{
@@ -1958,13 +1937,13 @@ function applyNavPerms(){
     const m=onclick.match(/nav\('([^']+)'\)/);
     if(!m)return;
     const page=m[1];
-    // Pages toujours visibles
+    // Pages toujours visibles pour tous
     const alwaysVisible=['accueil','caisse','chat'];
     if(alwaysVisible.includes(page)){el.style.display='flex';return;}
-    // Pages admin seulement
+    // Pages admin uniquement — superviseur y accède si permission 'admin_menus'
     const adminOnly=['users','caisses-config','salaires','parametres'];
     if(adminOnly.includes(page)){
-      el.style.display=role==='superviseur'?'flex':'none';
+      el.style.display=(role==='superviseur'&&perms.includes('admin_menus'))?'flex':'none';
       return;
     }
     // Pages selon permissions
@@ -3527,30 +3506,19 @@ async function pullFromFirebase(){
       const{_syncTime,_device,...cleanCloud}=cloudData;
       const cloudTime=_syncTime||0,localTime=DB._syncTime||0;
       if(cloudTime>localTime){
-        // Restaurer photos locales
-        if(cleanCloud.produits&&DB.produits){
-          // Fusionner: garder les produits locaux absents du cloud (nouveaux ajoutés)
-          const cloudIds=new Set(cleanCloud.produits.map(p=>p.id));
-          const localOnly=DB.produits.filter(p=>!cloudIds.has(p.id));
-          cleanCloud.produits=cleanCloud.produits.map(cp=>{
-            const lp=DB.produits.find(p=>p.id===cp.id);
-            if(lp&&lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;
-            // Réinjecter les stocks depuis les nœuds dédiés
-            cp.s1=lp?lp.s1:0;
-            cp.s2=lp?lp.s2:0;
-            return cp;
-          });
-          // Fusion par _updated: le produit le plus récent gagne
-          cleanCloud.produits=cleanCloud.produits.map(cp=>{
-            const lp2=DB.produits.find(p=>p.id===cp.id);
-            if(lp2&&(lp2._updated||0)>=(cp._updated||0))return {...cp,s1:lp2.s1||0,s2:lp2.s2||0,photo:lp2.photo||cp.photo,_updated:lp2._updated||cp._updated};
-            return cp;
-          });
-          // Toujours ajouter les produits locaux nouveaux
-          if(localOnly.length>0){
-            cleanCloud.produits=[...cleanCloud.produits,...localOnly];
-            console.log('Produits locaux conservés:',localOnly.map(p=>p.nom));
-          }
+        // PRODUITS: LOCAL EST TOUJOURS PRIORITAIRE — Firebase ne peut jamais écraser
+        if(DB.produits&&DB.produits.length>0){
+          // Garder TOUS les produits locaux
+          // Ajouter seulement les produits cloud absents localement
+          const localPIds=new Set(DB.produits.map(p=>p.id));
+          const cloudOnlyP=(cleanCloud.produits||[]).filter(cp=>!localPIds.has(cp.id));
+          // Fusionner: local + nouveaux du cloud uniquement
+          cleanCloud.produits=[...DB.produits.map(lp=>{
+            // Réinjecter stocks depuis cloud si disponible
+            const cp=(cleanCloud.produits||[]).find(c=>c.id===lp.id);
+            return {...lp,s1:cp?cp.s1:lp.s1||0,s2:cp?cp.s2:lp.s2||0};
+          }),...cloudOnlyP];
+          console.log('Produits locaux protégés:',DB.produits.length,'+ cloud:',cloudOnlyP.length);
         }
         delete cleanCloud.factures; // Factures gérées séparément
         delete cleanCloud.clients;   // Clients gérés séparément par boutique
@@ -3653,23 +3621,18 @@ function startRealtimeSync(){
     const cloudTime=cloudData._syncTime||0,localTime=DB._syncTime||0;
     if(cloudTime>localTime+2000){
       const{_syncTime,_device,...cleanCloud}=cloudData;
-      if(cleanCloud.produits&&DB.produits){
-        // Fusion par _updated: le produit le plus récent gagne toujours
-        const cloudPIds=new Set(cleanCloud.produits.map(p=>p.id));
-        // Garder tous les produits locaux absents du cloud
-        const localOnlyP=DB.produits.filter(p=>!cloudPIds.has(p.id));
-        cleanCloud.produits=cleanCloud.produits.map(cp=>{
-          const lp=DB.produits.find(p=>p.id===cp.id);
-          if(lp){
-            // Le local gagne si plus récent OU si modifié récemment
-            if((lp._updated||0)>=(cp._updated||0))return {...cp,s1:lp.s1||0,s2:lp.s2||0,photo:lp.photo||cp.photo,_updated:lp._updated||cp._updated};
-            if(lp.photo&&lp.photo.startsWith('data:'))cp.photo=lp.photo;
-            cp.s1=lp.s1||0;cp.s2=lp.s2||0;
-          }
-          return cp;
-        });
-        // Toujours ajouter les produits locaux nouveaux
-        if(localOnlyP.length>0)cleanCloud.produits=[...cleanCloud.produits,...localOnlyP];
+      // PRODUITS: ne jamais écraser depuis Firebase — local est toujours prioritaire
+      if(cleanCloud.produits&&DB.produits&&DB.produits.length>0){
+        // Fusionner: garder tous les produits locaux, ajouter seulement les nouveaux du cloud
+        const localIds=new Set(DB.produits.map(p=>p.id));
+        const cloudNew=cleanCloud.produits.filter(cp=>!localIds.has(cp.id));
+        if(cloudNew.length>0){
+          cleanCloud.produits=[...DB.produits,...cloudNew];
+        } else {
+          cleanCloud.produits=DB.produits; // Garder 100% local
+        }
+      } else if(DB.produits&&DB.produits.length>0){
+        cleanCloud.produits=DB.produits; // Garder 100% local
       }
       // Sauvegarder users/factures/clients avant assign
       const currentUsers=DB.users;
