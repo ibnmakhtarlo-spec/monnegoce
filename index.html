@@ -493,6 +493,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="ni admin-nav" onclick="nav('produits-lents')"><span class="ic">🐢</span> Produits Lents</div>
   <div class="ni" onclick="nav('chat')"><span class="ic">💬</span> Chat Personnel</div>
   <div class="ni admin-nav" onclick="nav('users')"><span class="ic">🔐</span> Utilisateurs & Rôles</div>
+  <div class="ni admin-nav" onclick="openModal('modal-transfert');setTimeout(()=>{const s=document.getElementById('tr-prod');if(s)s.innerHTML=DB.produits.map(p=>`<option value="${p.id}">${p.nom} (B1:${p.s1||0} B2:${p.s2||0})</option>`).join('');},50)"><span class="ic">🔄</span> Transfert Stock</div>
   <div class="ni admin-nav" onclick="nav('caisses-config')"><span class="ic">💰</span> Config Caisses</div>
   <div class="ni admin-nav" onclick="nav('salaires')"><span class="ic">💼</span> Salaires</div>
   <div class="ni admin-nav" onclick="nav('rapports')"><span class="ic">📈</span> Rapports</div>
@@ -799,6 +800,13 @@ canvas.chart-canvas{display:block;width:100%!important;}
         <button class="btn btn-cyan" style="width:100%;" onclick="iaSuggestionPrix()">💰 Suggestion prix</button>
         <div id="ia-analyse-result" style="margin-top:8px;"></div>
       </div>
+    </div>
+    <div class="card" style="padding:13px;margin-bottom:11px;border-color:rgba(139,92,246,.3);">
+      <h3 style="font-size:13px;font-weight:800;color:var(--purple);margin-bottom:9px;">✅ Agent Tâches IA</h3>
+      <textarea id="ia-tache-input" style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:8px;color:var(--text);font-family:var(--font);font-size:12px;min-height:55px;outline:none;resize:vertical;" placeholder="Ex: Rappelle-moi de commander des écouteurs demain à 9h"></textarea>
+      <button class="btn btn-purple" style="width:100%;margin-top:6px;" onclick="iaCreerTache()">🤖 Ajouter la tâche</button>
+      <div id="ia-tache-result" style="margin-top:8px;"></div>
+      <div id="ia-taches-liste" style="margin-top:10px;max-height:220px;overflow-y:auto;"></div>
     </div>
     <div class="card" style="padding:13px;margin-bottom:11px;border-color:rgba(139,92,246,.3);">
       <h3 style="font-size:12px;font-weight:800;color:var(--purple);margin-bottom:8px;">🔑 Clé API Claude</h3>
@@ -1228,6 +1236,35 @@ canvas.chart-canvas{display:block;width:100%!important;}
 </div>
 
 <!-- NOUVELLE FACTURE -->
+<div class="overlay" id="modal-fact">
+  <div class="modal">
+    <div class="mtitle"><span>📄 Détail</span><span class="mclose" onclick="closeModal('modal-fact')">✕</span></div>
+    <div id="modal-fact-body"></div>
+  </div>
+</div>
+<div class="overlay" id="modal-transfert">
+  <div class="modal">
+    <div class="mtitle"><span>🔄 Transfert de Stock</span><span class="mclose" onclick="closeModal('modal-transfert')">✕</span></div>
+    <div class="fgrid">
+      <div class="fg">
+        <label>Produit</label>
+        <select id="tr-prod" style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;color:var(--text);font-family:var(--font);font-size:12px;outline:none;"></select>
+      </div>
+      <div class="fg">
+        <label>Quantité à transférer</label>
+        <input type="number" id="tr-qte" min="1" placeholder="0" style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;color:var(--text);font-family:var(--font);font-size:12px;outline:none;">
+      </div>
+      <div class="fg">
+        <label>Sens du transfert</label>
+        <select id="tr-sens" style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;color:var(--text);font-family:var(--font);font-size:12px;outline:none;">
+          <option value="B1toB2">Boutique 1 → Boutique 2</option>
+          <option value="B2toB1">Boutique 2 → Boutique 1</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-gold" style="width:100%;margin-top:10px;" onclick="transfertStock()">🔄 Effectuer le transfert</button>
+  </div>
+</div>
 <div class="overlay" id="modal-nf">
   <div class="modal lg">
     <div class="mtitle"><span>🧾 Nouvelle Facture</span><span class="mclose" onclick="closeModal('modal-nf')">✕</span></div>
@@ -1243,6 +1280,9 @@ canvas.chart-canvas{display:block;width:100%!important;}
       </div>
       <div class="fg"><label>Mode de paiement</label>
         <select id="nf-pay"><option value="especes">💵 Espèces</option><option value="wave">🌊 Wave</option><option value="orange">🟠 Orange Money</option><option value="mobile">📱 Mobile Money</option><option value="carte">💳 Carte</option><option value="credit">📝 Crédit</option></select>
+      </div>
+      <div class="fg"><label>Date de la facture</label>
+        <input type="date" id="nf-date" style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;">
       </div>
     </div>
     <div style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:11px;">
@@ -1649,6 +1689,7 @@ let AC;try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){AC
 function pt(f,d,t='sine',v=.3){if(!AC)return;try{const o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.type=t;o.frequency.value=f;g.gain.setValueAtTime(v,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+d);o.start();o.stop(AC.currentTime+d);}catch(e){}}
 function soundOk(){pt(523,.1,'sine',.4);setTimeout(()=>pt(659,.1,'sine',.4),100);setTimeout(()=>pt(784,.3,'sine',.4),200);}
 function soundErr(){pt(200,.3,'sawtooth',.3);}
+function soundDoublon(){pt(300,.15,'square',.3);setTimeout(()=>pt(300,.15,'square',.3),180);}
 function soundLogin(){[440,523,659,784].forEach((f,i)=>setTimeout(()=>pt(f,.3,'sine',.2),i*120));setTimeout(()=>pt(880,.6,'sine',.15),500);}
 function soundLogout(){[784,659,523,440,330].forEach((f,i)=>setTimeout(()=>pt(f,.25,'sine',.2),i*100));}
 
@@ -1678,7 +1719,7 @@ const ALL_PERMS=[
 
 const ROLE_PERMS={
   admin:ALL_PERMS.map(p=>p.id),
-  superviseur:['caisse','factures','devis','retours','depenses','produits','produits_edit','fournisseurs','clients','prix_achat','benefices','dashboard','ventes_jour','inventaire','rapports','del_facture','admin_menus'],
+  superviseur:['caisse','factures','devis','retours','depenses','produits','produits_edit','fournisseurs','clients','dashboard','ventes_jour','inventaire','rapports','admin_menus'],
   vendeur:['caisse','factures','devis','retours','produits','clients'],
   caissier:['caisse','factures'],
 };
@@ -1707,6 +1748,7 @@ let DB={
     {id:'CAS01',nom:'Caissier Gamma',pwd:'4444',role:'caissier',boutique:'B1',caisse:'C1',actif:true,perms:ROLE_PERMS.caissier},
   ],
   clotures:LS('clotures')||[],
+  taches:LS('taches')||[],
   logs:LS('logs')||[],
   caisses:LS('caisses')||[
     {id:'C1',nom:'Caisse 1',boutique:'B1',responsable:'',fond:0},
@@ -1839,6 +1881,24 @@ function resetInactivity(){
     }
   },INACT_DELAY);
 }
+// Rappel Alhamdoulillah toutes les 30 minutes
+function playAlhamdoulillah(){
+  if(!AC)return;
+  // Mélodie douce évoquant la gratitude (pas de parole, juste un son agréable de rappel)
+  [392,440,494,523,587,659].forEach((f,i)=>setTimeout(()=>pt(f,.35,'sine',.25),i*200));
+  setTimeout(()=>{
+    if('speechSynthesis' in window){
+      const u=new SpeechSynthesisUtterance('الحمد لله');
+      u.lang='ar-SA';u.rate=0.8;u.volume=0.6;
+      speechSynthesis.speak(u);
+    }
+  },1500);
+  toast('🤲 الحمد لله — Alhamdoulillah','info');
+}
+function startAlhamdoulillahTimer(){
+  setInterval(playAlhamdoulillah,30*60*1000); // 30 minutes
+}
+
 function startInactivityTimer(){
   ['click','keydown','touchstart','mousemove'].forEach(e=>document.addEventListener(e,resetInactivity,{passive:true}));
   resetInactivity();
@@ -1852,20 +1912,39 @@ function logAction(action,details=''){
   if(DB.logs.length>500)DB.logs=DB.logs.slice(0,500); // Garder 500 dernières actions
 }
 
+let _loginAttempts={};
 function doLogin(){
   if(AC&&AC.state==='suspended')AC.resume();
   const id=document.getElementById('l-id').value.trim().toUpperCase();
+  // Anti brute-force: bloquer après 5 tentatives échouées (verrou 5 min)
+  const att=_loginAttempts[id]||{count:0,lockUntil:0};
+  if(att.lockUntil>Date.now()){
+    const remain=Math.ceil((att.lockUntil-Date.now())/1000);
+    soundErr();toast('🔒 Compte verrouillé. Réessayez dans '+remain+'s','err');
+    return;
+  }
   const pwd=document.getElementById('l-pwd').value;
   // Debug: check what's in DB
   const userFound=DB.users.find(u=>u.id===id);
   const u=DB.users.find(u=>u.id===id&&u.pwd===pwd&&u.actif!==false);
   if(!u){
     soundErr();
+    if(!_loginAttempts[id])_loginAttempts[id]={count:0,lockUntil:0};
+    _loginAttempts[id].count++;
+    if(_loginAttempts[id].count>=5){
+      _loginAttempts[id].lockUntil=Date.now()+5*60*1000;
+      _loginAttempts[id].count=0;
+      logAction&&logAction('Sécurité','Verrouillage compte '+id+' après 5 échecs');
+      toast('🔒 5 échecs — Compte verrouillé 5 minutes','err');
+      return;
+    }
     if(userFound&&userFound.actif===false) toast('Compte désactivé — contactez Admin','err');
-    else if(userFound) toast('Code secret incorrect pour '+id,'err');
+    else if(userFound) toast('Code secret incorrect pour '+id+' ('+(5-_loginAttempts[id].count)+' essai(s) restant(s))','err');
     else toast('Identifiant "'+id+'" introuvable','err');
     return;
   }
+  // Connexion réussie: réinitialiser le compteur
+  delete _loginAttempts[id];
   session.user=u;
   session.boutique=document.getElementById('l-boutique').value;
   // Si caisse vide (admin/superviseur), utiliser la caisse du select login
@@ -1901,6 +1980,7 @@ function startApp(){
   nav('accueil');
   // Déconnexion automatique après 30min d'inactivité
   startInactivityTimer();
+  startAlhamdoulillahTimer();
   setTheme(DB.settings.theme||'dark');
   setTimeout(checkStockAlerts,1500);
   setTimeout(()=>{setPeriod('mois');setCrPeriod('tout');},100);
@@ -1957,7 +2037,7 @@ function applyNavPerms(){
     };
     const requiredPerm=permMap[page];
     if(requiredPerm){
-      el.style.display=(perms.includes(requiredPerm)||role==='superviseur')?'flex':'none';
+      el.style.display=perms.includes(requiredPerm)?'flex':'none';
     } else {
       el.style.display='flex';
     }
@@ -1965,11 +2045,11 @@ function applyNavPerms(){
 
   // Bouton ajouter produit
   const addProd=document.getElementById('btn-add-prod');
-  if(addProd)addProd.style.display=(perms.includes('produits_edit')||role==='superviseur')?'flex':'none';
+  if(addProd)addProd.style.display=perms.includes('produits_edit')?'flex':'none';
 
   // Colonne prix achat
   const thAchat=document.getElementById('th-achat');
-  if(thAchat)thAchat.style.display=(perms.includes('prix_achat')||role==='superviseur')?'':'none';
+  if(thAchat)thAchat.style.display=perms.includes('prix_achat')?'':'none';
 }
 
 function logout(){
@@ -2184,7 +2264,7 @@ function renderFactures(){
     const boutiqueMatch=canSeeAll?(!bf||f.boutique===bf):(f.boutique===userBoutique&&(!bf||f.boutique===bf));
     return(!q||f.id.toLowerCase().includes(q)||f.client.toLowerCase().includes(q))&&boutiqueMatch&&(!df||fd>=df)&&(!dt||fd<=dt);
   });
-  const canDel=hasPerm('del_facture')||isAdmin();
+  const canDel=hasPerm('del_facture')||session.user?.role==='admin';
   document.getElementById('tb-f').innerHTML=list.length?list.map(f=>`<tr>
     <td><span class="mono" style="color:var(--gold);font-weight:700;font-size:11px;">${f.id}</span></td>
     <td><span class="badge ${f.boutique==='B1'?'bb':'bo'}">${getBName(f.boutique).substring(0,9)}</span></td>
@@ -2240,7 +2320,7 @@ async function buildPDFBytes(f){
   doc.setFontSize(24);doc.setTextColor(...gold);doc.text(s.logo||'🏪',14,29);
   doc.setFontSize(16);doc.setFont('helvetica','bold');doc.setTextColor(...gold);doc.text((s.nom||'MON NÉGOCE').toUpperCase(),45,21);
   doc.setFontSize(7.5);doc.setFont('helvetica','normal');doc.setTextColor(...lg);
-  let iy=27;if(s.adr){doc.text(s.adr,45,iy);iy+=4;}if(s.tel){doc.text('Tél: '+s.tel,45,iy);iy+=4;}if(s.ninea){doc.text('NINEA: '+s.ninea,45,iy);}
+  let iy=27;if(s.adr){doc.text(s.adr,45,iy);iy+=4;}if(s.tel){doc.text('Tél: '+s.tel,45,iy);iy+=4;}if(s.ninea){doc.text('NINEA: '+s.ninea,45,iy);iy+=4;}if(s.rc){doc.text('RC: '+s.rc,45,iy);}
   doc.setFillColor(...gold);doc.roundedRect(140,12,58,14,3,3,'F');doc.setFontSize(13);doc.setFont('helvetica','bold');doc.setTextColor(...dark);doc.text('FACTURE',169,21,{align:'center'});doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text(f.id,169,27,{align:'center'});
   doc.setDrawColor(...gold);doc.setLineWidth(0.8);doc.line(0,50,W,50);
   doc.setFillColor(...lg);doc.roundedRect(10,55,88,32,3,3,'F');doc.roundedRect(112,55,88,32,3,3,'F');
@@ -2351,7 +2431,10 @@ function nfValider(){
   // ID unique: préfixe utilisateur + timestamp pour éviter collisions entre appareils
   const _fid='F'+session.user.id.replace(/[^A-Z0-9]/g,'').substring(0,3)+Date.now().toString(36).toUpperCase().slice(-5);
   DB.nextIds.f++;
-  const fac={id:_fid,boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:nfLignes.map(l=>({id:l.id,nom:String(l.nom),prix:Number(l.prix),achat:Number(l.achat||0),qty:Number(l.qty),unite:String(l.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
+    // Utiliser la date saisie si fournie, sinon maintenant
+  const nfDateVal=document.getElementById('nf-date')?.value;
+  const nfDate=nfDateVal?new Date(nfDateVal+'T'+new Date().toTimeString().slice(0,8)).toISOString():new Date().toISOString();
+  const fac={id:_fid,boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:nfLignes.map(l=>({id:l.id,nom:String(l.nom),prix:Number(l.prix),achat:Number(l.achat||0),qty:Number(l.qty),unite:String(l.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,date:nfDate};
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;
     // Points fidélité: 1 point par 1000 FCFA
     const newPoints=Math.floor(total/1000);
@@ -2431,7 +2514,7 @@ function saveProd(){
   const eid=document.getElementById('mp-id').value;
   // Bloquer doublons — vérifier si un produit avec ce nom existe déjà
   const doublon=DB.produits.find(p=>p.nom.toLowerCase()===nom.toLowerCase()&&p.id!==eid);
-  if(doublon){soundErr();toast('⚠️ Produit "'+nom+'" existe déjà ('+doublon.id+')','err');return;}
+  if(doublon){soundDoublon();toast('⚠️ Produit "'+nom+'" existe déjà ('+doublon.id+')','err');return;}
   // Avertir si prix achat = 0
   const achatVal=parseFloat(document.getElementById('mp-achat').value)||0;
   if(achatVal===0&&!eid){if(!confirm('⚠️ Prix d\'achat = 0 FCFA. Continuer quand même ?')){return;}}
@@ -2447,9 +2530,9 @@ function saveProd(){
   save();stopCamera();closeModal('modal-prod');renderProduits();refreshAllSelects();toast(eid?'Modifié ✅':'Ajouté ✅','ok');
 }
 function renderProduits(){
-  const q=(document.getElementById('srch-p')?.value||'').toLowerCase();const adm=hasPerm('prix_achat')||isAdmin();
+  const q=(document.getElementById('srch-p')?.value||'').toLowerCase();const adm=hasPerm('prix_achat')||session.user?.role==='admin';
   const list=DB.produits.filter(p=>!q||p.nom.toLowerCase().includes(q)||(p.ref||'').toLowerCase().includes(q));
-  const canEdit=hasPerm('produits_edit')||isAdmin();
+  const canEdit=hasPerm('produits_edit')||session.user?.role==='admin';
   document.getElementById('tb-p').innerHTML=list.length?list.map(p=>{
     const st=p.s1<=0&&p.s2<=0?'br':p.s1<=(p.alerte||5)||p.s2<=(p.alerte||5)?'by':'bg';const sl=p.s1<=0&&p.s2<=0?'Rupture':p.s1<=(p.alerte||5)||p.s2<=(p.alerte||5)?'Faible':'En stock';
     return`<tr><td>${p.photo?`<img src="${p.photo}" style="width:30px;height:30px;border-radius:4px;object-fit:cover;">`:'<div style="width:30px;height:30px;border-radius:4px;background:var(--surf3);display:inline-flex;align-items:center;justify-content:center;font-size:13px;">📦</div>'}</td><td class="mono" style="font-size:9px;color:var(--orange)">${p.ref||'—'}</td><td><b>${p.nom}</b>${p.desc?`<br><span style="font-size:9px;color:var(--text2)">${p.desc.substring(0,35)}...</span>`:''}</td><td><span class="badge bb">${p.cat}</span></td><td class="mono" style="color:var(--green);font-weight:700">${fmt(p.prix)}</td>${adm?`<td class="mono" style="color:var(--text2)">${fmt(p.achat)}</td>`:''}<td style="font-weight:700;color:${p.s1<=(p.alerte||5)?'var(--red)':'inherit'}">${p.s1}</td><td style="font-weight:700;color:${p.s2<=(p.alerte||5)?'var(--red)':'inherit'}">${p.s2}</td><td>${p.alerte||5}</td><td><span class="badge ${st}">${sl}</span></td><td style="display:flex;gap:3px;">${canEdit?`<button class="btn btn-ghost btn-xs" onclick="editProd('${p.id}')">✏️</button><button class="btn btn-red btn-xs" onclick="delProd('${p.id}')">🗑</button>`:'—'}</td></tr>`;
@@ -2543,7 +2626,7 @@ function openModalUser(){
 function saveUser(){
   const nom=document.getElementById('mu-nom').value.trim();const id2=document.getElementById('mu-id2').value.trim().toUpperCase();const pwd=document.getElementById('mu-pwd').value;
   if(!nom||!id2||!pwd){soundErr();toast('Tous les champs requis','err');return;}
-  const eid=document.getElementById('mu-eid').value;if(!eid&&DB.users.find(u=>u.id===id2)){soundErr();toast('Identifiant déjà pris','err');return;}
+  const eid=document.getElementById('mu-eid').value;if(!eid&&DB.users.find(u=>u.id===id2)){soundDoublon();toast('Identifiant déjà pris','err');return;}
   const perms=getSelectedPerms();
   if(perms.length===0&&document.getElementById('mu-role').value!=='admin'){if(!confirm('Aucune permission sélectionnée. Continuer ?')){return;}}
   const _ts=Date.now();
@@ -2895,7 +2978,7 @@ function saveSettings(b){const n=b==='B1'?1:2;const s=DB.settings[b];const get=i
 function saveSettingsGen(){DB.settings.appNom=document.getElementById('set-app-nom')?.value||'Mon Négoce';DB.settings.apiKey=document.getElementById('set-api-key')?.value||'';save();const sb=document.getElementById('sb-brand');if(sb)sb.textContent=DB.settings.appNom;toast('Paramètres enregistrés ✅','ok');}
 
 // ══ CENTRE IA ══
-function renderIACentre(){const b=document.getElementById('ia-api-banner');if(b)b.style.display=DB.settings.apiKey?'none':'block';const inp=document.getElementById('ia-centre-apikey');if(inp&&DB.settings.apiKey)inp.value=DB.settings.apiKey;const s=document.getElementById('ia-api-status');if(s)s.innerHTML=DB.settings.apiKey?'<span style="color:var(--green)">✅ Clé API active</span>':'<span style="color:var(--orange)">⚠️ Aucune clé</span>';}
+function renderIACentre(){renderTachesListe();const b=document.getElementById('ia-api-banner');if(b)b.style.display=DB.settings.apiKey?'none':'block';const inp=document.getElementById('ia-centre-apikey');if(inp&&DB.settings.apiKey)inp.value=DB.settings.apiKey;const s=document.getElementById('ia-api-status');if(s)s.innerHTML=DB.settings.apiKey?'<span style="color:var(--green)">✅ Clé API active</span>':'<span style="color:var(--orange)">⚠️ Aucune clé</span>';}
 function saveAPIKey(){const key=document.getElementById('ia-centre-apikey')?.value.trim()||'';if(!key.startsWith('sk-')){const s=document.getElementById('ia-api-status');if(s)s.innerHTML='<span style="color:var(--red)">❌ Clé invalide (doit commencer par sk-)</span>';return;}DB.settings.apiKey=key;save();const el=document.getElementById('set-api-key');if(el)el.value=key;const s=document.getElementById('ia-api-status');if(s)s.innerHTML='<span style="color:var(--green)">✅ Clé enregistrée !</span>';const b=document.getElementById('ia-api-banner');if(b)b.style.display='none';toast('Clé API sauvegardée ✅','ok');}
 
 // ══ IA ══
@@ -2923,6 +3006,58 @@ async function iaCreerFacture(){
     e=>iaError('ia-fac-result',e)
   );
 }
+async function iaCreerTache(){
+  const input=document.getElementById('ia-tache-input')?.value.trim();
+  if(!input){soundErr();toast('Décrivez la tâche','err');return;}
+  iaLoading('ia-tache-result');
+  const todayISO=new Date().toISOString();
+  await callIA(`Date actuelle: ${todayISO}\nExtrait une tâche/rappel de ce texte: "${input}"\nJSON UNIQUEMENT: {"titre":"texte court","date":"YYYY-MM-DDTHH:mm:00","priorite":"normale|haute|basse","commentaire":"confirmation courte"}`,
+    txt=>{
+      try{
+        const d=JSON.parse(txt.replace(/```json|```/g,'').trim());
+        const tache={
+          id:'TK'+Date.now().toString(36).toUpperCase().slice(-6),
+          titre:d.titre||input,
+          date:d.date||todayISO,
+          priorite:d.priorite||'normale',
+          done:false,
+          createdBy:session.user?.nom||'?',
+          createdAt:todayISO
+        };
+        if(!DB.taches)DB.taches=[];
+        DB.taches.push(tache);
+        save();
+        logAction&&logAction('Tâche IA créée',tache.titre);
+        document.getElementById('ia-tache-input').value='';
+        iaResult('ia-tache-result',`✅ ${d.commentaire||'Tâche ajoutée !'}`);
+        renderTachesListe();
+        soundOk();
+      }catch(e){iaError('ia-tache-result','Format invalide. Réessayez.');}
+    },
+    e=>iaError('ia-tache-result',e)
+  );
+}
+function renderTachesListe(){
+  const el=document.getElementById('ia-taches-liste');if(!el)return;
+  const taches=(DB.taches||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  if(!taches.length){el.innerHTML='<div class="empty" style="padding:10px;font-size:11px;">Aucune tâche</div>';return;}
+  const prioColor={haute:'var(--red)',normale:'var(--gold)',basse:'var(--text2)'};
+  el.innerHTML=taches.map(t=>{
+    const dDate=new Date(t.date);
+    const isPast=dDate<new Date()&&!t.done;
+    return`<div style="display:flex;align-items:center;gap:7px;padding:6px;background:var(--surf2);border-radius:7px;margin-bottom:5px;${t.done?'opacity:.5;':''}${isPast?'border-left:3px solid var(--red);':''}">
+      <input type="checkbox" ${t.done?'checked':''} onchange="toggleTache('${t.id}')" style="cursor:pointer;">
+      <div style="flex:1;">
+        <div style="font-size:11px;font-weight:700;${t.done?'text-decoration:line-through;':''}">${t.titre}</div>
+        <div style="font-size:9px;color:var(--text2);">📅 ${dDate.toLocaleDateString('fr-FR')} ${dDate.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})} — <span style="color:${prioColor[t.priorite]||'var(--text2)'}">${t.priorite}</span></div>
+      </div>
+      <button class="btn btn-xs btn-danger" onclick="delTache('${t.id}')">🗑</button>
+    </div>`;
+  }).join('');
+}
+function toggleTache(id){const t=(DB.taches||[]).find(x=>x.id===id);if(t){t.done=!t.done;save();renderTachesListe();}}
+function delTache(id){DB.taches=(DB.taches||[]).filter(x=>x.id!==id);save();renderTachesListe();}
+
 async function iaRapport(){const zone=document.getElementById('ia-rapport-zone');if(!zone)return;zone.innerHTML='<div class="ia-loading" style="justify-content:center;padding:16px;"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div></div>';await callIA(`${buildContext()}\nAnalyse stratégique: performance, forces, faiblesses, actions prioritaires.`,r=>{zone.innerHTML=`<div class="ia-panel"><div class="ia-title">🤖 Analyse</div><div class="ia-msg">${r.replace(/\n/g,'<br>')}</div></div>`;},e=>{zone.innerHTML=`<div class="empty">❌ ${e}</div>`;});}
 async function askIA(){const q=document.getElementById('ia-question')?.value.trim();if(!q){toast('Posez une question','err');return;}const result=document.getElementById('ia-modal-result');if(!result)return;result.innerHTML='<div class="ia-panel"><div class="ia-loading"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div></div></div>';await callIA(`${buildContext()}\nQuestion: ${q}`,r=>{result.innerHTML=`<div class="ia-panel"><div class="ia-title">🤖 Réponse</div><div class="ia-msg">${r.replace(/\n/g,'<br>')}</div></div>`;},e=>{result.innerHTML=`<div class="empty">❌ ${e}</div>`;});}
 
@@ -4154,7 +4289,7 @@ function openThermalReceipt(factId){
     ${row('Paiement:',f.mode.toUpperCase())}
     <div class="tr-divider"></div>
     <div style="text-align:center;font-size:9px;margin-top:6px;">Merci pour votre achat !<br>Conservez ce reçu</div>
-    <div style="text-align:center;font-size:8px;margin-top:4px;color:#999;">${s.ninea?'NINEA: '+s.ninea:''}</div>
+    <div style="text-align:center;font-size:8px;margin-top:4px;color:#999;">${s.ninea?'NINEA: '+s.ninea:''}${s.ninea&&s.rc?' — ':''}${s.rc?'RC: '+s.rc:''}</div>
   </div>`;
   document.getElementById('thermal-content').innerHTML=html;
   openModal('modal-thermal');
@@ -4372,7 +4507,7 @@ function openExportModal(){openModal('modal-export');}
   });
 })();
 
-const cwConf={fmt24:true,showSec:true,showDate:true,showWeather:true,ville:'Dakar',panelOpen:false};
+const cwConf={fmt24:true,showSec:true,showDate:true,showWeather:true,ville:'Louga',panelOpen:false};
 let cwWeather=null,cwTimer=null;
 async function fetchWeather(ville){try{const r=await fetch(`https://wttr.in/${encodeURIComponent(ville)}?format=j1`);const d=await r.json();const cur=d.current_condition[0];const desc=cur.weatherDesc[0].value;const temp=cur.temp_C;const icons={'Sunny':'☀️','Clear':'🌙','Partly':'⛅','Cloud':'☁️','Mist':'🌫️','Fog':'🌫️','rain':'🌧️','Thunder':'⛈️','Snow':'🌨️','Drizzle':'🌦️'};const icon=Object.entries(icons).find(([k])=>desc.toLowerCase().includes(k.toLowerCase()))?.[1]||'🌡️';cwWeather={temp,desc,icon};}catch(e){cwWeather={temp:'--',desc:'—',icon:'🌡️'};}renderClock();}
 function renderClock(){const el=document.getElementById('topbar-clock');if(!el)return;const now=new Date();const h=now.getHours(),m=now.getMinutes(),s=now.getSeconds();let timeStr;if(cwConf.fmt24){timeStr=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}${cwConf.showSec?':'+String(s).padStart(2,'0'):''}`;}else{const h12=h%12||12;const ap=h<12?'AM':'PM';timeStr=`${h12}:${String(m).padStart(2,'0')}${cwConf.showSec?':'+String(s).padStart(2,'0'):''} ${ap}`;}
