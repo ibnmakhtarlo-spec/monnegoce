@@ -15,6 +15,7 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <title>Mon Négoce Enterprise</title>
 <style>
@@ -493,7 +494,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="ni admin-nav" onclick="nav('produits-lents')"><span class="ic">🐢</span> Produits Lents</div>
   <div class="ni" onclick="nav('chat')"><span class="ic">💬</span> Chat Personnel</div>
   <div class="ni admin-nav" onclick="nav('users')"><span class="ic">🔐</span> Utilisateurs & Rôles</div>
-  <div class="ni admin-nav" onclick="openModal('modal-transfert');setTimeout(()=>{const s=document.getElementById('tr-prod');if(s)s.innerHTML=DB.produits.map(p=>`<option value="${p.id}">${p.nom} (B1:${p.s1||0} B2:${p.s2||0})</option>`).join('');},50)"><span class="ic">🔄</span> Transfert Stock</div>
+  <div class="ni admin-nav" onclick="openTransfertStock()"><span class="ic">🔄</span> Transfert Stock</div>
   <div class="ni admin-nav" onclick="nav('caisses-config')"><span class="ic">💰</span> Config Caisses</div>
   <div class="ni admin-nav" onclick="nav('salaires')"><span class="ic">💼</span> Salaires</div>
   <div class="ni admin-nav" onclick="nav('rapports')"><span class="ic">📈</span> Rapports</div>
@@ -1669,6 +1670,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
       <div class="export-card" onclick="exportJSON()"><div class="ec-icon">📦</div><div class="ec-title">Export JSON</div><div class="ec-desc">Toutes les données</div></div>
       <div class="export-card" onclick="exportCSV()"><div class="ec-icon">📊</div><div class="ec-title">Export CSV</div><div class="ec-desc">Factures seulement</div></div>
+      <div class="export-card" onclick="exportFullBackup()"><div class="ec-icon">💾</div><div class="ec-title">Sauvegarde complète</div><div class="ec-desc">Toute la base (JSON)</div></div>
       <div class="export-card" onclick="exportProduitsCSV()"><div class="ec-icon">📦</div><div class="ec-title">Export Produits CSV</div><div class="ec-desc">Catalogue complet</div></div>
       <div class="export-card" onclick="exportClientsCSV()"><div class="ec-icon">👥</div><div class="ec-title">Export Clients CSV</div><div class="ec-desc">Base clients</div></div>
     </div>
@@ -1844,17 +1846,20 @@ function showResetPanel(){
   document.getElementById('reset-panel').style.display='block';
   document.getElementById('reset-admin-code').focus();
 }
-function doResetPassword(){
+async function doResetPassword(){
   const targetId=document.getElementById('l-id').value.trim().toUpperCase();
   const adminCode=document.getElementById('reset-admin-code').value;
   const newPwd=document.getElementById('reset-new-pwd').value;
   if(!targetId){toast('Entrez d\'abord l\'identifiant en haut','err');return;}
   if(!newPwd||newPwd.length<2){toast('Nouveau code trop court','err');return;}
-  const admin=DB.users.find(u=>u.role==='admin'&&u.pwd===adminCode&&u.actif!==false);
+  let admin=null;
+  for(const u of DB.users){
+    if(u.role==='admin'&&u.actif!==false&&await checkPwd(adminCode,u.pwd)){admin=u;break;}
+  }
   if(!admin){soundErr();toast('Code Admin incorrect','err');return;}
   const target=DB.users.find(u=>u.id===targetId);
   if(!target){toast('Utilisateur "'+targetId+'" introuvable','err');return;}
-  target.pwd=newPwd;
+  target.pwd=await hashPwd(newPwd);
   save();
   // Pousser immédiatement sur Firebase
   if(fbConnected){
@@ -1913,7 +1918,23 @@ function logAction(action,details=''){
 }
 
 let _loginAttempts={};
-function doLogin(){
+// ══ HASH MOTS DE PASSE (SHA-256) ══
+async function hashPwd(pwd){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('mn_salt_'+pwd));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function checkPwd(inputPwd,storedPwd){
+  if(!storedPwd)return false;
+  // Ancien format (clair, 4 chiffres) -> comparer direct ET migrer
+  if(storedPwd.length<20){
+    return inputPwd===storedPwd;
+  }
+  // Nouveau format (haché)
+  const h=await hashPwd(inputPwd);
+  return h===storedPwd;
+}
+
+async function doLogin(){
   if(AC&&AC.state==='suspended')AC.resume();
   const id=document.getElementById('l-id').value.trim().toUpperCase();
   // Anti brute-force: bloquer après 5 tentatives échouées (verrou 5 min)
@@ -1924,9 +1945,16 @@ function doLogin(){
     return;
   }
   const pwd=document.getElementById('l-pwd').value;
-  // Debug: check what's in DB
   const userFound=DB.users.find(u=>u.id===id);
-  const u=DB.users.find(u=>u.id===id&&u.pwd===pwd&&u.actif!==false);
+  let u=null;
+  if(userFound&&userFound.actif!==false&&await checkPwd(pwd,userFound.pwd)){
+    u=userFound;
+    // Migration auto: si l'ancien mdp était en clair, le hasher maintenant
+    if(userFound.pwd.length<20){
+      userFound.pwd=await hashPwd(pwd);
+      save();
+    }
+  }
   if(!u){
     soundErr();
     if(!_loginAttempts[id])_loginAttempts[id]={count:0,lockUntil:0};
@@ -2290,9 +2318,12 @@ function openDelFact(id){
   document.getElementById('del-fact-info').textContent=`Facture ${f.id} — ${f.client} — ${fmt(f.total)} — ${new Date(f.date).toLocaleDateString('fr-FR')}`;
   openModal('modal-del-fact');
 }
-function confirmDelFact(){
+async function confirmDelFact(){
   const id=document.getElementById('del-fact-id').value;const pwd=document.getElementById('del-fact-pwd').value;
-  const admin=DB.users.find(u=>u.role==='admin'&&u.pwd===pwd&&u.actif!==false);
+  let admin=null;
+  for(const u of DB.users){
+    if(u.role==='admin'&&u.actif!==false&&await checkPwd(pwd,u.pwd)){admin=u;break;}
+  }
   if(!admin){soundErr();toast('Code administrateur incorrect','err');return;}
   DB.factures=DB.factures.filter(f=>f.id!==id);save();closeModal('modal-del-fact');renderFactures();
   toast(`Facture supprimée (validé par ${admin.nom}) ✅`,'ok');
@@ -2539,6 +2570,13 @@ function renderProduits(){
   }).join(''):`<tr><td colspan="11" class="empty"><div class="ei">📦</div>Aucun produit</td></tr>`;
 }
 function editProd(id){const p=DB.produits.find(x=>x.id===id);document.getElementById('mp-t').textContent='✏️ Modifier';document.getElementById('mp-id').value=p.id;document.getElementById('mp-nom').value=p.nom;document.getElementById('mp-ref').value=p.ref||'';document.getElementById('mp-cat').value=p.cat||'';document.getElementById('mp-prix').value=p.prix;document.getElementById('mp-achat').value=p.achat||0;document.getElementById('mp-s1').value=p.s1||0;document.getElementById('mp-s2').value=p.s2||0;document.getElementById('mp-al').value=p.alerte||5;document.getElementById('mp-un').value=p.unite||'pièce';document.getElementById('mp-desc').value=p.desc||'';if(p.photo){document.getElementById('mp-photo-data').value=p.photo;document.getElementById('mp-photo-preview').innerHTML=`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover;">`;document.getElementById('mp-photo-clear').style.display='inline-flex';}else clearProdPhoto();refreshFournSel('mp-fourn',p.fourn);mpShowTab('manuel');openModal('modal-prod');}
+function openTransfertStock(){
+  openModal('modal-transfert');
+  setTimeout(()=>{
+    const s=document.getElementById('tr-prod');
+    if(s)s.innerHTML=DB.produits.map(p=>'<option value="'+p.id+'">'+p.nom+' (B1:'+(p.s1||0)+' B2:'+(p.s2||0)+')</option>').join('');
+  },50);
+}
 function transfertStock(){
   const pid=document.getElementById('tr-prod')?.value;
   const qte=parseInt(document.getElementById('tr-qte')?.value)||0;
@@ -2623,13 +2661,22 @@ function openModalUser(){
   document.getElementById('mu-role').value='vendeur';document.getElementById('mu-boutique').value='B1';
   buildCaisseSelect('mu-caisse','');updatePermGrid();openModal('modal-user');
 }
-function saveUser(){
-  const nom=document.getElementById('mu-nom').value.trim();const id2=document.getElementById('mu-id2').value.trim().toUpperCase();const pwd=document.getElementById('mu-pwd').value;
-  if(!nom||!id2||!pwd){soundErr();toast('Tous les champs requis','err');return;}
-  const eid=document.getElementById('mu-eid').value;if(!eid&&DB.users.find(u=>u.id===id2)){soundDoublon();toast('Identifiant déjà pris','err');return;}
+async function saveUser(){
+  const nom=document.getElementById('mu-nom').value.trim();const id2=document.getElementById('mu-id2').value.trim().toUpperCase();const pwdInput=document.getElementById('mu-pwd').value;
+  const eid=document.getElementById('mu-eid').value;
+  const existing=eid?DB.users.find(u=>u.id===eid):null;
+  // Si modification et champ vide -> garder l'ancien mot de passe (déjà haché)
+  if(!nom||!id2||(!pwdInput&&!existing)){soundErr();toast('Tous les champs requis','err');return;}
+  if(!eid&&DB.users.find(u=>u.id===id2)){soundDoublon();toast('Identifiant déjà pris','err');return;}
   const perms=getSelectedPerms();
   if(perms.length===0&&document.getElementById('mu-role').value!=='admin'){if(!confirm('Aucune permission sélectionnée. Continuer ?')){return;}}
   const _ts=Date.now();
+  let pwd;
+  if(!pwdInput&&existing){
+    pwd=existing.pwd; // Champ vide en modification -> garder l'ancien hash
+  } else {
+    pwd=await hashPwd(pwdInput); // Nouveau mdp saisi en clair -> hasher
+  }
   const u={id:id2,nom,pwd,role:document.getElementById('mu-role').value,boutique:document.getElementById('mu-boutique').value,caisse:document.getElementById('mu-caisse').value||'',actif:true,perms,_updated:_ts};
   if(eid){const i=DB.users.findIndex(x=>x.id===eid);DB.users[i]={...DB.users[i],...u,id:eid,_updated:_ts};}else DB.users.push(u);
   DB._usersUpdated=_ts;
@@ -2672,7 +2719,7 @@ function renderUsers(){
     </td>
   </tr>`).join('');
 }
-function editUser(id){const u=DB.users.find(x=>x.id===id);document.getElementById('mu-t').textContent='✏️ Modifier';document.getElementById('mu-eid').value=u.id;document.getElementById('mu-nom').value=u.nom;document.getElementById('mu-id2').value=u.id;document.getElementById('mu-pwd').value=u.pwd;document.getElementById('mu-role').value=u.role;document.getElementById('mu-boutique').value=u.boutique;buildCaisseSelect('mu-caisse',u.caisse||'');updatePermGrid();// Recocher perms sauvées
+function editUser(id){const u=DB.users.find(x=>x.id===id);document.getElementById('mu-t').textContent='✏️ Modifier';document.getElementById('mu-eid').value=u.id;document.getElementById('mu-nom').value=u.nom;document.getElementById('mu-id2').value=u.id;document.getElementById('mu-pwd').value='';document.getElementById('mu-pwd').placeholder=u.pwd.length<20?u.pwd:'•••• (laisser vide pour garder)';document.getElementById('mu-role').value=u.role;document.getElementById('mu-boutique').value=u.boutique;buildCaisseSelect('mu-caisse',u.caisse||'');updatePermGrid();// Recocher perms sauvées
 setTimeout(()=>{(u.perms||[]).forEach(p=>{const cb=document.querySelector(`#perm-grid input[value="${p}"]`);if(cb){cb.checked=true;cb.closest('.perm-item').className='perm-item active';}});},50);openModal('modal-user');}
 function viewPerms(id){const u=DB.users.find(x=>x.id===id);if(!u)return;toast(`${u.nom}: ${(u.perms||[]).length} permissions actives`,'info');}
 function toggleUser(id){const u=DB.users.find(x=>x.id===id);u.actif=!u.actif;save();renderUsers();}
@@ -3063,6 +3110,33 @@ async function askIA(){const q=document.getElementById('ia-question')?.value.tri
 
 // ══ EXPORT / IMPORT ══
 function exportJSON(){const data=JSON.stringify({produits:DB.produits,clients:DB.clients,fournisseurs:DB.fournisseurs,factures:DB.factures,devis:DB.devis,retours:DB.retours,salaires:DB.salaires,depenses:DB.depenses,caisses:DB.caisses,settings:DB.settings,exported:new Date().toISOString()},null,2);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=`MonNegoce_${today()}.json`;a.click();toast('Export téléchargé ✅','ok');}
+function exportFullBackup(){
+  // Exclure les mots de passe hachés de la sauvegarde visible, mais garder le reste
+  const backup={
+    exportDate:new Date().toISOString(),
+    appNom:DB.settings?.appNom||'Mon Négoce',
+    produits:DB.produits,
+    clients:DB.clients,
+    fournisseurs:DB.fournisseurs,
+    factures:DB.factures,
+    devis:DB.devis,
+    retours:DB.retours,
+    depenses:DB.depenses,
+    salaires:DB.salaires,
+    caisses:DB.caisses,
+    clotures:DB.clotures,
+    settings:DB.settings,
+    taches:DB.taches,
+    users:DB.users.map(u=>({id:u.id,nom:u.nom,role:u.role,boutique:u.boutique,caisse:u.caisse,actif:u.actif,perms:u.perms})), // Sans mots de passe
+  };
+  const json=JSON.stringify(backup,null,2);
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));
+  a.download=`MonNegoce_Sauvegarde_${today()}.json`;
+  a.click();
+  logAction&&logAction('Export','Sauvegarde complète téléchargée');
+  toast('💾 Sauvegarde complète exportée ✅','ok');
+}
 function exportCSV(){const header='Facture,Boutique,Caisse,Client,Total,Mode,Vendeur,Date';const rows=DB.factures.map(f=>`${f.id},${getBName(f.boutique)},${f.caisse},${f.client},${f.total},${f.mode},${f.vendeur||''},${f.date.slice(0,10)}`);const csv=header+'\n'+rows.join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`Factures_${today()}.csv`;a.click();toast('CSV exporté ✅','ok');}
 function importJSON(input){const file=input.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{try{const data=JSON.parse(e.target.result);if(!confirm('Restaurer ces données ? Les données actuelles seront remplacées.'))return;['produits','clients','fournisseurs','factures','devis','retours','salaires','depenses','caisses','settings'].forEach(k=>{if(data[k])DB[k]=data[k];});save();refreshAllSelects();buildBoutiqueSelects();setTheme(DB.settings.theme||'dark');toast('Restauration réussie ✅','ok');}catch(e){soundErr();toast('Fichier JSON invalide','err');}};reader.readAsText(file);input.value='';}
 function importCSVProduits(input){const file=input.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{const lines=e.target.result.split('\n').filter(Boolean);const header=lines[0].split(',');let added=0;lines.slice(1).forEach(line=>{const cols=line.split(',');const obj={};header.forEach((h,i)=>obj[h.trim().toLowerCase()]=cols[i]?.trim()||'');if(obj.nom){DB.produits.push({id:'P'+String(DB.nextIds.p++).padStart(3,'0'),nom:obj.nom,ref:obj.ref||'',cat:obj.cat||obj.categorie||'Accessoire High-Tech',fourn:'',prix:parseFloat(obj.prix||obj.prix_vente||0)||0,achat:parseFloat(obj.achat||obj.prix_achat||0)||0,s1:parseInt(obj.s1||obj.stock_b1||0)||0,s2:parseInt(obj.s2||obj.stock_b2||0)||0,alerte:parseInt(obj.alerte||5)||5,unite:obj.unite||'pièce',desc:obj.desc||obj.description||'',photo:''});added++;}});save();renderProduits();refreshAllSelects();toast(`${added} produits importés ✅`,'ok');};reader.readAsText(file);input.value='';}
@@ -3487,17 +3561,25 @@ function initFirebase(){
     fbApp=firebase.initializeApp(FIREBASE_CONFIG);
     fbDB=firebase.database();
     fbInitialized=true;
+    // Authentification anonyme automatique — requis par les règles de sécurité Firebase
+    firebase.auth().signInAnonymously().catch(e=>{
+      console.error('Auth anonyme échouée:',e);
+      toast('⚠️ Authentification Firebase échouée — vérifiez la console','err');
+    });
     let fbFirstConnect=true;
-    fbDB.ref('.info/connected').on('value',snap=>{
-      fbConnected=snap.val()===true;
-      updateSyncUI(fbConnected?'connected':'offline');
-      if(fbConnected){
-        if(fbFirstConnect){
-          fbFirstConnect=false;
-          toast('☁️ Firebase connecté !','ok');
-          pullFromFirebase();
-        }
-      } else toast('📴 Hors ligne — données locales','warn');
+    firebase.auth().onAuthStateChanged(user=>{
+      if(!user)return; // Attendre l'authentification avant de connecter la DB
+      fbDB.ref('.info/connected').on('value',snap=>{
+        fbConnected=snap.val()===true;
+        updateSyncUI(fbConnected?'connected':'offline');
+        if(fbConnected){
+          if(fbFirstConnect){
+            fbFirstConnect=false;
+            toast('☁️ Firebase connecté !','ok');
+            pullFromFirebase();
+          }
+        } else toast('📴 Hors ligne — données locales','warn');
+      });
     });
   }catch(e){console.error('Firebase:',e);updateSyncUI('error');}
 }
