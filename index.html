@@ -2022,9 +2022,9 @@ function startApp(){
     window._fbPushEnabled=(myRoleForPush!=='admin');
     save=function(){_origSaveLocal();DB._syncTime=Date.now();if(fbConnected&&!fbLoading&&window._fbPushEnabled===true)pushToFirebase();};
     initFirebase();
-    setTimeout(startRealtimeSync,3000);
+    onFbAuthReady(()=>setTimeout(startRealtimeSync,500));
     // Pull users seulement si DB.users est vide (premier démarrage)
-    setTimeout(()=>{if(DB.users.length<=1)pullUsersFromFirebase();},4000);
+    onFbAuthReady(()=>setTimeout(()=>{if(DB.users.length<=1)pullUsersFromFirebase();},500));
   },800);
 }
 
@@ -3552,6 +3552,12 @@ const FIREBASE_CONFIG = {
 };
 let fbApp=null,fbDB=null,fbConnected=false,fbSyncing=false,fbInitialized=false,fbLoading=false;
 
+let fbAuthReady=false;
+let _fbAuthReadyCallbacks=[];
+function onFbAuthReady(cb){
+  if(fbAuthReady)cb();
+  else _fbAuthReadyCallbacks.push(cb);
+}
 function initFirebase(){
   try{
     if(typeof firebase==='undefined'){
@@ -3569,6 +3575,12 @@ function initFirebase(){
     let fbFirstConnect=true;
     firebase.auth().onAuthStateChanged(user=>{
       if(!user)return; // Attendre l'authentification avant de connecter la DB
+      // Marquer l'auth comme prête et déclencher les callbacks en attente (ex: startRealtimeSync)
+      if(!fbAuthReady){
+        fbAuthReady=true;
+        _fbAuthReadyCallbacks.forEach(cb=>cb());
+        _fbAuthReadyCallbacks=[];
+      }
       fbDB.ref('.info/connected').on('value',snap=>{
         fbConnected=snap.val()===true;
         updateSyncUI(fbConnected?'connected':'offline');
