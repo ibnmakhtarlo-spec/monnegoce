@@ -51,19 +51,24 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex
 .lbtn:hover{background:var(--gold2);}
 /* SIDEBAR */
 #sidebar{width:var(--sb);height:100vh;background:var(--surf);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
-.sblogo{padding:13px 15px 11px;border-bottom:1px solid var(--border);}
-.sblogo .brand{font-size:15px;font-weight:900;color:var(--gold);}
-.sbsel{background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:11px;border-radius:5px;padding:3px 6px;width:100%;outline:none;cursor:pointer;margin-top:4px;}
+.sblogo{padding:16px 15px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px;}
+.sblogo-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--gold),#ff8c00);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;box-shadow:0 2px 8px rgba(240,165,0,.3);}
+.sblogo-text{flex:1;min-width:0;}
+.sblogo .brand{font-size:14px;font-weight:900;color:var(--text);line-height:1.1;}
+.sblogo .brand-sub{font-size:8px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;font-weight:700;}
+.sbsels{padding:8px 11px;display:flex;flex-direction:column;gap:5px;border-bottom:1px solid var(--border);}
+.sbsel{background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:11px;border-radius:8px;padding:6px 9px;width:100%;outline:none;cursor:pointer;}
 .sbsel.cyan{color:var(--cyan);}
-.sbuser{padding:7px 11px;margin:5px;background:var(--goldf);border:1px solid rgba(240,165,0,.2);border-radius:7px;}
-.sbuser .uname{font-size:12px;font-weight:700;color:var(--gold);}
-.sbuser .urole{font-size:9px;color:var(--text2);}
-.sbsec{padding:7px 13px 2px;font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:2px;font-weight:700;}
-.ni{display:flex;align-items:center;gap:7px;padding:7px 13px;cursor:pointer;font-size:12px;color:var(--text2);border-left:3px solid transparent;margin:1px 5px 1px 0;border-radius:0 6px 6px 0;transition:all .15s;}
+.sbuser{padding:9px 11px;margin:8px 8px 4px;background:var(--surf2);border:1px solid var(--border2);border-radius:10px;display:flex;align-items:center;gap:8px;}
+.sbuser-avatar{width:30px;height:30px;border-radius:50%;background:var(--goldf);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.sbuser .uname{font-size:12px;font-weight:800;color:var(--text);}
+.sbuser .urole{font-size:9px;color:var(--gold);font-weight:700;}
+.sbsec{padding:13px 16px 5px;font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;font-weight:800;}
+.ni{display:flex;align-items:center;gap:10px;padding:8px 13px;cursor:pointer;font-size:12.5px;color:var(--text2);font-weight:600;margin:1px 8px;border-radius:9px;transition:all .15s;}
 .ni:hover{color:var(--text);background:var(--surf2);}
-.ni.active{color:var(--gold);border-left-color:var(--gold);background:var(--goldf);}
-.ni .ic{font-size:13px;width:15px;text-align:center;}
-.sbout{margin:auto 8px 8px;padding:7px 12px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:7px;color:var(--red);font-size:12px;cursor:pointer;text-align:center;}
+.ni.active{color:#fff;background:linear-gradient(135deg,var(--gold),#ff8c00);box-shadow:0 2px 8px rgba(240,165,0,.25);}
+.ni .ic{font-size:14px;width:18px;text-align:center;flex-shrink:0;}
+.sbout{margin:10px 8px 10px;padding:9px 12px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:9px;color:var(--red);font-size:12px;font-weight:700;cursor:pointer;text-align:center;}
 .admin-nav{display:none;}
 .role-admin .admin-nav{display:flex!important;}
 /* MAIN */
@@ -366,18 +371,24 @@ canvas.chart-canvas{display:block;width:100%!important;}
 .trend-stable{background:rgba(240,165,0,.15);color:var(--gold);font-size:9px;padding:2px 6px;border-radius:10px;}
 
 /* ══ ACCUEIL DASHBOARD ══ */
-.accueil-hero{background:linear-gradient(135deg,var(--surf2),var(--surf3));border:1px solid var(--border2);border-radius:14px;padding:18px;margin-bottom:13px;display:flex;align-items:center;gap:14px;}
-.accueil-hero .ah-icon{font-size:36px;}
-.accueil-hero .ah-text h2{font-size:16px;font-weight:900;margin-bottom:3px;}
-.accueil-hero .ah-text p{font-size:11px;color:var(--text2);}
-.accueil-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:13px;}
-.accueil-card{background:var(--surf);border:1px solid var(--border2);border-radius:12px;padding:13px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
-.accueil-card:hover{border-color:var(--gold);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);}
-.accueil-card .ac-icon{font-size:22px;margin-bottom:6px;}
-.accueil-card .ac-title{font-size:11px;font-weight:800;margin-bottom:2px;}
-.accueil-card .ac-val{font-size:15px;font-weight:900;color:var(--gold);}
-.accueil-card .ac-sub{font-size:9px;color:var(--text2);margin-top:2px;}
-.accueil-card .ac-badge{position:absolute;top:7px;right:7px;background:var(--red);color:#fff;font-size:8px;font-weight:900;padding:2px 5px;border-radius:10px;}
+.accueil-hero{background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid var(--border2);border-radius:16px;padding:20px;margin-bottom:14px;display:flex;align-items:center;gap:16px;box-shadow:0 4px 14px rgba(0,0,0,.2);}
+.accueil-hero .ah-icon{width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#ff8c00);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;box-shadow:0 4px 12px rgba(240,165,0,.35);}
+.accueil-hero .ah-text h2{font-size:17px;font-weight:900;margin-bottom:3px;color:#fff;}
+.accueil-hero .ah-text p{font-size:11px;color:#94a3b8;}
+.accueil-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:13px;}
+@media (max-width:900px){.accueil-grid{grid-template-columns:repeat(2,1fr);}}
+.accueil-card{border-radius:14px;padding:15px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.15);}
+.accueil-card:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(0,0,0,.25);}
+.accueil-card .ac-icon{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:10px;}
+.accueil-card .ac-title{font-size:10.5px;font-weight:700;margin-bottom:4px;opacity:.92;text-transform:uppercase;letter-spacing:.3px;}
+.accueil-card .ac-val{font-size:19px;font-weight:900;color:#fff;line-height:1.1;}
+.accueil-card .ac-sub{font-size:9.5px;margin-top:5px;opacity:.85;font-weight:600;}
+.accueil-card .ac-badge{position:absolute;top:9px;right:9px;background:rgba(255,255,255,.95);color:#dc2626;font-size:9px;font-weight:900;padding:2px 7px;border-radius:10px;}
+/* 4 couleurs de fond rotatives style HIKMA */
+.accueil-card:nth-child(4n+1){background:linear-gradient(135deg,#2563eb,#1d4ed8);}
+.accueil-card:nth-child(4n+2){background:linear-gradient(135deg,#16a34a,#15803d);}
+.accueil-card:nth-child(4n+3){background:linear-gradient(135deg,#9333ea,#7e22ce);}
+.accueil-card:nth-child(4n+4){background:linear-gradient(135deg,#ea580c,#c2410c);}
 
 /* ══ CHAT PERSONNEL ══ */
 .chat-layout{display:flex;height:calc(100vh - 130px);gap:9px;}
@@ -464,11 +475,17 @@ canvas.chart-canvas{display:block;width:100%!important;}
 <div id="app" style="display:none;width:100%;flex:1;">
 <aside id="sidebar">
   <div class="sblogo">
-    <div class="brand" id="sb-brand">🏪 Mon Négoce</div>
+    <div class="sblogo-icon">🏪</div>
+    <div class="sblogo-text">
+      <div class="brand" id="sb-brand">Mon Négoce</div>
+      <div class="brand-sub">Software</div>
+    </div>
+  </div>
+  <div class="sbsels">
     <select class="sbsel" id="sb-boutique" onchange="changeBoutique(this.value)"></select>
     <select class="sbsel cyan" id="sb-caisse" onchange="session.caisse=this.value;updCSig()"></select>
   </div>
-  <div class="sbuser"><div class="uname" id="sb-uname">—</div><div class="urole" id="sb-urole">—</div></div>
+  <div class="sbuser"><div class="sbuser-avatar">👤</div><div><div class="uname" id="sb-uname">—</div><div class="urole" id="sb-urole">—</div></div></div>
   <div class="sbsec">Ventes</div>
   <div class="ni" onclick="nav('accueil')"><span class="ic">🏠</span> Accueil</div>
   <div class="ni active" onclick="nav('caisse')"><span class="ic">🛒</span> Caisse / POS</div>
@@ -605,6 +622,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <input type="date" id="fil-d-to" style="background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;border-radius:7px;padding:5px;outline:none;" onchange="renderFactures()" title="Au">
       <button class="btn btn-gold btn-sm" onclick="openNouvelleFacture()">+ Nouvelle</button>
     </div>
+    <div id="fact-total-bar" style="display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap;"></div>
     <div class="card"><div class="twrap">
       <table><thead><tr><th>#</th><th>Boutique</th><th>Caisse</th><th>Client</th><th>Art.</th><th>Total</th><th>Mode</th><th>Vendeur</th><th>Date</th><th>Actions</th></tr></thead>
       <tbody id="tb-f"></tbody></table>
@@ -1507,7 +1525,8 @@ canvas.chart-canvas{display:block;width:100%!important;}
 <div class="overlay" id="modal-retour">
   <div class="modal sm">
     <div class="mtitle"><span>↩️ Retour</span><span class="mclose" onclick="closeModal('modal-retour')">✕</span></div>
-    <div class="fg"><label>N° Facture</label><input id="mr-fact"></div>
+    <div class="fg"><label>N° Facture *</label><input id="mr-fact" list="mr-fact-list" placeholder="Ex: FVEN3K9X2" oninput="verifierFactureRetour()" required><datalist id="mr-fact-list"></datalist></div>
+    <div id="mr-fact-info" style="font-size:11px;margin-bottom:8px;"></div>
     <div class="fg"><label>Client</label><select id="mr-cl"><option value="">Anonyme</option></select></div>
     <div class="fg"><label>Produit</label><select id="mr-prod"><option value="">Sélectionner...</option></select></div>
     <div class="fg"><label>Quantité</label><input type="number" id="mr-qty" value="1" min="1"></div>
@@ -1882,7 +1901,7 @@ function resetInactivity(){
   _inactTimer=setTimeout(()=>{
     if(session.user){
       toast('⏱️ Déconnecté pour inactivité','info');
-      setTimeout(doLogout,1500);
+      setTimeout(logout,1500);
     }
   },INACT_DELAY);
 }
@@ -1993,15 +2012,22 @@ function startApp(){
   document.getElementById('sb-caisse').onchange=function(){session.caisse=this.value;updCSig();};
   document.getElementById('sb-brand').textContent=DB.settings.appNom||'Mon Négoce';
   updCSig();
-  // Admin stuff
-  if(isAdmin()){
+  // Admin stuff — UNIQUEMENT pour le vrai rôle admin, jamais le superviseur
+  if(session.user?.role==='admin'){
     document.body.classList.add('role-admin');
     document.querySelectorAll('.admin-nav').forEach(el=>el.style.display='flex');
     document.querySelectorAll('.admin-stat').forEach(el=>el.style.display='flex');
     const th=document.getElementById('th-achat');if(th)th.style.display='';
     const iab=document.getElementById('ia-btn');if(iab)iab.style.display='flex';
+  } else {
+    // Superviseur/vendeur/caissier: tout est masqué par défaut, applyNavPerms() décide ensuite
+    document.body.classList.remove('role-admin');
+    document.querySelectorAll('.admin-nav').forEach(el=>el.style.display='none');
+    document.querySelectorAll('.admin-stat').forEach(el=>el.style.display='none');
+    const th2=document.getElementById('th-achat');if(th2)th2.style.display='none';
+    const iab2=document.getElementById('ia-btn');if(iab2)iab2.style.display='none';
   }
-  // Permissions nav
+  // Permissions nav — applique les permissions réelles pour superviseur/vendeur/caissier
   applyNavPerms();
   refreshAllSelects();loadSettings();startAutoSave();
   loadChat();
@@ -2054,6 +2080,12 @@ function applyNavPerms(){
       el.style.display=(role==='superviseur'&&perms.includes('admin_menus'))?'flex':'none';
       return;
     }
+    // Pages strictement réservées à l'admin — JAMAIS accessibles au superviseur, même avec permissions
+    const adminStrict=['comparaison','previsions'];
+    if(adminStrict.includes(page)){
+      el.style.display='none'; // Toujours masqué (admin déjà géré par le retour précoce isAdmin)
+      return;
+    }
     // Pages selon permissions
     const permMap={
       'factures':'factures','devis':'devis','retours':'retours',
@@ -2094,6 +2126,12 @@ const TITLES={accueil:'<span>Accueil</span>',caisse:'Caisse / <span>POS</span>',
 const RENDERS={accueil:renderAccueil,caisse:renderGrid,'ventes-jour':renderVentesJour,factures:renderFactures,devis:renderDevis,retours:renderRetours,depenses:renderDepenses,produits:renderProduits,fournisseurs:renderFourn,clients:renderClients,dashboard:renderDash,benefice:renderBenefice,inventaire:renderInventaire,'ia-centre':renderIACentre,agenda:renderAgenda,creances:renderCreances,'heures-fortes':renderHeuresFortes,'produits-lents':renderProduitsLents,chat:renderChat,comparaison:renderComparaison,previsions:()=>{},users:renderUsers,'caisses-config':renderCaissesConfig,salaires:renderSalaires,rapports:renderRapports,parametres:loadSettings};
 
 function nav(page){
+  // Sécurité: pages strictement admin, bloquées même via appel direct (console, etc.)
+  const adminStrictPages=['comparaison','previsions'];
+  if(adminStrictPages.includes(page)&&session.user?.role!=='admin'){
+    soundErr();toast('⛔ Accès réservé à l\'administrateur','err');
+    return;
+  }
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
   if(page==='agenda'){
@@ -2214,7 +2252,13 @@ function validerVente(){
   const sub=cart.reduce((s,i)=>s+i.prix*i.qty,0);const r=parseFloat(document.getElementById('p-rem').value)||0;const total=sub*(1-r/100);const mode=document.getElementById('pay-mode').value;
   const cid=document.getElementById('pos-cl-id').value||'';const client=DB.clients.find(c=>c.id===cid);
   cart.forEach(item=>{const p=DB.produits.find(x=>x.id===item.id);if(p){if(session.boutique==='B1')p.s1-=item.qty;else p.s2-=item.qty;}});
-  if(mode==='credit'&&client)client.credit=(client.credit||0)+total;
+  if(mode==='credit'&&client){
+    client.credit=(client.credit||0)+total;
+    const plafond=DB.settings?.plafondCredit||50000;
+    if(client.credit>plafond){
+      toast('⚠️ '+client.nom+' dépasse le plafond crédit ('+fmt(client.credit)+')','info');
+    }
+  }
   // ID unique: préfixe utilisateur + timestamp pour éviter collisions entre appareils
   const _fid='F'+session.user.id.replace(/[^A-Z0-9]/g,'').substring(0,3)+Date.now().toString(36).toUpperCase().slice(-5);
   DB.nextIds.f++;
@@ -2286,13 +2330,27 @@ function renderFactures(){
   const q=(document.getElementById('srch-f')?.value||'').toLowerCase();const bf=document.getElementById('fil-b')?.value||'';const df=document.getElementById('fil-d-from')?.value||'';const dt=document.getElementById('fil-d-to')?.value||'';
   const userBoutique=session.user?.boutique||'';
   // Admin, superviseur, "all", "Les deux" voient tout
-  const canSeeAll=isAdmin()||userBoutique==='all'||userBoutique==='Les deux'||userBoutique===''||session.user?.role==='superviseur';
+  const canSeeAll=session.user?.role==='admin'||userBoutique==='all'||userBoutique==='Les deux'||userBoutique==='';
   const list=[...DB.factures].sort((a,b)=>new Date(b.date)-new Date(a.date)).filter(f=>{
     const fd=f.date.slice(0,10);
     const boutiqueMatch=canSeeAll?(!bf||f.boutique===bf):(f.boutique===userBoutique&&(!bf||f.boutique===bf));
     return(!q||f.id.toLowerCase().includes(q)||f.client.toLowerCase().includes(q))&&boutiqueMatch&&(!df||fd>=df)&&(!dt||fd<=dt);
   });
   const canDel=hasPerm('del_facture')||session.user?.role==='admin';
+  // Bandeau total des ventes filtrées
+  const totalFiltre=list.reduce((s,f)=>s+f.total,0);
+  const totalBar=document.getElementById('fact-total-bar');
+  if(totalBar){
+    totalBar.innerHTML=`
+      <div style="background:var(--surf2);border:1px solid var(--border2);border-radius:10px;padding:9px 14px;">
+        <div style="font-size:9px;color:var(--text2);">Nb factures</div>
+        <div style="font-size:16px;font-weight:900;color:var(--cyan);">${list.length}</div>
+      </div>
+      <div style="background:var(--surf2);border:1px solid var(--border2);border-radius:10px;padding:9px 14px;">
+        <div style="font-size:9px;color:var(--text2);">Total des ventes</div>
+        <div style="font-size:16px;font-weight:900;color:var(--green);">${fmt(totalFiltre)}</div>
+      </div>`;
+  }
   document.getElementById('tb-f').innerHTML=list.length?list.map(f=>`<tr>
     <td><span class="mono" style="color:var(--gold);font-weight:700;font-size:11px;">${f.id}</span></td>
     <td><span class="badge ${f.boutique==='B1'?'bb':'bo'}">${getBName(f.boutique).substring(0,9)}</span></td>
@@ -2301,7 +2359,7 @@ function renderFactures(){
     <td class="mono" style="color:var(--green);font-weight:700;">${fmt(f.total)}</td>
     <td>${IC[f.mode]||''} ${f.mode}</td>
     <td style="font-size:10px;color:var(--text2);">${f.vendeur||'—'}</td>
-    <td style="font-size:10px;">${new Date(f.date).toLocaleDateString('fr-FR')}</td>
+    <td style="font-size:10px;white-space:nowrap;">${new Date(f.date).toLocaleDateString('fr-FR')}<br><span style="color:var(--text2);">${new Date(f.date).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span></td>
     <td style="display:flex;gap:3px;flex-wrap:wrap;">
       <button class="btn btn-ghost btn-xs" onclick="openFactDetail('${f.id}')">👁</button>
       <button class="btn btn-blue btn-xs" onclick="(function(){const f=DB.factures.find(x=>x.id==='${f.id}');if(f){currentFact=JSON.parse(JSON.stringify(f));genererFacturePDF();}})()">📄</button>
@@ -2491,11 +2549,59 @@ function convDevis(id){const d=DB.devis.find(x=>x.id===id);d.articles.forEach(a=
 function delDevis(id){const d=DB.devis.find(x=>x.id===id);safeDelete(`Devis : ${d?.id||id}`,()=>{DB.devis=DB.devis.filter(x=>x.id!==id);save();renderDevis();});}
 
 // ══ RETOURS ══
+function verifierFactureRetour(){
+  const factId=document.getElementById('mr-fact').value.trim().toUpperCase();
+  const infoEl=document.getElementById('mr-fact-info');
+  const fact=DB.factures.find(f=>f.id===factId);
+  if(!fact){
+    infoEl.innerHTML='<span style="color:var(--red);">❌ Facture introuvable</span>';
+    return null;
+  }
+  // Vérifier que cette facture n'a pas déjà été entièrement retournée
+  const dejaRetourne=DB.retours.filter(r=>r.factRef===factId).length;
+  infoEl.innerHTML=`<span style="color:var(--green);">✅ ${fact.client} — ${fmt(fact.total)} — ${fact.items.length} produit(s)</span>${dejaRetourne?` <span style="color:var(--gold);">(${dejaRetourne} retour(s) déjà fait(s))</span>`:''}`;
+  // Pré-remplir produit/client/montant si un seul article
+  if(fact.items.length===1){
+    const it=fact.items[0];
+    const prodSel=document.getElementById('mr-prod');
+    if(prodSel)prodSel.value=it.id;
+    document.getElementById('mr-mont').value=it.prix*it.qty;
+    document.getElementById('mr-qty').value=it.qty;
+    document.getElementById('mr-qty').max=it.qty;
+  }
+  if(fact.clientId){
+    const clSel=document.getElementById('mr-cl');
+    if(clSel)clSel.value=fact.clientId;
+  }
+  return fact;
+}
+
 function saveRetour(){
-  const cid=document.getElementById('mr-cl').value;const c=DB.clients.find(x=>x.id===cid);const pid=document.getElementById('mr-prod').value;const p=DB.produits.find(x=>x.id===pid);
-  const qty=parseInt(document.getElementById('mr-qty').value)||1;if(p){if(session.boutique==='B1')p.s1+=qty;else p.s2+=qty;}
-  const r={id:'RT'+Date.now().toString(36).toUpperCase().slice(-6),factRef:document.getElementById('mr-fact').value||'—',client:c?.nom||'Anonyme',produit:p?.nom||'Inconnu',qty,montant:parseFloat(document.getElementById('mr-mont').value)||0,motif:document.getElementById('mr-motif').value,date:new Date().toISOString()};
-  DB.retours.push(r);save();closeModal('modal-retour');renderRetours();toast('Retour enregistré ✅','ok');
+  const factId=document.getElementById('mr-fact').value.trim().toUpperCase();
+  const fact=DB.factures.find(f=>f.id===factId);
+  if(!fact){
+    soundErr();toast('⛔ Numéro de facture introuvable — vérifiez la saisie','err');
+    return;
+  }
+  const cid=document.getElementById('mr-cl').value;const c=DB.clients.find(x=>x.id===cid);
+  const pid=document.getElementById('mr-prod').value;const p=DB.produits.find(x=>x.id===pid);
+  if(!p){soundErr();toast('Sélectionnez un produit','err');return;}
+  // Vérifier que ce produit fait bien partie de la facture
+  const itemFact=fact.items.find(i=>i.id===pid);
+  if(!itemFact){
+    soundErr();toast('⛔ Ce produit n\'est pas dans la facture '+factId,'err');
+    return;
+  }
+  const qty=parseInt(document.getElementById('mr-qty').value)||1;
+  if(qty>itemFact.qty){
+    soundErr();toast('⛔ Quantité retournée ('+qty+') supérieure à la quantité vendue ('+itemFact.qty+')','err');
+    return;
+  }
+  if(p){if(session.boutique==='B1')p.s1+=qty;else p.s2+=qty;}
+  const r={id:'RT'+Date.now().toString(36).toUpperCase().slice(-6),factRef:factId,client:c?.nom||fact.client||'Anonyme',produit:p?.nom||'Inconnu',qty,montant:parseFloat(document.getElementById('mr-mont').value)||0,motif:document.getElementById('mr-motif').value,date:new Date().toISOString()};
+  DB.retours.push(r);
+  logAction&&logAction('Retour produit',r.produit+' x'+qty+' — Facture '+factId);
+  save();closeModal('modal-retour');renderRetours();toast('Retour enregistré ✅','ok');
 }
 function renderRetours(){
   const q=(document.getElementById('srch-rt')?.value||'').toLowerCase();const list=[...DB.retours].reverse().filter(r=>!q||r.client.toLowerCase().includes(q));
@@ -2602,7 +2708,7 @@ function renderClients(){const q=(document.getElementById('srch-cl')?.value||'')
 function editClient(id){const c=DB.clients.find(x=>x.id===id);document.getElementById('mc-id').value=c.id;document.getElementById('mc-nom').value=c.nom;document.getElementById('mc-tel').value=c.tel||'';document.getElementById('mc-email').value=c.email||'';document.getElementById('mc-ville').value=c.ville||'';openModal('modal-client');}
 function delClient(id){const c=DB.clients.find(x=>x.id===id);if(!c)return;safeDelete(`Client : ${c.nom}`,()=>{DB.clients=DB.clients.filter(x=>x.id!==id);save();renderClients();refreshAllSelects();});}
 function openFicheClient(id){const c=DB.clients.find(x=>x.id===id);if(!c)return;document.getElementById('fc-titre').textContent=`👤 ${c.nom}`;const factures=DB.factures.filter(f=>f.clientId===id).reverse();const prefs={};factures.forEach(f=>f.items.forEach(i=>prefs[i.nom]=(prefs[i.nom]||0)+i.qty));const top=Object.entries(prefs).sort((a,b)=>b[1]-a[1]).slice(0,3);document.getElementById('fc-content').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:11px;"><div style="background:var(--surf2);border-radius:7px;padding:9px;font-size:12px;"><div style="font-size:9px;color:var(--text2);margin-bottom:6px;font-weight:700;text-transform:uppercase;">Contact</div><div>📱 ${c.tel||'—'}</div><div>📍 ${c.ville||'—'}</div></div><div style="background:var(--surf2);border-radius:7px;padding:9px;"><div style="font-size:9px;color:var(--text2);margin-bottom:6px;font-weight:700;text-transform:uppercase;">Stats</div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span>Achats</span><span class="badge bb">${c.achats||0}</span></div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span>Total</span><span class="mono" style="color:var(--green);font-weight:700">${fmt(c.total||0)}</span></div><div style="display:flex;justify-content:space-between;font-size:12px;"><span>Crédit</span><span class="mono" style="color:${(c.credit||0)>0?'var(--red)':'var(--text2)'};font-weight:700">${fmt(c.credit||0)}</span></div></div></div>${top.length?`<div style="background:var(--goldf);border:1px solid rgba(240,165,0,.2);border-radius:7px;padding:9px;margin-bottom:9px;"><div style="font-size:9px;color:var(--gold);font-weight:700;margin-bottom:5px;text-transform:uppercase;">⭐ Préférés</div><div style="display:flex;gap:4px;flex-wrap:wrap;">${top.map(([n,q])=>`<span class="badge by">${n} (×${q})</span>`).join('')}</div></div>`:''} ${(c.credit||0)>0?`<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:9px;margin-bottom:9px;"><div style="font-weight:700;color:var(--red);font-size:12px;">⚠️ Crédit: ${fmt(c.credit)}</div><button class="btn btn-green btn-xs" style="margin-top:5px;" onclick="solderCredit('${c.id}')">✅ Solder</button></div>`:''}<div class="twrap card"><table><thead><tr><th>#</th><th>Total</th><th>Mode</th><th>Date</th></tr></thead><tbody>${factures.length?factures.map(f=>`<tr><td class="mono" style="color:var(--gold);cursor:pointer;font-size:10px;" onclick="closeModal('modal-fiche-client');openFactDetail('${f.id}')">${f.id}</td><td class="mono" style="color:var(--green);font-weight:700">${fmt(f.total)}</td><td style="font-size:10px;">${f.mode}</td><td style="font-size:10px;">${new Date(f.date).toLocaleDateString('fr-FR')}</td></tr>`).join(''):`<tr><td colspan="4" class="empty">Aucun achat</td></tr>`}</tbody></table></div>`;document.getElementById('fc-wa-btn').onclick=()=>{if(c.tel)window.open(`https://wa.me/${c.tel.replace(/\D/g,'')}?text=Bonjour ${encodeURIComponent(c.nom)} 🙏`,'_blank');else toast('Pas de téléphone','err');};openModal('modal-fiche-client');}
-function solderCredit(id){const c=DB.clients.find(x=>x.id===id);if(!c)return;c.credit=0;save();toast('Crédit soldé ✅','ok');openFicheClient(id);}
+function solderCredit(id){const c=DB.clients.find(x=>x.id===id);if(!c)return;const montantSolde=c.credit;c.credit=0;logAction&&logAction('Créance soldée',c.nom+' — '+fmt(montantSolde));save();toast('Crédit soldé ✅','ok');openFicheClient(id);}
 
 // ══ DASHBOARD ══
 function renderDash(){
@@ -2985,7 +3091,7 @@ function solderPartiel(id){
   const c=DB.clients.find(x=>x.id===id);if(!c||!c.credit)return;
   const montant=parseFloat(prompt(`Solder partiellement la créance de ${c.nom} (${fmt(c.credit)})\nMontant à solder :`));
   if(isNaN(montant)||montant<=0)return;
-  c.credit=Math.max(0,c.credit-montant);save();renderCreances();
+  c.credit=Math.max(0,c.credit-montant);logAction&&logAction('Paiement partiel créance',c.nom+' — '+fmt(montant));save();renderCreances();
   addNotif('Paiement partiel',`${c.nom} — ${fmt(montant)} soldé`,'ok');
   toast(`${fmt(montant)} soldé pour ${c.nom} ✅`,'ok');
 }
@@ -3238,7 +3344,7 @@ function renderAccueil(){
       ${k.badge?`<div class="ac-badge">${k.badge}</div>`:''}
       <div class="ac-icon">${k.icon}</div>
       <div class="ac-title">${k.title}</div>
-      <div class="ac-val" style="color:${k.color}">${k.val}</div>
+      <div class="ac-val">${k.val}</div>
       <div class="ac-sub">${k.sub}</div>
     </div>`).join('');
 
