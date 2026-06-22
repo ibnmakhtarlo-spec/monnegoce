@@ -371,6 +371,18 @@ canvas.chart-canvas{display:block;width:100%!important;}
 .trend-stable{background:rgba(240,165,0,.15);color:var(--gold);font-size:9px;padding:2px 6px;border-radius:10px;}
 
 /* ══ ACCUEIL DASHBOARD ══ */
+.quick-actions-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:13px;}
+@media (max-width:900px){.quick-actions-grid{grid-template-columns:repeat(2,1fr);}}
+.qa-btn{border:none;border-radius:14px;padding:16px 10px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:var(--font);box-shadow:0 3px 10px rgba(0,0,0,.12);}
+.qa-btn:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,.2);}
+.qa-icon{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:19px;margin-bottom:4px;}
+.qa-label{font-size:11.5px;font-weight:800;color:#fff;}
+.qa-sub{font-size:9px;color:rgba(255,255,255,.8);font-weight:600;}
+.qa-blue{background:linear-gradient(135deg,#2563eb,#1d4ed8);}
+.qa-green{background:linear-gradient(135deg,#16a34a,#15803d);}
+.qa-purple{background:linear-gradient(135deg,#9333ea,#7e22ce);}
+.qa-orange{background:linear-gradient(135deg,#ea580c,#c2410c);}
+.qa-cyan{background:linear-gradient(135deg,#0891b2,#0e7490);}
 .accueil-hero{background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid var(--border2);border-radius:16px;padding:20px;margin-bottom:14px;display:flex;align-items:center;gap:16px;box-shadow:0 4px 14px rgba(0,0,0,.2);}
 .accueil-hero .ah-icon{width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#ff8c00);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;box-shadow:0 4px 12px rgba(240,165,0,.35);}
 .accueil-hero .ah-text h2{font-size:17px;font-weight:900;margin-bottom:3px;color:#fff;}
@@ -503,6 +515,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="ni admin-nav" onclick="nav('dashboard')"><span class="ic">📊</span> Tableau de bord</div>
   <div class="ni admin-nav" onclick="nav('benefice')"><span class="ic">💰</span> Bénéfice journalier</div>
   <div class="ni admin-nav" onclick="nav('inventaire')"><span class="ic">📦</span> Inventaire</div>
+  <div class="ni admin-nav" onclick="nav('mouvements')"><span class="ic">🔄</span> Mouvements Stock</div>
   <div class="ni admin-nav" onclick="nav('comparaison')"><span class="ic">📊</span> Comparaison Boutiques</div>
   <div class="ni admin-nav" onclick="nav('previsions')"><span class="ic">🤖</span> IA Prévisions</div>
   <div class="ni admin-nav" onclick="nav('ia-centre')"><span class="ic">🤖</span> Centre IA</div>
@@ -671,9 +684,28 @@ canvas.chart-canvas{display:block;width:100%!important;}
   </div>
 
   <!-- PRODUITS -->
+  <div class="sec" id="sec-mouvements">
+    <div style="display:flex;gap:6px;margin-bottom:11px;flex-wrap:wrap;">
+      <input class="srch" style="flex:1;min-width:130px;" placeholder="🔍 Produit..." id="srch-mv" oninput="renderMouvements()">
+      <select id="fil-mv-type" style="background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:11px;border-radius:7px;padding:5px 9px;outline:none;" onchange="renderMouvements()">
+        <option value="">Tous types</option>
+        <option value="vente">Vente</option>
+        <option value="retour">Retour</option>
+        <option value="transfert">Transfert</option>
+        <option value="creation">Création</option>
+        <option value="ajustement">Ajustement manuel</option>
+      </select>
+    </div>
+    <div class="card"><div class="twrap">
+      <table><thead><tr><th>Date</th><th>Produit</th><th>Type</th><th>Quantité</th><th>Boutique</th><th>Par</th><th>Détails</th></tr></thead>
+      <tbody id="tb-mv"></tbody></table>
+    </div></div>
+  </div>
   <div class="sec" id="sec-produits">
-    <div style="display:flex;gap:6px;margin-bottom:11px;">
-      <input class="srch" style="flex:1" placeholder="🔍 Nom, référence..." id="srch-p" oninput="renderProduits()">
+    <div style="display:flex;gap:6px;margin-bottom:11px;flex-wrap:wrap;">
+      <input class="srch" style="flex:1;min-width:130px;" placeholder="🔍 Nom, référence..." id="srch-p" oninput="renderProduits()">
+      <select id="fil-cat-p" style="background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:11px;border-radius:7px;padding:5px 9px;outline:none;" onchange="renderProduits()"><option value="">Toutes catégories</option></select>
+      <button class="btn btn-ghost btn-sm" onclick="openModal('modal-categories');renderCategories();">🏷️ Catégories</button>
       <button class="btn btn-gold btn-sm" id="btn-add-prod" onclick="openModalProd()">+ Ajouter</button>
     </div>
     <div class="card"><div class="twrap">
@@ -1061,15 +1093,22 @@ canvas.chart-canvas{display:block;width:100%!important;}
       </div>
     </div>
     <!-- Ligne 3 : Raccourcis -->
-    <div class="card" style="padding:13px;">
-      <h3 style="font-size:12px;font-weight:800;margin-bottom:9px;">⚡ Accès rapide</h3>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px;">
-        <button class="btn btn-ghost" style="flex-direction:column;padding:9px 5px;height:auto;" onclick="nav('caisse')">🛒<br><span style="font-size:9px;">Caisse</span></button>
-        <button class="btn btn-ghost" style="flex-direction:column;padding:9px 5px;height:auto;" onclick="nav('factures')">🧾<br><span style="font-size:9px;">Factures</span></button>
-        <button class="btn btn-ghost" style="flex-direction:column;padding:9px 5px;height:auto;" onclick="nav('produits')">📦<br><span style="font-size:9px;">Produits</span></button>
-        <button class="btn btn-ghost" style="flex-direction:column;padding:9px 5px;height:auto;" onclick="nav('clients')">👥<br><span style="font-size:9px;">Clients</span></button>
-        <button class="btn btn-ghost" style="flex-direction:column;padding:9px 5px;height:auto;" onclick="nav('chat')">💬<br><span style="font-size:9px;">Chat</span></button>
-      </div>
+    <div class="quick-actions-grid" id="accueil-quick-actions">
+      <button class="qa-btn qa-blue" onclick="nav('caisse')">
+        <div class="qa-icon">🛒</div><div class="qa-label">Nouvelle vente</div><div class="qa-sub">Encaisser</div>
+      </button>
+      <button class="qa-btn qa-green" onclick="openScanner()">
+        <div class="qa-icon">📷</div><div class="qa-label">Scanner</div><div class="qa-sub">Code-barres</div>
+      </button>
+      <button class="qa-btn qa-purple" onclick="openModalProd()">
+        <div class="qa-icon">➕</div><div class="qa-label">Nouveau produit</div><div class="qa-sub">Ajouter au stock</div>
+      </button>
+      <button class="qa-btn qa-orange" onclick="openModal('modal-client')">
+        <div class="qa-icon">👤</div><div class="qa-label">Nouveau client</div><div class="qa-sub">Ajouter au CRM</div>
+      </button>
+      <button class="qa-btn qa-cyan" onclick="nav('rapports')">
+        <div class="qa-icon">📊</div><div class="qa-label">Rapport</div><div class="qa-sub">Journalier</div>
+      </button>
     </div>
   </div>
 
@@ -1255,6 +1294,33 @@ canvas.chart-canvas{display:block;width:100%!important;}
 </div>
 
 <!-- NOUVELLE FACTURE -->
+<div class="overlay" id="modal-solder-partiel">
+  <div class="modal">
+    <div class="mtitle"><span>💰 Paiement partiel</span><span class="mclose" onclick="closeModal('modal-solder-partiel')">✕</span></div>
+    <input type="hidden" id="sp-cl-id">
+    <div style="background:var(--surf2);border-radius:9px;padding:10px;margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text2);">Client</div>
+      <div id="sp-cl-nom" style="font-size:14px;font-weight:800;color:var(--cyan);"></div>
+      <div style="font-size:11px;color:var(--text2);margin-top:6px;">Créance actuelle</div>
+      <div id="sp-cl-credit" style="font-size:16px;font-weight:900;color:var(--red);"></div>
+    </div>
+    <div class="fg">
+      <label>Montant à solder (FCFA)</label>
+      <input type="number" id="sp-montant" min="1" placeholder="0" style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:8px 10px;color:var(--text);font-family:var(--mono);font-size:15px;font-weight:700;outline:none;">
+    </div>
+    <button class="btn btn-gold" style="width:100%;margin-top:10px;" onclick="confirmSolderPartiel()">✅ Confirmer le paiement</button>
+  </div>
+</div>
+<div class="overlay" id="modal-categories">
+  <div class="modal">
+    <div class="mtitle"><span>🏷️ Catégories de produits</span><span class="mclose" onclick="closeModal('modal-categories')">✕</span></div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;">
+      <input id="new-cat-input" placeholder="Nouvelle catégorie..." style="flex:1;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:7px 10px;color:var(--text);font-family:var(--font);font-size:12px;outline:none;">
+      <button class="btn btn-gold btn-sm" onclick="ajouterCategorie()">+ Ajouter</button>
+    </div>
+    <div id="categories-liste" style="max-height:300px;overflow-y:auto;"></div>
+  </div>
+</div>
 <div class="overlay" id="modal-fact">
   <div class="modal">
     <div class="mtitle"><span>📄 Détail</span><span class="mclose" onclick="closeModal('modal-fact')">✕</span></div>
@@ -1351,7 +1417,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <div class="fgrid">
         <div class="fg"><label>Nom *</label><input id="mp-nom"></div>
         <div class="fg"><label>Référence</label><input id="mp-ref" placeholder="HT-001"></div>
-        <div class="fg"><label>Catégorie</label><input id="mp-cat" value="Accessoire High-Tech"></div>
+        <div class="fg"><label>Catégorie</label><input id="mp-cat" list="mp-cat-list" value="Accessoire High-Tech"><datalist id="mp-cat-list"></datalist></div>
         <div class="fg"><label>Fournisseur</label><select id="mp-fourn"><option value="">— Aucun —</option></select></div>
         <div class="fg"><label>Prix Vente (FCFA) *</label><input type="number" id="mp-prix" min="0"></div>
         <div class="fg"><label>Prix Achat (FCFA)</label><input type="number" id="mp-achat" min="0"></div>
@@ -1770,6 +1836,7 @@ let DB={
   ],
   clotures:LS('clotures')||[],
   taches:LS('taches')||[],
+  mouvements:LS('mouvements')||[],
   logs:LS('logs')||[],
   caisses:LS('caisses')||[
     {id:'C1',nom:'Caisse 1',boutique:'B1',responsable:'',fond:0},
@@ -1929,6 +1996,16 @@ function startInactivityTimer(){
 }
 
 // ══ HISTORIQUE DES ACTIONS ══
+function logMouvement(produitId,produitNom,type,qte,boutique,details=''){
+  if(!DB.mouvements)DB.mouvements=[];
+  DB.mouvements.unshift({
+    id:'MV'+Date.now().toString(36).toUpperCase().slice(-6),
+    date:new Date().toISOString(),
+    produitId,produitNom,type,qte,boutique,
+    user:session.user?.nom||'?',details
+  });
+  if(DB.mouvements.length>1000)DB.mouvements=DB.mouvements.slice(0,1000);
+}
 function logAction(action,details=''){
   if(!session.user)return;
   if(!DB.logs)DB.logs=[];
@@ -2092,7 +2169,7 @@ function applyNavPerms(){
       'depenses':'depenses','produits':'produits','fournisseurs':'fournisseurs',
       'clients':'clients','dashboard':'dashboard','benefice':'benefices',
       'inventaire':'inventaire','rapports':'rapports','creances':'clients',
-      'heures-fortes':'dashboard','produits-lents':'produits',
+      'heures-fortes':'dashboard','produits-lents':'produits','mouvements':'produits',
       'ventes-jour':'ventes_jour','ia-centre':'ia','agenda':'agenda',
     };
     const requiredPerm=permMap[page];
@@ -2122,8 +2199,8 @@ function updCSig(){document.getElementById('csig-label').textContent=session.cai
 function changeBoutique(b){session.boutique=b;updCSig();renderGrid();}
 
 // ══ NAV ══
-const TITLES={accueil:'<span>Accueil</span>',caisse:'Caisse / <span>POS</span>','ventes-jour':'Ventes du <span>Jour</span>',factures:'Historique <span>Factures</span>',devis:'<span>Devis</span>',retours:'<span>Retours</span>',depenses:'<span>Dépenses</span>',produits:'Gestion <span>Produits</span>',fournisseurs:'<span>Fournisseurs</span>',clients:'Gestion <span>Clients</span>',dashboard:'Tableau de <span>Bord</span>',benefice:'Bénéfice <span>Journalier</span>',inventaire:'Inventaire & <span>Analyses</span>','ia-centre':'Centre <span>IA</span>',agenda:'<span>Agenda</span> & Rappels',creances:'<span>Créances</span> & Relances','heures-fortes':'🔥 Heures <span>Fortes</span>','produits-lents':'🐢 Produits <span>Lents</span>',chat:'💬 Chat <span>Personnel</span>',comparaison:'📊 Comparaison <span>Boutiques</span>',previsions:'🤖 IA <span>Prévisions</span>',users:'Utilisateurs & <span>Rôles</span>','caisses-config':'Config <span>Caisses</span>',salaires:'<span>Salaires</span>',rapports:'<span>Rapports</span>',parametres:'<span>Paramètres</span>'};
-const RENDERS={accueil:renderAccueil,caisse:renderGrid,'ventes-jour':renderVentesJour,factures:renderFactures,devis:renderDevis,retours:renderRetours,depenses:renderDepenses,produits:renderProduits,fournisseurs:renderFourn,clients:renderClients,dashboard:renderDash,benefice:renderBenefice,inventaire:renderInventaire,'ia-centre':renderIACentre,agenda:renderAgenda,creances:renderCreances,'heures-fortes':renderHeuresFortes,'produits-lents':renderProduitsLents,chat:renderChat,comparaison:renderComparaison,previsions:()=>{},users:renderUsers,'caisses-config':renderCaissesConfig,salaires:renderSalaires,rapports:renderRapports,parametres:loadSettings};
+const TITLES={accueil:'<span>Accueil</span>',caisse:'Caisse / <span>POS</span>','ventes-jour':'Ventes du <span>Jour</span>',factures:'Historique <span>Factures</span>',devis:'<span>Devis</span>',retours:'<span>Retours</span>',depenses:'<span>Dépenses</span>',produits:'Gestion <span>Produits</span>',fournisseurs:'<span>Fournisseurs</span>',clients:'Gestion <span>Clients</span>',dashboard:'Tableau de <span>Bord</span>',benefice:'Bénéfice <span>Journalier</span>',inventaire:'Inventaire & <span>Analyses</span>','ia-centre':'Centre <span>IA</span>',agenda:'<span>Agenda</span> & Rappels',creances:'<span>Créances</span> & Relances','heures-fortes':'🔥 Heures <span>Fortes</span>','produits-lents':'🐢 Produits <span>Lents</span>',chat:'💬 Chat <span>Personnel</span>',comparaison:'📊 Comparaison <span>Boutiques</span>',previsions:'🤖 IA <span>Prévisions</span>',users:'Utilisateurs & <span>Rôles</span>','caisses-config':'Config <span>Caisses</span>',salaires:'<span>Salaires</span>',rapports:'<span>Rapports</span>',parametres:'<span>Paramètres</span>',mouvements:'🔄 Mouvements de <span>Stock</span>'};
+const RENDERS={accueil:renderAccueil,caisse:renderGrid,'ventes-jour':renderVentesJour,factures:renderFactures,devis:renderDevis,retours:renderRetours,depenses:renderDepenses,produits:renderProduits,fournisseurs:renderFourn,clients:renderClients,dashboard:renderDash,benefice:renderBenefice,inventaire:renderInventaire,'ia-centre':renderIACentre,agenda:renderAgenda,creances:renderCreances,'heures-fortes':renderHeuresFortes,'produits-lents':renderProduitsLents,chat:renderChat,comparaison:renderComparaison,previsions:()=>{},users:renderUsers,'caisses-config':renderCaissesConfig,salaires:renderSalaires,rapports:renderRapports,parametres:loadSettings,mouvements:renderMouvements};
 
 function nav(page){
   // Sécurité: pages strictement admin, bloquées même via appel direct (console, etc.)
@@ -2251,7 +2328,7 @@ function validerVente(){
   }
   const sub=cart.reduce((s,i)=>s+i.prix*i.qty,0);const r=parseFloat(document.getElementById('p-rem').value)||0;const total=sub*(1-r/100);const mode=document.getElementById('pay-mode').value;
   const cid=document.getElementById('pos-cl-id').value||'';const client=DB.clients.find(c=>c.id===cid);
-  cart.forEach(item=>{const p=DB.produits.find(x=>x.id===item.id);if(p){if(session.boutique==='B1')p.s1-=item.qty;else p.s2-=item.qty;}});
+  cart.forEach(item=>{const p=DB.produits.find(x=>x.id===item.id);if(p){if(session.boutique==='B1')p.s1-=item.qty;else p.s2-=item.qty;logMouvement(p.id,p.nom,'vente',-item.qty,session.boutique,'Vente caisse');}});
   if(mode==='credit'&&client){
     client.credit=(client.credit||0)+total;
     const plafond=DB.settings?.plafondCredit||50000;
@@ -2597,7 +2674,7 @@ function saveRetour(){
     soundErr();toast('⛔ Quantité retournée ('+qty+') supérieure à la quantité vendue ('+itemFact.qty+')','err');
     return;
   }
-  if(p){if(session.boutique==='B1')p.s1+=qty;else p.s2+=qty;}
+  if(p){if(session.boutique==='B1')p.s1+=qty;else p.s2+=qty;logMouvement(p.id,p.nom,'retour',qty,session.boutique,'Retour facture '+factId);}
   const r={id:'RT'+Date.now().toString(36).toUpperCase().slice(-6),factRef:factId,client:c?.nom||fact.client||'Anonyme',produit:p?.nom||'Inconnu',qty,montant:parseFloat(document.getElementById('mr-mont').value)||0,motif:document.getElementById('mr-motif').value,date:new Date().toISOString()};
   DB.retours.push(r);
   logAction&&logAction('Retour produit',r.produit+' x'+qty+' — Facture '+factId);
@@ -2660,15 +2737,82 @@ function saveProd(){
   if(!eid)DB.nextIds.p++;
   const _prodTs=Date.now();
   const p={id:_pid,_updated:_prodTs,nom,ref:document.getElementById('mp-ref').value,cat:document.getElementById('mp-cat').value||'Accessoire High-Tech',fourn:document.getElementById('mp-fourn').value||'',prix,achat:parseFloat(document.getElementById('mp-achat').value)||0,s1:parseInt(document.getElementById('mp-s1').value)||0,s2:parseInt(document.getElementById('mp-s2').value)||0,alerte:parseInt(document.getElementById('mp-al').value)||5,unite:document.getElementById('mp-un').value,desc:document.getElementById('mp-desc').value,photo:document.getElementById('mp-photo-data').value||''};
-  if(eid){const i=DB.produits.findIndex(x=>x.id===eid);DB.produits[i]=p;logAction('Modif produit',p.nom);}else{DB.produits.push(p);logAction('Ajout produit',p.nom);}
+  if(eid){const old=DB.produits.find(x=>x.id===eid);if(old&&(old.s1!==p.s1||old.s2!==p.s2)){if(old.s1!==p.s1)logMouvement(p.id,p.nom,'ajustement',p.s1-old.s1,'B1','Modification manuelle stock');if(old.s2!==p.s2)logMouvement(p.id,p.nom,'ajustement',p.s2-old.s2,'B2','Modification manuelle stock');}const i=DB.produits.findIndex(x=>x.id===eid);DB.produits[i]=p;logAction('Modif produit',p.nom);}else{DB.produits.push(p);logAction('Ajout produit',p.nom);if(p.s1>0)logMouvement(p.id,p.nom,'creation',p.s1,'B1','Stock initial');if(p.s2>0)logMouvement(p.id,p.nom,'creation',p.s2,'B2','Stock initial');}
   // Forcer push immédiat pour que les autres appareils voient le nouveau produit
   window._prodUpdated=Date.now();
   save();
   save();stopCamera();closeModal('modal-prod');renderProduits();refreshAllSelects();toast(eid?'Modifié ✅':'Ajouté ✅','ok');
 }
+function renderCategories(){
+  const cats=[...new Set(DB.produits.map(p=>p.cat).filter(Boolean))].sort();
+  const el=document.getElementById('categories-liste');if(!el)return;
+  el.innerHTML=cats.length?cats.map(c=>{
+    const count=DB.produits.filter(p=>p.cat===c).length;
+    return`<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--surf2);border-radius:8px;margin-bottom:5px;">
+      <span style="flex:1;font-size:12px;font-weight:700;">${c}</span>
+      <span class="badge bcy">${count} produit(s)</span>
+      <button class="btn btn-ghost btn-xs" onclick="renommerCategorie('${c.replace(/'/g,"\\'")}')">✏️</button>
+      <button class="btn btn-red btn-xs" onclick="supprimerCategorie('${c.replace(/'/g,"\\'")}')">🗑️</button>
+    </div>`;
+  }).join(''):'<div class="empty" style="padding:14px;">Aucune catégorie</div>';
+  // Mettre à jour le datalist du formulaire produit
+  const dl=document.getElementById('mp-cat-list');
+  if(dl)dl.innerHTML=cats.map(c=>`<option value="${c}">`).join('');
+}
+function ajouterCategorie(){
+  const input=document.getElementById('new-cat-input');
+  const nom=input.value.trim();
+  if(!nom){soundErr();toast('Nom de catégorie requis','err');return;}
+  // Les catégories sont implicites (dérivées des produits) — on crée un produit "modèle" invisible n'est pas idéal,
+  // donc on stocke juste la liste pour le datalist immédiatement
+  const dl=document.getElementById('mp-cat-list');
+  if(dl&&!dl.innerHTML.includes(nom))dl.innerHTML+=`<option value="${nom}">`;
+  input.value='';
+  toast('Catégorie "'+nom+'" prête — assignez-la à un produit','ok');
+}
+function renommerCategorie(ancien){
+  const nouveau=prompt('Renommer la catégorie "'+ancien+'" en :',ancien);
+  if(!nouveau||nouveau.trim()===''||nouveau===ancien)return;
+  DB.produits.forEach(p=>{if(p.cat===ancien)p.cat=nouveau.trim();});
+  logAction&&logAction('Catégorie renommée',ancien+' -> '+nouveau);
+  save();renderCategories();renderProduits();
+  toast('Catégorie renommée ✅','ok');
+}
+function supprimerCategorie(cat){
+  const count=DB.produits.filter(p=>p.cat===cat).length;
+  if(!confirm('Supprimer la catégorie "'+cat+'" ? '+count+' produit(s) deviendront "Sans catégorie".'))return;
+  DB.produits.forEach(p=>{if(p.cat===cat)p.cat='Sans catégorie';});
+  logAction&&logAction('Catégorie supprimée',cat);
+  save();renderCategories();renderProduits();
+  toast('Catégorie supprimée ✅','ok');
+}
+function renderMouvements(){
+  const q=(document.getElementById('srch-mv')?.value||'').toLowerCase();
+  const typeFil=document.getElementById('fil-mv-type')?.value||'';
+  const list=(DB.mouvements||[]).filter(m=>(!q||m.produitNom.toLowerCase().includes(q))&&(!typeFil||m.type===typeFil));
+  const typeIcons={vente:'🛒',retour:'↩️',transfert:'🔄',creation:'✨',ajustement:'✏️'};
+  const typeColors={vente:'var(--red)',retour:'var(--green)',transfert:'var(--cyan)',creation:'var(--gold)',ajustement:'var(--purple)'};
+  document.getElementById('tb-mv').innerHTML=list.length?list.map(m=>`<tr>
+    <td style="font-size:10px;white-space:nowrap;">${new Date(m.date).toLocaleDateString('fr-FR')}<br><span style="color:var(--text2);">${new Date(m.date).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span></td>
+    <td style="font-weight:700;">${m.produitNom}</td>
+    <td><span class="badge" style="background:${typeColors[m.type]||'var(--text2)'}22;color:${typeColors[m.type]||'var(--text2)'};">${typeIcons[m.type]||''} ${m.type}</span></td>
+    <td class="mono" style="font-weight:900;color:${m.qte>0?'var(--green)':'var(--red)'};">${m.qte>0?'+':''}${m.qte}</td>
+    <td><span class="badge bcy">${m.boutique}</span></td>
+    <td style="font-size:10px;color:var(--text2);">${m.user}</td>
+    <td style="font-size:10px;color:var(--text2);">${m.details||'—'}</td>
+  </tr>`).join(''):`<tr><td colspan="7" class="empty"><div class="ei">🔄</div>Aucun mouvement</td></tr>`;
+}
 function renderProduits(){
   const q=(document.getElementById('srch-p')?.value||'').toLowerCase();const adm=hasPerm('prix_achat')||session.user?.role==='admin';
-  const list=DB.produits.filter(p=>!q||p.nom.toLowerCase().includes(q)||(p.ref||'').toLowerCase().includes(q));
+  const catFil=document.getElementById('fil-cat-p')?.value||'';
+  // Remplir le select des catégories dynamiquement
+  const catSel=document.getElementById('fil-cat-p');
+  if(catSel&&catSel.options.length<=1){
+    const cats=[...new Set(DB.produits.map(p=>p.cat).filter(Boolean))].sort();
+    catSel.innerHTML='<option value="">Toutes catégories</option>'+cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+    catSel.value=catFil;
+  }
+  const list=DB.produits.filter(p=>(!q||p.nom.toLowerCase().includes(q)||(p.ref||'').toLowerCase().includes(q))&&(!catFil||p.cat===catFil));
   const canEdit=hasPerm('produits_edit')||session.user?.role==='admin';
   document.getElementById('tb-p').innerHTML=list.length?list.map(p=>{
     const st=p.s1<=0&&p.s2<=0?'br':p.s1<=(p.alerte||5)||p.s2<=(p.alerte||5)?'by':'bg';const sl=p.s1<=0&&p.s2<=0?'Rupture':p.s1<=(p.alerte||5)||p.s2<=(p.alerte||5)?'Faible':'En stock';
@@ -2689,8 +2833,8 @@ function transfertStock(){
   const sens=document.getElementById('tr-sens')?.value||'B1toB2';
   if(!pid||qte<=0){soundErr();toast('Sélectionnez un produit et une quantité','err');return;}
   const p=DB.produits.find(x=>x.id===pid);if(!p)return;
-  if(sens==='B1toB2'){if(p.s1<qte){soundErr();toast('Stock B1 insuffisant ('+p.s1+')','err');return;}p.s1-=qte;p.s2+=qte;}
-  else{if(p.s2<qte){soundErr();toast('Stock B2 insuffisant ('+p.s2+')','err');return;}p.s2-=qte;p.s1+=qte;}
+  if(sens==='B1toB2'){if(p.s1<qte){soundErr();toast('Stock B1 insuffisant ('+p.s1+')','err');return;}p.s1-=qte;p.s2+=qte;logMouvement(p.id,p.nom,'transfert',qte,'B1->B2','Transfert vers B2');}
+  else{if(p.s2<qte){soundErr();toast('Stock B2 insuffisant ('+p.s2+')','err');return;}p.s2-=qte;p.s1+=qte;logMouvement(p.id,p.nom,'transfert',qte,'B2->B1','Transfert vers B1');}
   logAction('Transfert stock',p.nom+' x'+qte+' '+sens);
   save();renderProduits();toast('✅ Transfert: '+p.nom+' x'+qte,'ok');
 }
@@ -2707,8 +2851,8 @@ function saveClient(){const nom=document.getElementById('mc-nom').value.trim();i
 function renderClients(){const q=(document.getElementById('srch-cl')?.value||'').toLowerCase();const list=DB.clients.filter(c=>!q||c.nom.toLowerCase().includes(q)||(c.tel||'').includes(q));document.getElementById('tb-cl').innerHTML=list.length?list.map(c=>`<tr><td><b>${c.nom}</b></td><td>${c.tel||'—'}</td><td>${c.ville||'—'}</td><td><span class="badge bb">${c.achats||0}</span></td><td class="mono" style="color:var(--green);font-weight:700">${fmt(c.total||0)}</td><td class="mono" style="color:${(c.credit||0)>0?'var(--red)':'var(--text2)'};font-weight:700">${fmt(c.credit||0)}</td><td style="display:flex;gap:3px;"><button class="btn btn-blue btn-xs" onclick="openFicheClient('${c.id}')">👤</button><button class="btn btn-ghost btn-xs" onclick="editClient('${c.id}')">✏️</button><button class="btn btn-red btn-xs" onclick="delClient('${c.id}')">🗑</button></td></tr>`).join(''):`<tr><td colspan="7" class="empty"><div class="ei">👥</div>Aucun client</td></tr>`;}
 function editClient(id){const c=DB.clients.find(x=>x.id===id);document.getElementById('mc-id').value=c.id;document.getElementById('mc-nom').value=c.nom;document.getElementById('mc-tel').value=c.tel||'';document.getElementById('mc-email').value=c.email||'';document.getElementById('mc-ville').value=c.ville||'';openModal('modal-client');}
 function delClient(id){const c=DB.clients.find(x=>x.id===id);if(!c)return;safeDelete(`Client : ${c.nom}`,()=>{DB.clients=DB.clients.filter(x=>x.id!==id);save();renderClients();refreshAllSelects();});}
-function openFicheClient(id){const c=DB.clients.find(x=>x.id===id);if(!c)return;document.getElementById('fc-titre').textContent=`👤 ${c.nom}`;const factures=DB.factures.filter(f=>f.clientId===id).reverse();const prefs={};factures.forEach(f=>f.items.forEach(i=>prefs[i.nom]=(prefs[i.nom]||0)+i.qty));const top=Object.entries(prefs).sort((a,b)=>b[1]-a[1]).slice(0,3);document.getElementById('fc-content').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:11px;"><div style="background:var(--surf2);border-radius:7px;padding:9px;font-size:12px;"><div style="font-size:9px;color:var(--text2);margin-bottom:6px;font-weight:700;text-transform:uppercase;">Contact</div><div>📱 ${c.tel||'—'}</div><div>📍 ${c.ville||'—'}</div></div><div style="background:var(--surf2);border-radius:7px;padding:9px;"><div style="font-size:9px;color:var(--text2);margin-bottom:6px;font-weight:700;text-transform:uppercase;">Stats</div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span>Achats</span><span class="badge bb">${c.achats||0}</span></div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span>Total</span><span class="mono" style="color:var(--green);font-weight:700">${fmt(c.total||0)}</span></div><div style="display:flex;justify-content:space-between;font-size:12px;"><span>Crédit</span><span class="mono" style="color:${(c.credit||0)>0?'var(--red)':'var(--text2)'};font-weight:700">${fmt(c.credit||0)}</span></div></div></div>${top.length?`<div style="background:var(--goldf);border:1px solid rgba(240,165,0,.2);border-radius:7px;padding:9px;margin-bottom:9px;"><div style="font-size:9px;color:var(--gold);font-weight:700;margin-bottom:5px;text-transform:uppercase;">⭐ Préférés</div><div style="display:flex;gap:4px;flex-wrap:wrap;">${top.map(([n,q])=>`<span class="badge by">${n} (×${q})</span>`).join('')}</div></div>`:''} ${(c.credit||0)>0?`<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:9px;margin-bottom:9px;"><div style="font-weight:700;color:var(--red);font-size:12px;">⚠️ Crédit: ${fmt(c.credit)}</div><button class="btn btn-green btn-xs" style="margin-top:5px;" onclick="solderCredit('${c.id}')">✅ Solder</button></div>`:''}<div class="twrap card"><table><thead><tr><th>#</th><th>Total</th><th>Mode</th><th>Date</th></tr></thead><tbody>${factures.length?factures.map(f=>`<tr><td class="mono" style="color:var(--gold);cursor:pointer;font-size:10px;" onclick="closeModal('modal-fiche-client');openFactDetail('${f.id}')">${f.id}</td><td class="mono" style="color:var(--green);font-weight:700">${fmt(f.total)}</td><td style="font-size:10px;">${f.mode}</td><td style="font-size:10px;">${new Date(f.date).toLocaleDateString('fr-FR')}</td></tr>`).join(''):`<tr><td colspan="4" class="empty">Aucun achat</td></tr>`}</tbody></table></div>`;document.getElementById('fc-wa-btn').onclick=()=>{if(c.tel)window.open(`https://wa.me/${c.tel.replace(/\D/g,'')}?text=Bonjour ${encodeURIComponent(c.nom)} 🙏`,'_blank');else toast('Pas de téléphone','err');};openModal('modal-fiche-client');}
-function solderCredit(id){const c=DB.clients.find(x=>x.id===id);if(!c)return;const montantSolde=c.credit;c.credit=0;logAction&&logAction('Créance soldée',c.nom+' — '+fmt(montantSolde));save();toast('Crédit soldé ✅','ok');openFicheClient(id);}
+function openFicheClient(id){const c=DB.clients.find(x=>x.id===id);if(!c)return;document.getElementById('fc-titre').textContent=`👤 ${c.nom}`;const factures=DB.factures.filter(f=>f.clientId===id).reverse();const prefs={};factures.forEach(f=>f.items.forEach(i=>prefs[i.nom]=(prefs[i.nom]||0)+i.qty));const top=Object.entries(prefs).sort((a,b)=>b[1]-a[1]).slice(0,3);document.getElementById('fc-content').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:11px;"><div style="background:var(--surf2);border-radius:7px;padding:9px;font-size:12px;"><div style="font-size:9px;color:var(--text2);margin-bottom:6px;font-weight:700;text-transform:uppercase;">Contact</div><div>📱 ${c.tel||'—'}</div><div>📍 ${c.ville||'—'}</div></div><div style="background:var(--surf2);border-radius:7px;padding:9px;"><div style="font-size:9px;color:var(--text2);margin-bottom:6px;font-weight:700;text-transform:uppercase;">Stats</div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span>Achats</span><span class="badge bb">${c.achats||0}</span></div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span>Total</span><span class="mono" style="color:var(--green);font-weight:700">${fmt(c.total||0)}</span></div><div style="display:flex;justify-content:space-between;font-size:12px;"><span>Crédit</span><span class="mono" style="color:${(c.credit||0)>0?'var(--red)':'var(--text2)'};font-weight:700">${fmt(c.credit||0)}</span></div></div></div>${top.length?`<div style="background:var(--goldf);border:1px solid rgba(240,165,0,.2);border-radius:7px;padding:9px;margin-bottom:9px;"><div style="font-size:9px;color:var(--gold);font-weight:700;margin-bottom:5px;text-transform:uppercase;">⭐ Préférés</div><div style="display:flex;gap:4px;flex-wrap:wrap;">${top.map(([n,q])=>`<span class="badge by">${n} (×${q})</span>`).join('')}</div></div>`:''} ${(c.credit||0)>0?`<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:9px;margin-bottom:9px;"><div style="font-weight:700;color:var(--red);font-size:12px;">⚠️ Crédit: ${fmt(c.credit)}</div><button class="btn btn-green btn-xs" style="margin-top:5px;" onclick="solderCredit('${c.id}')">✅ Solder tout</button><button class="btn btn-gold btn-xs" style="margin-top:5px;margin-left:4px;" onclick="solderPartiel(\'${c.id}\')">💰 Partiel</button></div>`:''}<div class="twrap card"><table><thead><tr><th>#</th><th>Total</th><th>Mode</th><th>Date</th></tr></thead><tbody>${factures.length?factures.map(f=>`<tr><td class="mono" style="color:var(--gold);cursor:pointer;font-size:10px;" onclick="closeModal('modal-fiche-client');openFactDetail('${f.id}')">${f.id}</td><td class="mono" style="color:var(--green);font-weight:700">${fmt(f.total)}</td><td style="font-size:10px;">${f.mode}</td><td style="font-size:10px;">${new Date(f.date).toLocaleDateString('fr-FR')}</td></tr>`).join(''):`<tr><td colspan="4" class="empty">Aucun achat</td></tr>`}</tbody></table></div>`;document.getElementById('fc-wa-btn').onclick=()=>{if(c.tel)window.open(`https://wa.me/${c.tel.replace(/\D/g,'')}?text=Bonjour ${encodeURIComponent(c.nom)} 🙏`,'_blank');else toast('Pas de téléphone','err');};openModal('modal-fiche-client');}
+function solderCredit(id){const c=DB.clients.find(x=>x.id===id);if(!c)return;if(!confirm('Solder TOUTE la créance de '+c.nom+' ('+fmt(c.credit)+') ?'))return;const montantSolde=c.credit;c.credit=0;logAction&&logAction('Créance soldée',c.nom+' — '+fmt(montantSolde));save();toast('Crédit soldé ✅','ok');openFicheClient(id);}
 
 // ══ DASHBOARD ══
 function renderDash(){
@@ -3089,9 +3233,23 @@ function renderCreances(){
 
 function solderPartiel(id){
   const c=DB.clients.find(x=>x.id===id);if(!c||!c.credit)return;
-  const montant=parseFloat(prompt(`Solder partiellement la créance de ${c.nom} (${fmt(c.credit)})\nMontant à solder :`));
-  if(isNaN(montant)||montant<=0)return;
-  c.credit=Math.max(0,c.credit-montant);logAction&&logAction('Paiement partiel créance',c.nom+' — '+fmt(montant));save();renderCreances();
+  document.getElementById('sp-cl-id').value=id;
+  document.getElementById('sp-cl-nom').textContent=c.nom;
+  document.getElementById('sp-cl-credit').textContent=fmt(c.credit);
+  document.getElementById('sp-montant').value='';
+  document.getElementById('sp-montant').max=c.credit;
+  openModal('modal-solder-partiel');
+  setTimeout(()=>document.getElementById('sp-montant').focus(),100);
+}
+function confirmSolderPartiel(){
+  const id=document.getElementById('sp-cl-id').value;
+  const c=DB.clients.find(x=>x.id===id);if(!c)return;
+  const montant=parseFloat(document.getElementById('sp-montant').value);
+  if(isNaN(montant)||montant<=0){soundErr();toast('Montant invalide','err');return;}
+  if(montant>c.credit){soundErr();toast('Montant supérieur à la créance','err');return;}
+  c.credit=Math.max(0,c.credit-montant);
+  logAction&&logAction('Paiement partiel créance',c.nom+' — '+fmt(montant));
+  save();renderCreances();closeModal('modal-solder-partiel');
   addNotif('Paiement partiel',`${c.nom} — ${fmt(montant)} soldé`,'ok');
   toast(`${fmt(montant)} soldé pour ${c.nom} ✅`,'ok');
 }
