@@ -527,6 +527,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="ni admin-nav" onclick="openTransfertStock()"><span class="ic">🔄</span> Transfert Stock</div>
   <div class="ni admin-nav" onclick="nav('caisses-config')"><span class="ic">💰</span> Config Caisses</div>
   <div class="ni admin-nav" onclick="nav('salaires')"><span class="ic">💼</span> Salaires</div>
+  <div class="ni admin-nav" onclick="nav('tresorerie')"><span class="ic">🏦</span> Trésorerie</div>
   <div class="ni admin-nav" onclick="nav('rapports')"><span class="ic">📈</span> Rapports</div>
   <div class="ni admin-nav" onclick="nav('creances')"><span class="ic">💳</span> Créances</div>
   <div class="ni admin-nav" onclick="nav('parametres')"><span class="ic">⚙️</span> Paramètres</div>
@@ -684,6 +685,36 @@ canvas.chart-canvas{display:block;width:100%!important;}
   </div>
 
   <!-- PRODUITS -->
+  <div class="sec" id="sec-tresorerie">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+      <button class="btn btn-gold btn-sm" onclick="genererRapportFinancierPDF()">📄 Télécharger rapport PDF du mois</button>
+    </div>
+    <div class="accueil-grid" id="treso-kpis" style="margin-bottom:13px;"></div>
+    <div class="row" style="margin-bottom:11px;">
+      <div class="col card" style="padding:13px;flex:1.5;">
+        <h3 style="font-size:13px;font-weight:800;margin-bottom:9px;">📈 Évolution trésorerie (30 jours)</h3>
+        <div class="chart-container" style="height:170px;"><canvas id="chart-treso-evol" class="chart-canvas"></canvas></div>
+      </div>
+      <div class="col card" style="padding:13px;">
+        <h3 style="font-size:13px;font-weight:800;margin-bottom:9px;">💰 Par mode de paiement</h3>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <canvas id="chart-treso-modes" width="110" height="110"></canvas>
+          <div id="legend-treso-modes" style="font-size:10.5px;flex:1;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="padding:13px;margin-bottom:11px;">
+      <h3 style="font-size:13px;font-weight:800;margin-bottom:9px;">🏦 Fonds par caisse</h3>
+      <div id="treso-caisses" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:9px;"></div>
+    </div>
+    <div class="card" style="padding:13px;">
+      <h3 style="font-size:13px;font-weight:800;margin-bottom:9px;">📋 Mouvements financiers récents</h3>
+      <div class="twrap"><table>
+        <thead><tr><th>Date</th><th>Type</th><th>Libellé</th><th>Montant</th></tr></thead>
+        <tbody id="tb-treso-mvts"></tbody>
+      </table></div>
+    </div>
+  </div>
   <div class="sec" id="sec-mouvements">
     <div style="display:flex;gap:6px;margin-bottom:11px;flex-wrap:wrap;">
       <input class="srch" style="flex:1;min-width:130px;" placeholder="🔍 Produit..." id="srch-mv" oninput="renderMouvements()">
@@ -2135,9 +2166,9 @@ function startApp(){
     // Override save to also push
     const _origSaveLocal=save;
     window._origSave=_origSaveLocal;
-    const myRoleForPush=session.user?.role||'vendeur';
-    // Admin ne pousse jamais — il ne fait que recevoir
-    window._fbPushEnabled=(myRoleForPush!=='admin');
+    // Tous les rôles peuvent pousser — pushToFirebase() gère déjà la protection
+    // spécifique pour all_factures (admin n'y touche jamais, voir ligne ~3978)
+    window._fbPushEnabled=true;
     save=function(){_origSaveLocal();DB._syncTime=Date.now();if(fbConnected&&!fbLoading&&window._fbPushEnabled===true)pushToFirebase();};
     initFirebase();
     onFbAuthReady(()=>setTimeout(startRealtimeSync,500));
@@ -2184,7 +2215,7 @@ function applyNavPerms(){
       'depenses':'depenses','produits':'produits','fournisseurs':'fournisseurs',
       'clients':'clients','dashboard':'dashboard','benefice':'benefices',
       'inventaire':'inventaire','rapports':'rapports','creances':'clients',
-      'heures-fortes':'dashboard','produits-lents':'produits','mouvements':'produits',
+      'heures-fortes':'dashboard','produits-lents':'produits','mouvements':'produits','tresorerie':'benefices',
       'ventes-jour':'ventes_jour','ia-centre':'ia','agenda':'agenda',
     };
     const requiredPerm=permMap[page];
@@ -2214,8 +2245,8 @@ function updCSig(){document.getElementById('csig-label').textContent=session.cai
 function changeBoutique(b){session.boutique=b;updCSig();renderGrid();}
 
 // ══ NAV ══
-const TITLES={accueil:'<span>Accueil</span>',caisse:'Caisse / <span>POS</span>','ventes-jour':'Ventes du <span>Jour</span>',factures:'Historique <span>Factures</span>',devis:'<span>Devis</span>',retours:'<span>Retours</span>',depenses:'<span>Dépenses</span>',produits:'Gestion <span>Produits</span>',fournisseurs:'<span>Fournisseurs</span>',clients:'Gestion <span>Clients</span>',dashboard:'Tableau de <span>Bord</span>',benefice:'Bénéfice <span>Journalier</span>',inventaire:'Inventaire & <span>Analyses</span>','ia-centre':'Centre <span>IA</span>',agenda:'<span>Agenda</span> & Rappels',creances:'<span>Créances</span> & Relances','heures-fortes':'🔥 Heures <span>Fortes</span>','produits-lents':'🐢 Produits <span>Lents</span>',chat:'💬 Chat <span>Personnel</span>',comparaison:'📊 Comparaison <span>Boutiques</span>',previsions:'🤖 IA <span>Prévisions</span>',users:'Utilisateurs & <span>Rôles</span>','caisses-config':'Config <span>Caisses</span>',salaires:'<span>Salaires</span>',rapports:'<span>Rapports</span>',parametres:'<span>Paramètres</span>',mouvements:'🔄 Mouvements de <span>Stock</span>'};
-const RENDERS={accueil:renderAccueil,caisse:renderGrid,'ventes-jour':renderVentesJour,factures:renderFactures,devis:renderDevis,retours:renderRetours,depenses:renderDepenses,produits:renderProduits,fournisseurs:renderFourn,clients:renderClients,dashboard:renderDash,benefice:renderBenefice,inventaire:renderInventaire,'ia-centre':renderIACentre,agenda:renderAgenda,creances:renderCreances,'heures-fortes':renderHeuresFortes,'produits-lents':renderProduitsLents,chat:renderChat,comparaison:renderComparaison,previsions:()=>{},users:renderUsers,'caisses-config':renderCaissesConfig,salaires:renderSalaires,rapports:renderRapports,parametres:loadSettings,mouvements:renderMouvements};
+const TITLES={accueil:'<span>Accueil</span>',caisse:'Caisse / <span>POS</span>','ventes-jour':'Ventes du <span>Jour</span>',factures:'Historique <span>Factures</span>',devis:'<span>Devis</span>',retours:'<span>Retours</span>',depenses:'<span>Dépenses</span>',produits:'Gestion <span>Produits</span>',fournisseurs:'<span>Fournisseurs</span>',clients:'Gestion <span>Clients</span>',dashboard:'Tableau de <span>Bord</span>',benefice:'Bénéfice <span>Journalier</span>',inventaire:'Inventaire & <span>Analyses</span>','ia-centre':'Centre <span>IA</span>',agenda:'<span>Agenda</span> & Rappels',creances:'<span>Créances</span> & Relances','heures-fortes':'🔥 Heures <span>Fortes</span>','produits-lents':'🐢 Produits <span>Lents</span>',chat:'💬 Chat <span>Personnel</span>',comparaison:'📊 Comparaison <span>Boutiques</span>',previsions:'🤖 IA <span>Prévisions</span>',users:'Utilisateurs & <span>Rôles</span>','caisses-config':'Config <span>Caisses</span>',salaires:'<span>Salaires</span>',rapports:'<span>Rapports</span>',parametres:'<span>Paramètres</span>',mouvements:'🔄 Mouvements de <span>Stock</span>',tresorerie:'🏦 <span>Trésorerie</span>'};
+const RENDERS={accueil:renderAccueil,caisse:renderGrid,'ventes-jour':renderVentesJour,factures:renderFactures,devis:renderDevis,retours:renderRetours,depenses:renderDepenses,produits:renderProduits,fournisseurs:renderFourn,clients:renderClients,dashboard:renderDash,benefice:renderBenefice,inventaire:renderInventaire,'ia-centre':renderIACentre,agenda:renderAgenda,creances:renderCreances,'heures-fortes':renderHeuresFortes,'produits-lents':renderProduitsLents,chat:renderChat,comparaison:renderComparaison,previsions:()=>{},users:renderUsers,'caisses-config':renderCaissesConfig,salaires:renderSalaires,rapports:renderRapports,parametres:loadSettings,mouvements:renderMouvements,tresorerie:renderTresorerie};
 
 function nav(page){
   // Sécurité: pages strictement admin, bloquées même via appel direct (console, etc.)
@@ -2536,6 +2567,92 @@ async function buildPDFBytes(f){
   doc.setFontSize(6);doc.setFont('helvetica','normal');doc.text(`Généré le ${new Date().toLocaleString('fr-FR')}`,W/2,fY+16,{align:'center'});
   return doc.output('arraybuffer');
 }
+async function genererRapportFinancierPDF(){
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210,H=297,gold=[240,165,0],dark=[10,14,26],gray=[120,130,150],lg=[240,242,246],white=[255,255,255],red=[239,68,68],green=[22,163,74];
+  const s=DB.settings.B1||{};
+  // Période: mois en cours
+  const moisStr=today().slice(0,7);
+  const moisLabel=new Date().toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  const ventes=DB.factures.filter(f=>f.date.startsWith(moisStr));
+  const depenses=DB.depenses.filter(d=>d.date.startsWith(moisStr));
+  const ca=ventes.reduce((s,f)=>s+f.total,0);
+  const totalDep=depenses.reduce((s,d)=>s+d.montant,0);
+  const benefice=ventes.reduce((s,f)=>s+f.items.reduce((ss,i)=>ss+(i.prix-(i.achat||0))*i.qty,0),0)-totalDep;
+  const modesData={};ventes.forEach(f=>{modesData[f.mode]=(modesData[f.mode]||0)+f.total;});
+  const modeLabels={especes:'Espèces',wave:'Wave',orange:'Orange Money',mobile:'Mobile Money',carte:'Carte',credit:'Crédit'};
+
+  // En-tête
+  doc.setFillColor(...dark);doc.rect(0,0,W,42,'F');
+  doc.setFontSize(20);doc.setTextColor(...gold);doc.text(s.logo||'🏪',14,24);
+  doc.setFontSize(15);doc.setFont('helvetica','bold');doc.setTextColor(...gold);doc.text((DB.settings.appNom||'MON NÉGOCE').toUpperCase(),40,17);
+  doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(...lg);doc.text('Rapport Financier — '+moisLabel.charAt(0).toUpperCase()+moisLabel.slice(1),40,24);
+  doc.setFillColor(...gold);doc.roundedRect(150,10,48,20,3,3,'F');doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(...dark);
+  doc.text('Généré le',174,17,{align:'center'});doc.setFontSize(9);doc.text(new Date().toLocaleDateString('fr-FR'),174,24,{align:'center'});
+
+  let y=52;
+  // 3 cartes KPI
+  const kpiW=58,gap=4;
+  const kpis=[{label:'CHIFFRE D\'AFFAIRES',val:fmt(ca),color:[59,130,246]},{label:'DÉPENSES',val:fmt(totalDep),color:red},{label:'BÉNÉFICE NET',val:fmt(benefice),color:green}];
+  kpis.forEach((k,i)=>{
+    const x=10+i*(kpiW+gap);
+    doc.setFillColor(...k.color);doc.roundedRect(x,y,kpiW,26,3,3,'F');
+    doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);doc.text(k.label,x+4,y+8);
+    doc.setFontSize(12);doc.text(k.val+' F',x+4,y+18);
+  });
+  y+=36;
+
+  // Détail par mode de paiement
+  doc.setFillColor(...dark);doc.rect(10,y,190,8,'F');doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(...gold);
+  doc.text('RÉPARTITION PAR MODE DE PAIEMENT',14,y+5.5);y+=8;
+  Object.entries(modesData).sort((a,b)=>b[1]-a[1]).forEach(([mode,montant],idx)=>{
+    doc.setFillColor(...(idx%2===0?white:lg));doc.rect(10,y,190,7,'F');
+    doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(40,40,55);
+    doc.text(modeLabels[mode]||mode,14,y+5);
+    doc.setFont('helvetica','bold');doc.text(fmt(montant)+' FCFA',195,y+5,{align:'right'});
+    y+=7;
+  });
+  y+=8;
+
+  // Top 5 produits vendus
+  const prodTotals={};
+  ventes.forEach(f=>f.items.forEach(it=>{prodTotals[it.nom]=(prodTotals[it.nom]||0)+it.prix*it.qty;}));
+  const topProds=Object.entries(prodTotals).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  doc.setFillColor(...dark);doc.rect(10,y,190,8,'F');doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(...gold);
+  doc.text('TOP 5 PRODUITS DU MOIS',14,y+5.5);y+=8;
+  topProds.forEach(([nom,montant],idx)=>{
+    doc.setFillColor(...(idx%2===0?white:lg));doc.rect(10,y,190,7,'F');
+    doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(40,40,55);
+    doc.text((idx+1)+'. '+nom.substring(0,40),14,y+5);
+    doc.setFont('helvetica','bold');doc.text(fmt(montant)+' FCFA',195,y+5,{align:'right'});
+    y+=7;
+  });
+  y+=8;
+
+  // Créances en cours
+  const debiteurs=DB.clients.filter(c=>(c.credit||0)>0);
+  const totalCreances=debiteurs.reduce((s,c)=>s+c.credit,0);
+  doc.setFillColor(...dark);doc.rect(10,y,190,8,'F');doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(...gold);
+  doc.text('CRÉANCES EN COURS ('+debiteurs.length+' client(s))',14,y+5.5);y+=8;
+  doc.setFillColor(...lg);doc.rect(10,y,190,9,'F');
+  doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(...red);
+  doc.text('TOTAL CRÉANCES :',14,y+6);doc.text(fmt(totalCreances)+' FCFA',195,y+6,{align:'right'});
+
+  // Footer
+  const fY=H-18;doc.setDrawColor(...gold);doc.setLineWidth(0.5);doc.line(10,fY,W-10,fY);
+  doc.setFontSize(7);doc.setFont('helvetica','italic');doc.setTextColor(...gray);
+  doc.text('Document généré automatiquement — '+(DB.settings.appNom||'Mon Négoce'),W/2,fY+7,{align:'center'});
+
+  const bytes=doc.output('arraybuffer');
+  const blob=new Blob([bytes],{type:'application/pdf'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Rapport_Financier_'+moisStr+'.pdf';
+  a.click();
+  logAction&&logAction('Export','Rapport financier PDF — '+moisLabel);
+  toast('📄 Rapport financier téléchargé ✅','ok');
+}
+
 async function genererFacturePDF(){
   if(!currentFact)return;
   const fCopy=JSON.parse(JSON.stringify(currentFact));
@@ -2755,7 +2872,6 @@ function saveProd(){
   if(eid){const old=DB.produits.find(x=>x.id===eid);if(old&&(old.s1!==p.s1||old.s2!==p.s2)){if(old.s1!==p.s1)logMouvement(p.id,p.nom,'ajustement',p.s1-old.s1,'B1','Modification manuelle stock');if(old.s2!==p.s2)logMouvement(p.id,p.nom,'ajustement',p.s2-old.s2,'B2','Modification manuelle stock');}const i=DB.produits.findIndex(x=>x.id===eid);DB.produits[i]=p;logAction('Modif produit',p.nom);}else{DB.produits.push(p);logAction('Ajout produit',p.nom);if(p.s1>0)logMouvement(p.id,p.nom,'creation',p.s1,'B1','Stock initial');if(p.s2>0)logMouvement(p.id,p.nom,'creation',p.s2,'B2','Stock initial');}
   // Forcer push immédiat pour que les autres appareils voient le nouveau produit
   window._prodUpdated=Date.now();
-  save();
   save();stopCamera();closeModal('modal-prod');renderProduits();refreshAllSelects();toast(eid?'Modifié ✅':'Ajouté ✅','ok');
 }
 function renderCategories(){
@@ -2801,6 +2917,79 @@ function supprimerCategorie(cat){
   save();renderCategories();renderProduits();
   toast('Catégorie supprimée ✅','ok');
 }
+function renderTresorerie(){
+  const todayStr=today();
+  const moisStr=todayStr.slice(0,7);
+  // KPIs principaux
+  const caJour=DB.factures.filter(f=>f.date.startsWith(todayStr)).reduce((s,f)=>s+f.total,0);
+  const depJour=DB.depenses.filter(d=>d.date.startsWith(todayStr)).reduce((s,d)=>s+d.montant,0);
+  const caMois=DB.factures.filter(f=>f.date.startsWith(moisStr)).reduce((s,f)=>s+f.total,0);
+  const depMois=DB.depenses.filter(d=>d.date.startsWith(moisStr)).reduce((s,d)=>s+d.montant,0);
+  const totalFonds=DB.caisses.reduce((s,c)=>s+(c.fond||0),0);
+  const totalEspecesEncaisse=DB.factures.filter(f=>f.mode==='especes').reduce((s,f)=>s+f.total,0);
+  const totalCreances=DB.clients.reduce((s,c)=>s+(c.credit||0),0);
+  const soldeNet=totalFonds+totalEspecesEncaisse-DB.depenses.reduce((s,d)=>s+d.montant,0);
+
+  const kpis=[
+    {icon:'🏦',title:'Solde estimé',val:fmt(soldeNet),sub:'Fonds + espèces - dépenses',nav:'tresorerie'},
+    {icon:'📈',title:'CA du jour',val:fmt(caJour),sub:'vs '+fmt(caMois)+' ce mois',nav:'ventes-jour'},
+    {icon:'📉',title:'Dépenses du jour',val:fmt(depJour),sub:fmt(depMois)+' ce mois',nav:'depenses'},
+    {icon:'⏳',title:'Créances en attente',val:fmt(totalCreances),sub:DB.clients.filter(c=>(c.credit||0)>0).length+' client(s)',nav:'creances'},
+  ];
+  document.getElementById('treso-kpis').innerHTML=kpis.map(k=>`
+    <div class="accueil-card" onclick="nav('${k.nav}')">
+      <div class="ac-icon">${k.icon}</div>
+      <div class="ac-title">${k.title}</div>
+      <div class="ac-val">${k.val}</div>
+      <div class="ac-sub">${k.sub}</div>
+    </div>`).join('');
+
+  // Fonds par caisse
+  document.getElementById('treso-caisses').innerHTML=DB.caisses.map(c=>{
+    const ventesC=DB.factures.filter(f=>f.caisse===c.id&&f.mode==='especes').reduce((s,f)=>s+f.total,0);
+    return`<div style="background:var(--surf2);border:1px solid var(--border2);border-radius:10px;padding:11px;">
+      <div style="font-size:11px;color:var(--text2);">${c.nom}</div>
+      <div style="font-size:17px;font-weight:900;color:var(--gold);margin:4px 0;">${fmt((c.fond||0)+ventesC)}</div>
+      <div style="font-size:9px;color:var(--text3);">Fond: ${fmt(c.fond||0)} + Espèces: ${fmt(ventesC)}</div>
+    </div>`;
+  }).join('');
+
+  // Mouvements financiers récents (ventes + dépenses fusionnées)
+  const mvts=[
+    ...DB.factures.slice(0,15).map(f=>({date:f.date,type:'vente',lib:'Vente '+f.id+' — '+f.client,montant:f.total})),
+    ...DB.depenses.slice(0,15).map(d=>({date:d.date,type:'depense',lib:d.lib,montant:-d.montant}))
+  ].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,20);
+  document.getElementById('tb-treso-mvts').innerHTML=mvts.length?mvts.map(m=>`<tr>
+    <td style="font-size:10px;">${new Date(m.date).toLocaleDateString('fr-FR')} ${new Date(m.date).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</td>
+    <td><span class="badge ${m.type==='vente'?'bg':'br'}">${m.type==='vente'?'💰 Vente':'💸 Dépense'}</span></td>
+    <td style="font-size:11px;">${m.lib}</td>
+    <td class="mono" style="font-weight:700;color:${m.montant>0?'var(--green)':'var(--red)'};">${m.montant>0?'+':''}${fmt(m.montant)}</td>
+  </tr>`).join(''):`<tr><td colspan="4" class="empty"><div class="ei">🏦</div>Aucun mouvement</td></tr>`;
+
+  // Graphique évolution 30 jours (CA - dépenses cumulées)
+  setTimeout(()=>{
+    const labels30=[];const data30=[];
+    for(let i=29;i>=0;i--){
+      const d=new Date();d.setDate(d.getDate()-i);
+      const ds=d.toISOString().slice(0,10);
+      labels30.push(d.getDate()+'/'+(d.getMonth()+1));
+      const caD=DB.factures.filter(f=>f.date.startsWith(ds)).reduce((s,f)=>s+f.total,0);
+      const depD=DB.depenses.filter(dp=>dp.date.startsWith(ds)).reduce((s,dp)=>s+dp.montant,0);
+      data30.push(caD-depD);
+    }
+    // Afficher seulement 10 labels pour la lisibilité
+    const labelsAffiches=labels30.map((l,i)=>i%3===0?l:'');
+    drawLineChart('chart-treso-evol',labelsAffiches,data30,{color:'#16a34a'});
+
+    // Donut par mode de paiement (sur le mois)
+    const modesData={};
+    DB.factures.filter(f=>f.date.startsWith(moisStr)).forEach(f=>{modesData[f.mode]=(modesData[f.mode]||0)+f.total;});
+    const modeLabels={especes:'Espèces',wave:'Wave',orange:'Orange Money',mobile:'Mobile Money',carte:'Carte',credit:'Crédit'};
+    const donutData=Object.entries(modesData).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({label:modeLabels[k]||k,value:v}));
+    drawDonut('chart-treso-modes',donutData,'legend-treso-modes');
+  },80);
+}
+
 function renderMouvements(){
   const q=(document.getElementById('srch-mv')?.value||'').toLowerCase();
   const typeFil=document.getElementById('fil-mv-type')?.value||'';
@@ -3230,12 +3419,17 @@ function renderCreances(){
   const listeEl=document.getElementById('cr-factures-liste');
   if(listeEl){
     listeEl.innerHTML=factsCr.length?`<div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:5px;">Factures crédit dans la période (${factsCr.length})</div>`+
-    factsCr.map(f=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px;">
+    factsCr.map(f=>{
+      const cl=f.clientId?DB.clients.find(c=>c.id===f.clientId):null;
+      const peutSolder=cl&&(cl.credit||0)>0;
+      return`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;flex-wrap:wrap;gap:4px;">
       <span class="mono" style="color:var(--gold);cursor:pointer;" onclick="openFactDetail('${f.id}')">${f.id}</span>
       <span>${f.client}</span>
       <span class="mono" style="color:var(--red);font-weight:700;">${fmt(f.total)}</span>
       <span style="color:var(--text2);font-size:10px;">${new Date(f.date).toLocaleDateString('fr-FR')}</span>
-    </div>`).join(''):`<div class="empty" style="padding:12px;">Aucune facture crédit</div>`;
+      ${peutSolder?`<span style="display:flex;gap:3px;"><button class="btn btn-green btn-xs" onclick="solderCredit('${cl.id}')">✅</button><button class="btn btn-gold btn-xs" onclick="solderPartiel('${cl.id}')">💰</button></span>`:'<span style="font-size:9px;color:var(--green);">✓ Soldé</span>'}
+    </div>`;
+    }).join(''):`<div class="empty" style="padding:12px;">Aucune facture crédit</div>`;
   }
   // Chart créances par mois
   setTimeout(()=>{
@@ -3949,10 +4143,12 @@ function pushToFirebase(){
         _device: navigator.userAgent.substring(0,50)
       });
 
-      // 2. Stocks séparés par boutique
+      // 2. Stocks — pousser B1 et B2 systématiquement (un changement peut affecter n'importe quelle boutique,
+      // peu importe sur laquelle l'auteur est connecté — ex: superviseur sur B1 modifiant le stock B2 de VEN01)
       const stocks=DB.produits.map(p=>({id:p.id,s1:p.s1||0,s2:p.s2||0}));
       window._stocksPushTime=Date.now();
-      await fbDB.ref(`negoce/stocks/${boutique}`).set({stocks,_syncTime:window._stocksPushTime});
+      await fbDB.ref('negoce/stocks/B1').set({stocks,_syncTime:window._stocksPushTime});
+      await fbDB.ref('negoce/stocks/B2').set({stocks,_syncTime:window._stocksPushTime});
 
       // 3. Clients séparés par boutique
       await fbDB.ref(`negoce/clients/${boutique}`).set(DB.clients||[]);
@@ -4285,12 +4481,10 @@ function startRealtimeSync(){
 
 function syncNow(){
   if(!fbConnected){toast('📴 Pas de connexion','err');return;}
-  // Bloquer TOUT push pendant et après la synchronisation admin
+  // Bloquer le push uniquement PENDANT le pull (éviter une course), puis le réactiver pour tous
   window._fbPushEnabled=false;
   pullFromFirebase().finally(()=>{
-    // Remettre push seulement si pas admin
-    const role=session.user?.role||'vendeur';
-    if(role!=='admin')window._fbPushEnabled=true;
+    window._fbPushEnabled=true;
   });
 }
 
