@@ -588,9 +588,21 @@ canvas.chart-canvas{display:block;width:100%!important;}
               <div class="paybtn" onclick="setPay(this,'mobile')">📱 Mobile</div>
               <div class="paybtn" onclick="setPay(this,'carte')">💳 Carte</div>
               <div class="paybtn" onclick="setPay(this,'credit')">📝 Crédit</div>
+              <div class="paybtn" onclick="setPay(this,'acompte')">💼 Acompte</div>
             </div>
             <input type="hidden" id="pay-mode" value="especes">
             <input type="hidden" id="pos-cl-id" value="">
+            <div id="pos-acompte-zone" style="margin-top:6px;background:var(--surf2);border-radius:8px;padding:7px 10px;display:none;">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                <span style="font-size:11px;color:var(--text2);">💼 Acompte versé</span>
+                <input type="number" id="pos-acompte" placeholder="0" min="0" style="flex:1;background:var(--surf3);border:1px solid var(--border2);border-radius:5px;padding:4px 7px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;font-weight:700;" oninput="calcAcompte()">
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:11px;color:var(--text2);">⏳ Solde restant (devient créance)</span>
+                <span id="pos-solde-acompte" style="font-size:15px;font-weight:900;color:var(--red);">—</span>
+              </div>
+              <div style="font-size:9px;color:var(--text3);margin-top:3px;">⚠️ Le client doit être sélectionné pour suivre la créance</div>
+            </div>
             <div id="pos-monnaie-zone" style="margin-top:6px;background:var(--surf2);border-radius:8px;padding:7px 10px;">
               <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
                 <span style="font-size:11px;color:var(--text2);">💵 Montant reçu</span>
@@ -1917,7 +1929,7 @@ const today=()=>new Date().toISOString().slice(0,10);
 const getBName=b=>DB.settings[b]?.nom||b;
 const isAdmin=()=>['admin','superviseur'].includes(session.user?.role);
 const hasPerm=p=>session.user?.perms?.includes(p)||false;
-const IC={especes:'💵',wave:'🌊',orange:'🟠',mobile:'📱',carte:'💳',credit:'📝'};
+const IC={especes:'💵',wave:'🌊',orange:'🟠',mobile:'📱',carte:'💳',credit:'📝',acompte:'💼'};
 
 // ══ THEME ══
 const THEMES=[
@@ -2343,7 +2355,7 @@ function renderCart(){
 function calcCart(){
   const sub=cart.reduce((s,i)=>s+i.prix*i.qty,0);const r=parseFloat(document.getElementById('p-rem')?.value)||0;const disc=sub*r/100;
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
-  set('p-sub',fmt(sub));set('p-rem-v','-'+fmt(disc));set('p-tot',fmt(sub-disc));calcMonnaie();
+  set('p-sub',fmt(sub));set('p-rem-v','-'+fmt(disc));set('p-tot',fmt(sub-disc));calcMonnaie();calcAcompte();
 }
 function calcMonnaie(){
   const recu=parseFloat(document.getElementById('pos-recu')?.value)||0;
@@ -2362,6 +2374,19 @@ function setPay(el,mode){
   // Afficher zone monnaie seulement pour espèces
   const z=document.getElementById('pos-monnaie-zone');
   if(z)z.style.display=(mode==='especes')?'block':'none';
+  // Afficher zone acompte seulement pour mode acompte
+  const za=document.getElementById('pos-acompte-zone');
+  if(za)za.style.display=(mode==='acompte')?'block':'none';
+  if(mode==='acompte')calcAcompte();
+}
+function calcAcompte(){
+  const acompte=parseFloat(document.getElementById('pos-acompte')?.value)||0;
+  const total=cart.reduce((s,i)=>s+i.prix*i.qty,0)*(1-(parseFloat(document.getElementById('p-rem')?.value)||0)/100);
+  const solde=Math.max(0,total-acompte);
+  const el=document.getElementById('pos-solde-acompte');
+  if(!el)return;
+  el.textContent=fmt(solde);
+  el.style.color=solde>0?'var(--red)':'var(--green)';
 }
 function validerVente(){
   if(!cart.length){soundErr();toast('Panier vide !','err');return;}
@@ -2374,6 +2399,15 @@ function validerVente(){
   }
   const sub=cart.reduce((s,i)=>s+i.prix*i.qty,0);const r=parseFloat(document.getElementById('p-rem').value)||0;const total=sub*(1-r/100);const mode=document.getElementById('pay-mode').value;
   const cid=document.getElementById('pos-cl-id').value||'';const client=DB.clients.find(c=>c.id===cid);
+  // Mode Acompte: exige un client sélectionné
+  let acompteVerse=0,soldeAcompte=0;
+  if(mode==='acompte'){
+    if(!client){soundErr();toast('⛔ Sélectionnez un client pour un acompte','err');return;}
+    acompteVerse=parseFloat(document.getElementById('pos-acompte').value)||0;
+    if(acompteVerse<=0){soundErr();toast('⛔ Saisissez le montant de l\'acompte','err');return;}
+    if(acompteVerse>total){soundErr();toast('⛔ L\'acompte ne peut pas dépasser le total','err');return;}
+    soldeAcompte=total-acompteVerse;
+  }
   cart.forEach(item=>{const p=DB.produits.find(x=>x.id===item.id);if(p){if(session.boutique==='B1')p.s1-=item.qty;else p.s2-=item.qty;logMouvement(p.id,p.nom,'vente',-item.qty,session.boutique,'Vente caisse');}});
   if(mode==='credit'&&client){
     client.credit=(client.credit||0)+total;
@@ -2382,17 +2416,20 @@ function validerVente(){
       toast('⚠️ '+client.nom+' dépasse le plafond crédit ('+fmt(client.credit)+')','info');
     }
   }
+  if(mode==='acompte'&&client&&soldeAcompte>0){
+    client.credit=(client.credit||0)+soldeAcompte;
+  }
   // ID unique: préfixe utilisateur + timestamp pour éviter collisions entre appareils
   const _fid='F'+session.user.id.replace(/[^A-Z0-9]/g,'').substring(0,3)+Date.now().toString(36).toUpperCase().slice(-5);
   DB.nextIds.f++;
-  const fac={id:_fid,boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:cart.map(i=>({id:i.id,nom:String(i.nom),prix:Number(i.prix),achat:Number(i.achat||0),qty:Number(i.qty),unite:String(i.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,date:new Date().toISOString()};
+  const fac={id:_fid,boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:cart.map(i=>({id:i.id,nom:String(i.nom),prix:Number(i.prix),achat:Number(i.achat||0),qty:Number(i.qty),unite:String(i.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,acompteVerse:mode==='acompte'?acompteVerse:0,soldeAcompte:mode==='acompte'?soldeAcompte:0,date:new Date().toISOString()};
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;
     // Points fidélité: 1 point par 1000 FCFA
     const newPoints=Math.floor(total/1000);
     client.points=(client.points||0)+newPoints;
     if(newPoints>0)toast('🎁 '+client.nom+' gagne '+newPoints+' point(s) fidélité !','info');}
   logAction('Vente','Facture '+fac.id+' — '+fmt(total)+' — '+mode);
-  window._stocksPushTime=Date.now();save();currentFact=JSON.parse(JSON.stringify(fac));lastFactId=fac.id;cart=[];document.getElementById('p-rem').value='0';const pr=document.getElementById('pos-recu');if(pr)pr.value='';calcMonnaie();clearPOSClientSel();
+  window._stocksPushTime=Date.now();save();currentFact=JSON.parse(JSON.stringify(fac));lastFactId=fac.id;cart=[];document.getElementById('p-rem').value='0';const pr=document.getElementById('pos-recu');if(pr)pr.value='';const pa=document.getElementById('pos-acompte');if(pa)pa.value='';calcMonnaie();calcAcompte();clearPOSClientSel();
   soundOk();renderCart();renderGrid();
   const btnF=document.getElementById('btn-voir-fact');btnF.style.display='block';btnF.textContent=`🧾 Facture ${fac.id}`;
   toast(`✅ ${fac.id} — ${fmt(total)}`,'ok');
@@ -2670,7 +2707,8 @@ function openFactDetail(id){
   if(f.items)f.items=f.items.map(i=>({id:i.id,nom:String(i.nom||'?'),prix:Number(i.prix||0),achat:Number(i.achat||0),qty:Number(i.qty||1),unite:String(i.unite||'pièce')}));
   currentFact=f;const s=DB.settings[f.boutique]||{};
   document.getElementById('mfd-num').textContent=`Facture ${f.id}`;
-  document.getElementById('mfd-content').innerHTML=`<div style="background:var(--surf2);border-radius:7px;padding:9px;margin-bottom:9px;font-size:11px;"><div style="font-weight:800;font-size:12px;color:var(--gold);">${s.logo||'🏪'} ${s.nom||getBName(f.boutique)}</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:9px;font-size:11px;"><div><span style="color:var(--text2)">Facture :</span> <b>${f.id}</b></div><div><span style="color:var(--text2)">Date :</span> ${new Date(f.date).toLocaleString('fr-FR')}</div><div><span style="color:var(--text2)">Client :</span> ${f.client}</div><div><span style="color:var(--text2)">Caisse :</span> <span style="color:var(--cyan)">${f.caisse}</span></div><div><span style="color:var(--text2)">Vendeur :</span> ${f.vendeur||'—'}</div><div><span style="color:var(--text2)">Mode :</span> ${f.mode}</div></div><div class="twrap"><table><thead><tr><th>Produit</th><th>Qté</th><th>P.U.</th><th>Total</th></tr></thead><tbody>${f.items.map(i=>`<tr><td><b>${i.nom}</b></td><td>${i.qty}</td><td class="mono" style="color:var(--text2)">${fmt(i.prix)}</td><td class="mono" style="color:var(--gold);font-weight:700">${fmt(i.prix*i.qty)}</td></tr>`).join('')}</tbody></table></div><div style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px;">${f.remise>0?`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--red);margin-bottom:3px;"><span>Remise -${f.remise}%</span><span>-${fmt(f.sousTotal*f.remise/100)}</span></div>`:''}<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:900;"><span>TOTAL</span><span class="mono" style="color:var(--green)">${fmt(f.total)}</span></div></div>`;
+  const acompteHTML=(f.mode==='acompte')?`<div style="background:rgba(240,165,0,.1);border:1px solid rgba(240,165,0,.3);border-radius:7px;padding:8px;margin-top:6px;font-size:11px;"><div style="display:flex;justify-content:space-between;"><span>💼 Acompte versé</span><span class="mono" style="color:var(--green);font-weight:700;">${fmt(f.acompteVerse||0)}</span></div><div style="display:flex;justify-content:space-between;margin-top:3px;"><span>⏳ Solde restant (créance)</span><span class="mono" style="color:var(--red);font-weight:700;">${fmt(f.soldeAcompte||0)}</span></div></div>`:'';
+  document.getElementById('mfd-content').innerHTML=`<div style="background:var(--surf2);border-radius:7px;padding:9px;margin-bottom:9px;font-size:11px;"><div style="font-weight:800;font-size:12px;color:var(--gold);">${s.logo||'🏪'} ${s.nom||getBName(f.boutique)}</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:9px;font-size:11px;"><div><span style="color:var(--text2)">Facture :</span> <b>${f.id}</b></div><div><span style="color:var(--text2)">Date :</span> ${new Date(f.date).toLocaleString('fr-FR')}</div><div><span style="color:var(--text2)">Client :</span> ${f.client}</div><div><span style="color:var(--text2)">Caisse :</span> <span style="color:var(--cyan)">${f.caisse}</span></div><div><span style="color:var(--text2)">Vendeur :</span> ${f.vendeur||'—'}</div><div><span style="color:var(--text2)">Mode :</span> ${IC[f.mode]||''} ${f.mode}</div></div><div class="twrap"><table><thead><tr><th>Produit</th><th>Qté</th><th>P.U.</th><th>Total</th></tr></thead><tbody>${f.items.map(i=>`<tr><td><b>${i.nom}</b></td><td>${i.qty}</td><td class="mono" style="color:var(--text2)">${fmt(i.prix)}</td><td class="mono" style="color:var(--gold);font-weight:700">${fmt(i.prix*i.qty)}</td></tr>`).join('')}</tbody></table></div><div style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px;">${f.remise>0?`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--red);margin-bottom:3px;"><span>Remise -${f.remise}%</span><span>-${fmt(f.sousTotal*f.remise/100)}</span></div>`:''}<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:900;"><span>TOTAL</span><span class="mono" style="color:var(--green)">${fmt(f.total)}</span></div>${acompteHTML}</div>`;
   switchTab('apercu');openModal('modal-fdet');
 }
 function waShare(){if(currentFact)waShareId(currentFact.id);}
@@ -4433,6 +4471,8 @@ function startRealtimeSync(){
   // Écouter stocks de l'autre boutique
   fbDB.ref(`negoce/stocks/${autreBoutique}`).on('value',snap=>{
     if(fbSyncing)return;
+    // Même protection anti-rebond que pour la boutique courante: ignorer si on vient nous-même de pousser
+    if(window._stocksPushTime&&Date.now()-window._stocksPushTime<10000)return;
     const data=snap.val();if(!data||!data.stocks)return;
     fbLoading=true;applyStocksRT(data.stocks,autreBoutique);
     if(window._origSave)window._origSave();else save();
