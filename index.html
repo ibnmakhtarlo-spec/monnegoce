@@ -924,6 +924,25 @@ canvas.chart-canvas{display:block;width:100%!important;}
       </div>
     </div>
     <div class="card" style="padding:13px;margin-bottom:11px;border-color:rgba(139,92,246,.3);">
+      <h3 style="font-size:13px;font-weight:800;color:var(--purple);margin-bottom:9px;">📸 Scanner Facture / Bon de Livraison</h3>
+      <p style="font-size:10px;color:var(--text2);margin-bottom:8px;">Photographiez une facture fournisseur — l'IA extrait les produits et met à jour le stock.</p>
+      <div style="display:flex;gap:7px;margin-bottom:8px;">
+        <label class="btn btn-ghost btn-sm" style="flex:1;cursor:pointer;">📁 Galerie<input type="file" accept="image/*" style="display:none;" onchange="handleFacturePhoto(this)"></label>
+        <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="openCameraFor('facture')">📷 Caméra</button>
+      </div>
+      <div id="ia-fact-photo-preview" style="width:100%;height:120px;background:var(--surf2);border:2px dashed var(--border2);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--text3);margin-bottom:8px;overflow:hidden;">📄</div>
+      <button class="btn btn-purple" id="ia-fact-analyze-btn" style="width:100%;display:none;" onclick="analyzeFacturePhoto()">🤖 Analyser et extraire les produits</button>
+      <div id="ia-fact-result" style="margin-top:8px;"></div>
+    </div>
+    <div class="card" style="padding:13px;margin-bottom:11px;border-color:rgba(139,92,246,.3);">
+      <h3 style="font-size:13px;font-weight:800;color:var(--purple);margin-bottom:9px;">🗣️ Note Vocale</h3>
+      <p style="font-size:10px;color:var(--text2);margin-bottom:8px;">Enregistrez une note vocale — vente, tâche ou produit créés automatiquement, sans clavier.</p>
+      <button class="btn btn-purple" id="ia-voice-btn" style="width:100%;" onclick="toggleVoiceRecording()">🎤 Démarrer l'enregistrement</button>
+      <div id="ia-voice-transcript" style="margin-top:8px;font-size:11px;color:var(--text2);min-height:20px;"></div>
+      <div id="ia-voice-result" style="margin-top:8px;"></div>
+    </div>
+    <div class="sec" id="sec-ia-centre-placeholder-old" style="display:none;"></div>
+    <div class="card" style="padding:13px;margin-bottom:11px;border-color:rgba(139,92,246,.3);">
       <h3 style="font-size:13px;font-weight:800;color:var(--purple);margin-bottom:9px;">✅ Agent Tâches IA</h3>
       <textarea id="ia-tache-input" style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:8px;color:var(--text);font-family:var(--font);font-size:12px;min-height:55px;outline:none;resize:vertical;" placeholder="Ex: Rappelle-moi de commander des écouteurs demain à 9h"></textarea>
       <button class="btn btn-purple" style="width:100%;margin-top:6px;" onclick="iaCreerTache()">🤖 Ajouter la tâche</button>
@@ -1203,6 +1222,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
     <div class="chat-layout">
       <div class="chat-sidebar">
         <div class="cs-hdr">💬 Salons</div>
+        <div id="chat-online-count" style="padding:5px 11px;font-size:10px;color:var(--green);display:flex;align-items:center;gap:4px;"></div>
         <div id="chat-rooms-list"></div>
         <div style="padding:8px;border-top:1px solid var(--border);margin-top:auto;">
           <button class="btn btn-gold btn-xs" style="width:100%" onclick="createChatRoom()">+ Nouveau salon</button>
@@ -1215,6 +1235,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
             <div id="chat-room-name" style="font-size:12px;font-weight:800;">Sélectionnez un salon</div>
             <div id="chat-room-members" style="font-size:9px;color:var(--text2);"></div>
           </div>
+          <div id="chat-typing-indicator" style="font-size:10px;color:var(--green);font-style:italic;margin-left:10px;display:none;">✍️ en train d'écrire...</div>
           <div style="margin-left:auto;display:flex;gap:5px;">
             <button class="btn btn-ghost btn-xs" onclick="refreshChat()">🔄</button>
           </div>
@@ -1223,7 +1244,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
           <div class="empty" style="margin:auto;"><div class="ei">💬</div>Sélectionnez un salon</div>
         </div>
         <div class="chat-input-area" id="chat-input-area" style="display:none;">
-          <textarea class="chat-input" id="chat-input" placeholder="Écrire un message..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}"></textarea>
+          <textarea class="chat-input" id="chat-input" placeholder="Écrire un message..." rows="1" oninput="onChatTyping()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}"></textarea>
           <button class="btn btn-gold" style="border-radius:50%;width:34px;height:34px;padding:0;flex-shrink:0;" onclick="sendChatMsg()">➤</button>
         </div>
       </div>
@@ -1380,6 +1401,14 @@ canvas.chart-canvas{display:block;width:100%!important;}
 </div>
 
 <!-- NOUVELLE FACTURE -->
+<div class="overlay" id="modal-camera-ia">
+  <div class="modal">
+    <div class="mtitle"><span>📷 Capturer</span><span class="mclose" onclick="closeCameraIA()">✕</span></div>
+    <video id="ia-camera-video" style="width:100%;border-radius:8px;" autoplay playsinline></video>
+    <canvas id="ia-camera-canvas" style="display:none;"></canvas>
+    <button class="btn btn-gold" style="width:100%;margin-top:9px;" onclick="captureFromCameraIA()">📸 Capturer la photo</button>
+  </div>
+</div>
 <div class="overlay" id="modal-solder-partiel">
   <div class="modal">
     <div class="mtitle"><span>💰 Paiement partiel</span><span class="mclose" onclick="closeModal('modal-solder-partiel')">✕</span></div>
@@ -2273,6 +2302,12 @@ function startApp(){
   applyNavPerms();
   refreshAllSelects();loadSettings();startAutoSave();
   loadChat();
+  showChatBubble();
+  onFbAuthReady(()=>{
+    setOnlinePresence();
+    listenOnlinePresence();
+    setInterval(setOnlinePresence,20000); // Heartbeat toutes les 20s
+  });
   nav('accueil');
   // Déconnexion automatique après 30min d'inactivité
   startInactivityTimer();
@@ -2356,6 +2391,8 @@ function applyNavPerms(){
 
 function logout(){
   soundLogout();playAlhamdoulillah();clearInterval(autoSaveTimer);save();
+  const cb=document.getElementById('chat-bubble');if(cb)cb.style.display='none';
+  const cp=document.getElementById('chat-popup');if(cp)cp.style.display='none';
   setTimeout(()=>{session={user:null,boutique:'B1',caisse:'C1'};cart=[];document.body.classList.remove('role-admin');document.getElementById('app').style.display='none';document.getElementById('login-screen').style.display='flex';['l-id','l-pwd'].forEach(id=>document.getElementById(id).value='');},600);
 }
 
@@ -2993,6 +3030,172 @@ async function analyzeProductPhoto(){
     resultEl.innerHTML=`<div class="ia-panel"><div class="ia-title">✅ ${parsed.nom}</div><div class="ia-msg">${parsed.commentaire||''}</div></div>`;document.getElementById('mp-ia-prefilled').style.display='block';
   }catch(e){resultEl.innerHTML=`<div style="color:var(--red);font-size:11px;">❌ ${e.message}</div>`;}
 }
+// ══ SCANNER FACTURE / BON DE LIVRAISON ══
+let cameraStreamIA=null,cameraIATarget='facture';
+function openCameraFor(target){
+  cameraIATarget=target;
+  openModal('modal-camera-ia');
+  startCameraIA();
+}
+async function startCameraIA(){
+  try{
+    const video=document.getElementById('ia-camera-video');
+    cameraStreamIA=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+    video.srcObject=cameraStreamIA;
+  }catch(e){toast('Caméra indisponible: '+e.message,'err');closeCameraIA();}
+}
+function closeCameraIA(){
+  if(cameraStreamIA){cameraStreamIA.getTracks().forEach(t=>t.stop());cameraStreamIA=null;}
+  closeModal('modal-camera-ia');
+}
+function captureFromCameraIA(){
+  const video=document.getElementById('ia-camera-video');
+  const canvas=document.getElementById('ia-camera-canvas');
+  canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+  canvas.getContext('2d').drawImage(video,0,0);
+  const data=canvas.toDataURL('image/jpeg',0.85);
+  closeCameraIA();
+  if(cameraIATarget==='facture')setFacturePhoto(data);
+}
+function handleFacturePhoto(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>setFacturePhoto(e.target.result);
+  reader.readAsDataURL(file);
+}
+function setFacturePhoto(data){
+  document.getElementById('ia-fact-photo-preview').innerHTML=`<img src="${data}" style="width:100%;height:100%;object-fit:cover;">`;
+  document.getElementById('ia-fact-photo-preview')._base64=data;
+  document.getElementById('ia-fact-analyze-btn').style.display='block';
+}
+async function analyzeFacturePhoto(){
+  const b64=document.getElementById('ia-fact-photo-preview')._base64;
+  if(!b64){toast('Aucune photo','err');return;}
+  if(!DB.settings.apiKey){toast('Clé API requise','err');return;}
+  const resultEl=document.getElementById('ia-fact-result');
+  resultEl.innerHTML='<div class="ia-panel"><div class="ia-loading"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div> <span>Analyse de la facture...</span></div></div>';
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':DB.settings.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:b64.split(';')[0].split(':')[1],data:b64.split(',')[1]}},{type:'text',text:'Lis cette facture ou bon de livraison fournisseur. Extrait CHAQUE ligne de produit. JSON UNIQUEMENT (tableau):\\n[{"nom":"","qte":0,"prix_achat":0}]\\nPrix achat unitaire en FCFA. Ignore les lignes qui ne sont pas des produits (totaux, taxes, etc).'}]}]})});
+    const data=await res.json();
+    if(data.error){resultEl.innerHTML=`<div style="color:var(--red);font-size:11px;">❌ ${data.error.message}</div>`;return;}
+    const lignes=JSON.parse((data.content?.[0]?.text||'').replace(/```json|```/g,'').trim());
+    if(!Array.isArray(lignes)||!lignes.length){resultEl.innerHTML='<div style="color:var(--red);font-size:11px;">❌ Aucun produit détecté</div>';return;}
+    // Faire correspondre avec les produits existants (par nom) ou proposer la création
+    let html='<div class="ia-panel"><div class="ia-title">📦 '+lignes.length+' produit(s) détecté(s)</div>';
+    const matches=lignes.map((l,i)=>{
+      const existant=DB.produits.find(p=>p.nom.toLowerCase().includes(l.nom.toLowerCase())||l.nom.toLowerCase().includes(p.nom.toLowerCase()));
+      return{...l,existant,idx:i};
+    });
+    html+=matches.map(m=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;">
+      <span>${escapeHtml(m.nom)} <span style="color:var(--text2);">x${m.qte}</span></span>
+      <span style="color:${m.existant?'var(--green)':'var(--gold)'};font-size:9px;">${m.existant?'✓ Stock existant':'🆕 Nouveau produit'}</span>
+    </div>`).join('');
+    html+=`</div><button class="btn btn-gold" style="width:100%;margin-top:8px;" onclick='appliquerFactureIA(${JSON.stringify(matches).replace(/'/g,"&apos;")})'>✅ Mettre à jour le stock</button>`;
+    resultEl.innerHTML=html;
+  }catch(e){resultEl.innerHTML=`<div style="color:var(--red);font-size:11px;">❌ ${e.message}</div>`;}
+}
+function appliquerFactureIA(matches){
+  let nbAjoutes=0,nbNouveaux=0;
+  matches.forEach(m=>{
+    let p=m.existant?DB.produits.find(x=>x.id===m.existant.id):null;
+    if(!p){
+      p={id:'P'+Date.now().toString(36).toUpperCase().slice(-6)+m.idx,nom:m.nom,ref:'',cat:'Accessoire High-Tech',fourn:'',prix:Math.round((m.prix_achat||0)*1.3),achat:m.prix_achat||0,s1:0,s2:0,alerte:5,unite:'pièce',desc:'',photo:'',_updated:Date.now()};
+      DB.produits.push(p);
+      nbNouveaux++;
+    }
+    if(session.boutique==='B1')p.s1=(p.s1||0)+m.qte;else p.s2=(p.s2||0)+m.qte;
+    if(m.prix_achat>0)p.achat=m.prix_achat;
+    logMouvement(p.id,p.nom,'creation',m.qte,session.boutique,'Scanner facture IA');
+    nbAjoutes++;
+  });
+  window._prodUpdated=Date.now();
+  logAction&&logAction('Scanner facture IA',nbAjoutes+' produit(s) — '+nbNouveaux+' nouveau(x)');
+  save();
+  document.getElementById('ia-fact-result').innerHTML='<div class="ia-panel"><div class="ia-title">✅ Stock mis à jour !</div><div class="ia-msg">'+nbAjoutes+' produit(s) ajustés, dont '+nbNouveaux+' nouveau(x).</div></div>';
+  document.getElementById('ia-fact-analyze-btn').style.display='none';
+  document.getElementById('ia-fact-photo-preview').innerHTML='📄';
+  toast('✅ Stock mis à jour depuis la facture','ok');
+}
+
+// ══ NOTE VOCALE ══
+let voiceRecognition=null,isRecordingVoice=false;
+function toggleVoiceRecording(){
+  if(isRecordingVoice){stopVoiceRecording();return;}
+  if(!('webkitSpeechRecognition' in window)&&!('SpeechRecognition' in window)){
+    toast('Reconnaissance vocale non supportée sur ce navigateur','err');return;
+  }
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  voiceRecognition=new SR();
+  voiceRecognition.lang='fr-FR';
+  voiceRecognition.continuous=true;
+  voiceRecognition.interimResults=true;
+  let transcriptFinal='';
+  voiceRecognition.onresult=e=>{
+    let interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal)transcriptFinal+=e.results[i][0].transcript+' ';
+      else interim+=e.results[i][0].transcript;
+    }
+    document.getElementById('ia-voice-transcript').textContent=transcriptFinal+interim;
+  };
+  voiceRecognition.onerror=e=>{toast('Erreur micro: '+e.error,'err');stopVoiceRecording();};
+  voiceRecognition.onend=()=>{
+    if(isRecordingVoice){ // Redémarrage auto si coupure inattendue
+      try{voiceRecognition.start();}catch(e){}
+    }
+  };
+  voiceRecognition.start();
+  isRecordingVoice=true;
+  document.getElementById('ia-voice-btn').textContent='⏹️ Arrêter et traiter';
+  document.getElementById('ia-voice-btn').className='btn btn-red';
+  document.getElementById('ia-voice-transcript').textContent='🎤 Écoute en cours...';
+  window._voiceTranscriptFinal=()=>transcriptFinal;
+}
+function stopVoiceRecording(){
+  isRecordingVoice=false;
+  if(voiceRecognition){voiceRecognition.stop();voiceRecognition=null;}
+  document.getElementById('ia-voice-btn').textContent='🎤 Démarrer l\'enregistrement';
+  document.getElementById('ia-voice-btn').className='btn btn-purple';
+  const texte=(window._voiceTranscriptFinal?window._voiceTranscriptFinal():'').trim()||document.getElementById('ia-voice-transcript').textContent.trim();
+  if(texte&&texte!=='🎤 Écoute en cours...')traiterNoteVocale(texte);
+}
+async function traiterNoteVocale(texte){
+  const resultEl=document.getElementById('ia-voice-result');
+  if(!DB.settings.apiKey){resultEl.innerHTML='<div style="color:var(--red);font-size:11px;">⚠️ Clé API requise pour traiter la note</div>';return;}
+  resultEl.innerHTML='<div class="ia-panel"><div class="ia-loading"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div> <span>Traitement...</span></div></div>';
+  const todayISO=new Date().toISOString();
+  await callIA(`Date: ${todayISO}\\nTexte dicté par un commerçant: "${texte}"\\nDétermine le type d'action et extrait les infos. JSON UNIQUEMENT:\\n{"type":"vente|tache|produit","details":{},"resume":"phrase courte de confirmation"}\\nPour vente: details={"produit":"","qte":1,"client":"Anonyme","mode":"especes"}\\nPour tache: details={"titre":"","date":"YYYY-MM-DDTHH:mm:00","priorite":"normale"}\\nPour produit: details={"nom":"","prix_vente":0,"prix_achat":0,"qte":0}`,
+    txt=>{
+      try{
+        const r=JSON.parse(txt.replace(/```json|```/g,'').trim());
+        if(r.type==='tache'){
+          const tache={id:'TK'+Date.now().toString(36).toUpperCase().slice(-6),titre:r.details.titre||texte,date:r.details.date||todayISO,priorite:r.details.priorite||'normale',done:false,createdBy:session.user?.nom||'?',createdAt:todayISO};
+          if(!DB.taches)DB.taches=[];DB.taches.push(tache);save();renderTachesListe&&renderTachesListe();
+          resultEl.innerHTML=`<div class="ia-panel"><div class="ia-title">✅ Tâche créée</div><div class="ia-msg">${escapeHtml(r.resume||tache.titre)}</div></div>`;
+        } else if(r.type==='produit'){
+          const p={id:'P'+Date.now().toString(36).toUpperCase().slice(-6),nom:r.details.nom||texte,ref:'',cat:'Accessoire High-Tech',fourn:'',prix:r.details.prix_vente||0,achat:r.details.prix_achat||0,s1:session.boutique==='B1'?(r.details.qte||0):0,s2:session.boutique==='B2'?(r.details.qte||0):0,alerte:5,unite:'pièce',desc:'',photo:'',_updated:Date.now()};
+          DB.produits.push(p);window._prodUpdated=Date.now();save();renderProduits&&renderProduits();
+          resultEl.innerHTML=`<div class="ia-panel"><div class="ia-title">✅ Produit créé</div><div class="ia-msg">${escapeHtml(r.resume||p.nom)}</div></div>`;
+        } else if(r.type==='vente'){
+          const p=DB.produits.find(x=>x.nom.toLowerCase().includes((r.details.produit||'').toLowerCase()));
+          if(!p){resultEl.innerHTML='<div style="color:var(--red);font-size:11px;">❌ Produit non trouvé: '+escapeHtml(r.details.produit||'?')+'</div>';return;}
+          const qte=r.details.qte||1;
+          if(session.boutique==='B1')p.s1-=qte;else p.s2-=qte;
+          logMouvement(p.id,p.nom,'vente',-qte,session.boutique,'Note vocale');
+          const fac={id:'F'+session.user.id.replace(/[^A-Z0-9]/g,'').substring(0,3)+Date.now().toString(36).toUpperCase().slice(-5),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:r.details.client||'Anonyme',clientId:null,items:[{id:p.id,nom:String(p.nom),prix:Number(p.prix),achat:Number(p.achat||0),qty:qte,unite:String(p.unite||'pièce')}],sousTotal:p.prix*qte,remise:0,total:p.prix*qte,mode:r.details.mode||'especes',date:todayISO};
+          DB.factures.push(fac);DB.nextIds.f++;
+          logAction&&logAction('Vente (note vocale)','Facture '+fac.id+' — '+fmt(fac.total));
+          save();
+          resultEl.innerHTML=`<div class="ia-panel"><div class="ia-title">✅ Vente enregistrée</div><div class="ia-msg">${escapeHtml(r.resume||(fac.id+' — '+fmt(fac.total)))}</div></div>`;
+        }
+        document.getElementById('ia-voice-transcript').textContent='';
+        soundOk&&soundOk();
+      }catch(e){resultEl.innerHTML='<div style="color:var(--red);font-size:11px;">❌ Format invalide, réessayez</div>';}
+    },
+    e=>{resultEl.innerHTML=`<div style="color:var(--red);font-size:11px;">❌ ${e}</div>`;}
+  );
+}
+
 async function analyzeProductText(){
   const input=document.getElementById('mp-ia-text-input')?.value.trim();if(!input){toast('Décrivez le produit','err');return;}if(!DB.settings.apiKey){toast('Clé API requise','err');return;}
   const resultEl=document.getElementById('mp-ia-text-result');resultEl.innerHTML='<div class="ia-panel"><div class="ia-loading"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div></div></div>';
@@ -3982,12 +4185,59 @@ function renderAccueil(){
 let CHAT_ROOMS=[];
 let CHAT_MESSAGES={};
 let CHAT_CURRENT_ROOM=null;
+let CHAT_ONLINE_USERS={}; // userId -> timestamp dernière activité
+let CHAT_TYPING={}; // roomId -> {userId: timestamp}
+let _typingTimeout=null;
 const CHAT_DEFAULT_ROOMS=[
   {id:'general',name:'Général',icon:'💬',desc:'Discussion générale'},
   {id:'ventes',name:'Ventes',icon:'🛒',desc:'Équipe ventes'},
   {id:'stock',name:'Stock',icon:'📦',desc:'Gestion stock'},
   {id:'urgent',name:'Urgent',icon:'🚨',desc:'Messages urgents'},
 ];
+
+// Marquer présence en ligne (toutes les 20s tant que le chat est visible)
+function setOnlinePresence(){
+  if(!fbConnected||!fbDB||!session.user)return;
+  fbDB.ref('chat_presence/'+session.user.id).set({
+    nom:session.user.nom,role:session.user.role,lastSeen:Date.now()
+  });
+}
+function listenOnlinePresence(){
+  if(!fbConnected||!fbDB)return;
+  fbDB.ref('chat_presence').on('value',snap=>{
+    const data=snap.val()||{};
+    const now=Date.now();
+    CHAT_ONLINE_USERS={};
+    Object.entries(data).forEach(([uid,info])=>{
+      if(now-info.lastSeen<60000)CHAT_ONLINE_USERS[uid]=info; // En ligne si actif dans les 60 dernières secondes
+    });
+    renderChatRooms();
+  });
+}
+function onChatTyping(){
+  if(!CHAT_CURRENT_ROOM||!fbConnected||!fbDB||!session.user)return;
+  fbDB.ref('chat_typing/'+CHAT_CURRENT_ROOM+'/'+session.user.id).set({nom:session.user.nom,ts:Date.now()});
+  if(_typingTimeout)clearTimeout(_typingTimeout);
+  _typingTimeout=setTimeout(()=>{
+    fbDB.ref('chat_typing/'+CHAT_CURRENT_ROOM+'/'+session.user.id).remove();
+  },3000);
+}
+function listenTyping(roomId){
+  if(!fbConnected||!fbDB)return;
+  fbDB.ref('chat_typing/'+roomId).on('value',snap=>{
+    const data=snap.val()||{};
+    const now=Date.now();
+    const indicator=document.getElementById('chat-typing-indicator');
+    if(!indicator)return;
+    const autresEnTrainEcrire=Object.entries(data).filter(([uid,info])=>uid!==session.user?.id&&now-info.ts<4000);
+    if(autresEnTrainEcrire.length>0){
+      indicator.textContent='✍️ '+autresEnTrainEcrire.map(([,i])=>i.nom).join(', ')+' écrit...';
+      indicator.style.display='block';
+    } else {
+      indicator.style.display='none';
+    }
+  });
+}
 
 function loadChat(){
   CHAT_ROOMS=LS('chat_rooms')||CHAT_DEFAULT_ROOMS;
@@ -3997,10 +4247,23 @@ function loadChat(){
     fbDB.ref('chat').on('value',snap=>{
       const data=snap.val();
       if(data){
+        // Détecter les nouveaux messages reçus (pas envoyés par moi) pour jouer un son
+        const ancienCount={};
+        Object.keys(CHAT_MESSAGES).forEach(rid=>{ancienCount[rid]=(CHAT_MESSAGES[rid]||[]).length;});
         if(data.rooms)CHAT_ROOMS=data.rooms;
         if(data.messages)CHAT_MESSAGES=data.messages;
+        let nouveauMsgRecu=false;
+        Object.keys(CHAT_MESSAGES).forEach(rid=>{
+          const msgs=CHAT_MESSAGES[rid]||[];
+          if(msgs.length>(ancienCount[rid]||0)){
+            const dernier=msgs[msgs.length-1];
+            if(dernier&&dernier.userId!==session.user?.id)nouveauMsgRecu=true;
+          }
+        });
+        if(nouveauMsgRecu&&typeof soundOk==='function')soundOk();
         SS('chat_rooms',CHAT_ROOMS);SS('chat_messages',CHAT_MESSAGES);
         if(CHAT_CURRENT_ROOM)renderChatMessages(CHAT_CURRENT_ROOM);
+        if(CHAT_POPUP_ROOM&&document.getElementById('chat-popup')?.style.display==='flex'){renderChatPopupMessages();renderChatPopupRooms();}
         renderChatRooms();
         updateChatBadge();
       }
@@ -4023,6 +4286,76 @@ function updateChatBadge(){
     if(total>0){if(!badge){badge=document.createElement('span');badge.className='chat-badge';badge.style.cssText='background:var(--red);color:#fff;font-size:8px;font-weight:900;border-radius:50%;width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;';ni.appendChild(badge);}badge.textContent=total;}
     else if(badge)badge.remove();
   }
+  // Update bulle flottante
+  const bb=document.getElementById('chat-bubble-badge');
+  if(bb){
+    if(total>0){bb.textContent=total>9?'9+':total;bb.style.display='flex';}
+    else bb.style.display='none';
+  }
+}
+
+// ══ BULLE CHAT FLOTTANTE ══
+let CHAT_POPUP_ROOM=null;
+function showChatBubble(){
+  const b=document.getElementById('chat-bubble');
+  if(b)b.style.display='flex';
+}
+function toggleChatPopup(){
+  const popup=document.getElementById('chat-popup');
+  const bubble=document.getElementById('chat-bubble');
+  if(!popup)return;
+  const isOpen=popup.style.display==='flex';
+  if(isOpen){
+    popup.style.display='none';
+    bubble.style.display='flex';
+  } else {
+    popup.style.display='flex';
+    bubble.style.display='none';
+    renderChatPopupRooms();
+    if(!CHAT_POPUP_ROOM&&CHAT_ROOMS.length)CHAT_POPUP_ROOM=CHAT_ROOMS[0].id;
+    if(CHAT_POPUP_ROOM)selectChatPopupRoom(CHAT_POPUP_ROOM);
+  }
+}
+function renderChatPopupRooms(){
+  const el=document.getElementById('chat-popup-rooms');if(!el)return;
+  el.innerHTML=CHAT_ROOMS.map(r=>{
+    const unread=(CHAT_MESSAGES[r.id]||[]).filter(m=>m.userId!==session.user?.id&&!m.read).length;
+    return`<div onclick="selectChatPopupRoom('${r.id}')" style="flex-shrink:0;padding:5px 10px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;position:relative;${CHAT_POPUP_ROOM===r.id?'background:var(--goldf);color:var(--gold);':'background:var(--surf2);color:var(--text2);'}">${r.icon} ${escapeHtml(r.name)}${unread?` <span style="background:var(--red);color:#fff;border-radius:50%;font-size:8px;padding:1px 5px;margin-left:3px;">${unread}</span>`:''}</div>`;
+  }).join('');
+}
+function selectChatPopupRoom(roomId){
+  CHAT_POPUP_ROOM=roomId;
+  if(CHAT_MESSAGES[roomId]){CHAT_MESSAGES[roomId].forEach(m=>{if(m.userId!==session.user?.id)m.read=true;});saveChat();}
+  renderChatPopupMessages();
+  renderChatPopupRooms();
+  updateChatBadge();
+  listenTyping(roomId);
+}
+function renderChatPopupMessages(){
+  const el=document.getElementById('chat-popup-messages');if(!el||!CHAT_POPUP_ROOM)return;
+  const msgs=CHAT_MESSAGES[CHAT_POPUP_ROOM]||[];
+  if(!msgs.length){el.innerHTML='<div class="empty" style="margin:auto;font-size:11px;"><div class="ei">💬</div>Aucun message</div>';return;}
+  el.innerHTML=msgs.map(m=>{
+    const isMine=m.userId===session.user?.id;
+    return`<div class="chat-msg ${isMine?'mine':'other'}" style="align-self:${isMine?'flex-end':'flex-start'}">
+      ${!isMine?`<div class="cm-author">${escapeHtml(m.userName)}</div>`:''}
+      <div>${escapeHtml(m.text)}</div>
+      <div class="cm-time">${new Date(m.time).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</div>
+    </div>`;
+  }).join('');
+  el.scrollTop=el.scrollHeight;
+}
+function sendChatMsgPopup(){
+  const input=document.getElementById('chat-popup-input');
+  const text=input.value.trim();if(!text||!CHAT_POPUP_ROOM)return;
+  if(fbConnected&&fbDB&&session.user)fbDB.ref('chat_typing/'+CHAT_POPUP_ROOM+'/'+session.user.id).remove();
+  if(!CHAT_MESSAGES[CHAT_POPUP_ROOM])CHAT_MESSAGES[CHAT_POPUP_ROOM]=[];
+  CHAT_MESSAGES[CHAT_POPUP_ROOM].push({
+    id:'M'+Date.now(),userId:session.user?.id||'anon',
+    userName:session.user?.nom||session.user?.id||'Anonyme',
+    text,time:new Date().toISOString(),read:false
+  });
+  input.value='';saveChat();renderChatPopupMessages();renderChatPopupRooms();
 }
 
 function renderChat(){
@@ -4033,6 +4366,12 @@ function renderChat(){
 
 function renderChatRooms(){
   const el=document.getElementById('chat-rooms-list');if(!el)return;
+  // Afficher le nombre d'utilisateurs en ligne
+  const onlineEl=document.getElementById('chat-online-count');
+  if(onlineEl){
+    const nbOnline=Object.keys(CHAT_ONLINE_USERS).length;
+    onlineEl.innerHTML=nbOnline>0?`<span style="width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;"></span> ${nbOnline} en ligne`:'';
+  }
   el.innerHTML=CHAT_ROOMS.map(r=>{
     const msgs=CHAT_MESSAGES[r.id]||[];
     const last=msgs.length?msgs[msgs.length-1]:null;
@@ -4060,6 +4399,7 @@ function selectChatRoom(roomId){
   renderChatMessages(roomId);
   renderChatRooms();
   updateChatBadge();
+  listenTyping(roomId);
 }
 
 function renderChatMessages(roomId){
@@ -4080,6 +4420,7 @@ function renderChatMessages(roomId){
 function sendChatMsg(){
   const input=document.getElementById('chat-input');
   const text=input.value.trim();if(!text||!CHAT_CURRENT_ROOM)return;
+  if(fbConnected&&fbDB&&session.user)fbDB.ref('chat_typing/'+CHAT_CURRENT_ROOM+'/'+session.user.id).remove();
   if(!CHAT_MESSAGES[CHAT_CURRENT_ROOM])CHAT_MESSAGES[CHAT_CURRENT_ROOM]=[];
   CHAT_MESSAGES[CHAT_CURRENT_ROOM].push({
     id:'M'+Date.now(),userId:session.user?.id||'anon',
@@ -5425,6 +5766,24 @@ if(cwTimer)clearInterval(cwTimer);
 cwTimer=setInterval(renderClock,1000);
 fetchWeather(cwConf.ville);
 </script>
+<!-- BULLE CHAT FLOTTANTE (style Facebook Messenger) -->
+<div id="chat-bubble" onclick="toggleChatPopup()" style="position:fixed;bottom:18px;right:18px;width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#ff8c00);box-shadow:0 4px 16px rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;font-size:24px;cursor:pointer;z-index:9000;transition:transform .15s;">
+  💬
+  <span id="chat-bubble-badge" style="position:absolute;top:-3px;right:-3px;background:var(--red);color:#fff;font-size:10px;font-weight:900;border-radius:50%;min-width:18px;height:18px;display:none;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--bg);">0</span>
+</div>
+<div id="chat-popup" style="position:fixed;bottom:18px;right:18px;width:320px;height:440px;background:var(--surf);border:1px solid var(--border2);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.4);display:none;flex-direction:column;overflow:hidden;z-index:9001;">
+  <div style="background:linear-gradient(135deg,var(--gold),#ff8c00);padding:10px 12px;display:flex;align-items:center;gap:8px;">
+    <span style="font-size:16px;">💬</span>
+    <span style="font-weight:800;font-size:12px;color:#1a1a1a;flex:1;">Chat Mon Négoce</span>
+    <span onclick="event.stopPropagation();toggleChatPopup()" style="cursor:pointer;font-size:16px;color:#1a1a1a;">✕</span>
+  </div>
+  <div id="chat-popup-rooms" style="display:flex;gap:5px;padding:7px;border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;"></div>
+  <div id="chat-popup-messages" class="chat-messages" style="flex:1;padding:8px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;"></div>
+  <div style="padding:7px;border-top:1px solid var(--border);display:flex;gap:6px;flex-shrink:0;">
+    <input id="chat-popup-input" placeholder="Écrire..." style="flex:1;background:var(--surf2);border:1px solid var(--border2);border-radius:18px;padding:7px 12px;color:var(--text);font-family:var(--font);font-size:12px;outline:none;" oninput="onChatTyping()" onkeydown="if(event.key==='Enter'){sendChatMsgPopup();}">
+    <button onclick="sendChatMsgPopup()" style="width:32px;height:32px;border-radius:50%;background:var(--gold);border:none;cursor:pointer;font-size:14px;flex-shrink:0;">➤</button>
+  </div>
+</div>
 <!-- PWA Service Worker -->
 <script>
 if('serviceWorker' in navigator && location.hostname !== 'www.claudeusercontent.com' && location.protocol !== 'file:'){
