@@ -525,6 +525,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="ni" onclick="nav('chat')"><span class="ic">💬</span> Chat Personnel</div>
   <div class="ni admin-nav" onclick="nav('users')"><span class="ic">🔐</span> Utilisateurs & Rôles</div>
   <div class="ni admin-nav" onclick="openTransfertStock()"><span class="ic">🔄</span> Transfert Stock</div>
+  <div class="ni admin-nav" onclick="recalculerStockCloud()"><span class="ic">♻️</span> Recalculer le Stock</div>
   <div class="ni admin-nav" onclick="nav('caisses-config')"><span class="ic">💰</span> Config Caisses</div>
   <div class="ni admin-nav" onclick="nav('salaires')"><span class="ic">💼</span> Salaires</div>
   <div class="ni admin-nav" onclick="nav('tresorerie')"><span class="ic">🏦</span> Trésorerie</div>
@@ -3111,6 +3112,7 @@ function appliquerFactureIA(matches){
     if(!p){
       p={id:'P'+Date.now().toString(36).toUpperCase().slice(-6)+m.idx,nom:m.nom,ref:'',cat:'Accessoire High-Tech',fourn:'',prix:Math.round((m.prix_achat||0)*1.3),achat:m.prix_achat||0,s1:0,s2:0,alerte:5,unite:'pièce',desc:'',photo:'',_updated:Date.now()};
       DB.produits.push(p);
+      setStockQty(p.id,p.s1||0,p.s2||0);
       nbNouveaux++;
     }
     applyStockDelta(p.id,session.boutique==='B1'?'s1':'s2',m.qte);
@@ -3184,7 +3186,7 @@ async function traiterNoteVocale(texte){
           resultEl.innerHTML=`<div class="ia-panel"><div class="ia-title">✅ Tâche créée</div><div class="ia-msg">${escapeHtml(r.resume||tache.titre)}</div></div>`;
         } else if(r.type==='produit'){
           const p={id:'P'+Date.now().toString(36).toUpperCase().slice(-6),nom:r.details.nom||texte,ref:'',cat:'Accessoire High-Tech',fourn:'',prix:r.details.prix_vente||0,achat:r.details.prix_achat||0,s1:session.boutique==='B1'?(r.details.qte||0):0,s2:session.boutique==='B2'?(r.details.qte||0):0,alerte:5,unite:'pièce',desc:'',photo:'',_updated:Date.now()};
-          DB.produits.push(p);window._prodUpdated=Date.now();save();renderProduits&&renderProduits();
+          DB.produits.push(p);setStockQty(p.id,p.s1,p.s2);window._prodUpdated=Date.now();save();renderProduits&&renderProduits();
           resultEl.innerHTML=`<div class="ia-panel"><div class="ia-title">✅ Produit créé</div><div class="ia-msg">${escapeHtml(r.resume||p.nom)}</div></div>`;
         } else if(r.type==='vente'){
           const p=DB.produits.find(x=>x.nom.toLowerCase().includes((r.details.produit||'').toLowerCase()));
@@ -3229,6 +3231,8 @@ function saveProd(){
   const _prodTs=Date.now();
   const p={id:_pid,_updated:_prodTs,nom,ref:document.getElementById('mp-ref').value,cat:document.getElementById('mp-cat').value||'Accessoire High-Tech',fourn:document.getElementById('mp-fourn').value||'',prix,achat:parseFloat(document.getElementById('mp-achat').value)||0,s1:parseInt(document.getElementById('mp-s1').value)||0,s2:parseInt(document.getElementById('mp-s2').value)||0,alerte:parseInt(document.getElementById('mp-al').value)||5,unite:document.getElementById('mp-un').value,desc:document.getElementById('mp-desc').value,photo:document.getElementById('mp-photo-data').value||''};
   if(eid){const old=DB.produits.find(x=>x.id===eid);if(old&&(old.s1!==p.s1||old.s2!==p.s2)){if(old.s1!==p.s1)logMouvement(p.id,p.nom,'ajustement',p.s1-old.s1,'B1','Modification manuelle stock');if(old.s2!==p.s2)logMouvement(p.id,p.nom,'ajustement',p.s2-old.s2,'B2','Modification manuelle stock');}const i=DB.produits.findIndex(x=>x.id===eid);DB.produits[i]=p;logAction('Modif produit',p.nom);}else{DB.produits.push(p);logAction('Ajout produit',p.nom);if(p.s1>0)logMouvement(p.id,p.nom,'creation',p.s1,'B1','Stock initial');if(p.s2>0)logMouvement(p.id,p.nom,'creation',p.s2,'B2','Stock initial');}
+  // Publier le stock de ce produit vers Firebase (sinon les autres appareils ne le voient jamais)
+  setStockQty(p.id,p.s1,p.s2);
   // Forcer push immédiat pour que les autres appareils voient le nouveau produit
   window._prodUpdated=Date.now();
   save();stopCamera();closeModal('modal-prod');renderProduits();refreshAllSelects();toast(eid?'Modifié ✅':'Ajouté ✅','ok');
@@ -3247,7 +3251,7 @@ function renderCategories(){
   }).join(''):'<div class="empty" style="padding:14px;">Aucune catégorie</div>';
   // Mettre à jour le datalist du formulaire produit
   const dl=document.getElementById('mp-cat-list');
-  if(dl)dl.innerHTML=cats.map(c=>`<option value="${c}">`).join('');
+  if(dl)dl.innerHTML=cats.map(c=>`<option value="${escapeHtml(c)}">`).join('');
 }
 function ajouterCategorie(){
   const input=document.getElementById('new-cat-input');
@@ -3418,7 +3422,7 @@ function renderProduits(){
   const catSel=document.getElementById('fil-cat-p');
   if(catSel&&catSel.options.length<=1){
     const cats=[...new Set(DB.produits.map(p=>p.cat).filter(Boolean))].sort();
-    catSel.innerHTML='<option value="">Toutes catégories</option>'+cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+    catSel.innerHTML='<option value="">Toutes catégories</option>'+cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
     catSel.value=catFil;
   }
   const list=DB.produits.filter(p=>(!q||p.nom.toLowerCase().includes(q)||(p.ref||'').toLowerCase().includes(q))&&(!catFil||p.cat===catFil));
@@ -3433,9 +3437,27 @@ function openTransfertStock(){
   openModal('modal-transfert');
   setTimeout(()=>{
     const s=document.getElementById('tr-prod');
-    if(s)s.innerHTML=DB.produits.map(p=>'<option value="'+p.id+'">'+p.nom+' (B1:'+(p.s1||0)+' B2:'+(p.s2||0)+')</option>').join('');
+    if(s)s.innerHTML=DB.produits.map(p=>'<option value="'+escapeHtml(p.id)+'">'+escapeHtml(p.nom)+' (B1:'+(p.s1||0)+' B2:'+(p.s2||0)+')</option>').join('');
   },50);
 }
+// Force la republication du stock LOCAL de tous les produits vers Firebase.
+// À utiliser depuis l'appareil qui a les bons chiffres, si un écart apparaît entre appareils.
+async function recalculerStockCloud(){
+  if(session.user?.role!=='admin'){soundErr();toast('⛔ Réservé à l\'administrateur','err');return;}
+  if(!fbConnected||!fbDB){soundErr();toast('⛔ Hors ligne — connexion requise','err');return;}
+  if(!confirm('⚠️ Le stock affiché SUR CET APPAREIL deviendra la référence pour tous les autres.\n\nVérifiez que les chiffres sont corrects ici avant de continuer.\n\nContinuer ?'))return;
+  try{
+    const map={};
+    DB.produits.forEach(p=>{map[p.id]={s1:Number(p.s1)||0,s2:Number(p.s2)||0};});
+    await fbDB.ref('negoce/stock_qty').set(map);
+    logAction&&logAction('Recalcul stock','Republication de '+DB.produits.length+' produit(s) vers le cloud');
+    toast('✅ Stock republié pour '+DB.produits.length+' produit(s)','ok');
+  }catch(e){
+    console.error('recalculerStockCloud:',e);
+    soundErr();toast('❌ Échec du recalcul: '+e.message,'err');
+  }
+}
+
 function transfertStock(){
   const pid=document.getElementById('tr-prod')?.value;
   const qte=parseInt(document.getElementById('tr-qte')?.value)||0;
@@ -4694,6 +4716,14 @@ function applyStockDelta(productId,field,delta){
     queueStockDelta(productId,field,delta);
   }
 }
+// Écriture ABSOLUE du stock d'un produit (création produit, ajustement manuel).
+// Indispensable: sans ça, un produit créé après l'initialisation n'a aucune entrée
+// dans stock_qty, et son stock revient à zéro sur les autres appareils au rechargement.
+function setStockQty(productId,s1,s2){
+  if(!fbDB||!fbConnected)return;
+  fbDB.ref(`negoce/stock_qty/${productId}`).set({s1:Number(s1)||0,s2:Number(s2)||0})
+    .catch(e=>console.error('setStockQty:',e));
+}
 function queueStockDelta(productId,field,delta){
   const q=LS('pendingStockOps')||[];
   q.push({id:productId,field,delta,t:Date.now()});
@@ -4727,10 +4757,12 @@ function pushToFirebase(){
         if(c._updated===undefined)c._updated=Date.now();
         Object.keys(c).forEach(k=>{if(c[k]===undefined)delete c[k];});
         return c;});
+      // La clé API reste STRICTEMENT locale à l'appareil — jamais envoyée sur Firebase
+      const settingsSansCle={...DB.settings};delete settingsSansCle.apiKey;
       await fbDB.ref('negoce/shared/data').set({
         produits: produitsSansStock,
         fournisseurs: DB.fournisseurs,
-        settings: DB.settings,
+        settings: settingsSansCle,
         caisses: DB.caisses,
         devis: DB.devis,
         retours: DB.retours,
@@ -4741,20 +4773,25 @@ function pushToFirebase(){
         _device: navigator.userAgent.substring(0,50)
       });
 
-      // 2. Stocks — ne plus jamais écraser tout le tableau ici (ça causait des sauts de stock
-      // quand 2 caisses vendaient en même temps). On sème juste stock_qty une fois si absent;
-      // ensuite chaque vente/transfert écrit directement en atomique via applyStockDelta().
-      if(!window._stockQtySeeded){
-        try{
-          const qtySnap=await fbDB.ref('negoce/stock_qty').once('value');
-          if(!qtySnap.exists()){
-            const seed={};
-            DB.produits.forEach(p=>{seed[p.id]={s1:p.s1||0,s2:p.s2||0};});
-            await fbDB.ref('negoce/stock_qty').set(seed);
+      // 2. Stocks — on n'écrase jamais le tableau complet (ça causait les sauts de stock).
+      // Chaque vente/transfert écrit en atomique via applyStockDelta(). Ici on se contente
+      // de compléter les produits qui n'ont AUCUNE entrée dans stock_qty (produits créés
+      // après l'initialisation) — sans jamais toucher aux entrées existantes.
+      try{
+        const qtySnap=await fbDB.ref('negoce/stock_qty').once('value');
+        const qtyMap=qtySnap.val()||{};
+        const missing={};
+        DB.produits.forEach(p=>{
+          const q=qtyMap[p.id];
+          if(!q||typeof q.s1!=='number'||typeof q.s2!=='number'){
+            missing[p.id]={s1:Number(p.s1)||0,s2:Number(p.s2)||0};
           }
-        }catch(e){console.error('Seed stock_qty:',e);}
-        window._stockQtySeeded=true;
-      }
+        });
+        if(Object.keys(missing).length){
+          await fbDB.ref('negoce/stock_qty').update(missing);
+          console.log('stock_qty complété pour',Object.keys(missing).length,'produit(s)');
+        }
+      }catch(e){console.error('Backfill stock_qty:',e);}
 
       // 3. Clients séparés par boutique
       await fbDB.ref(`negoce/clients/${boutique}`).set(DB.clients||[]);
@@ -4810,14 +4847,10 @@ async function pullFromFirebase(){
     const snap=await fbDB.ref('negoce/shared/data').once('value');
     const cloudData=snap.val();
 
-    // 2. Stocks de la boutique courante
-    const stocksSnap=await fbDB.ref(`negoce/stocks/${boutique}`).once('value');
-    const stocksCloud=stocksSnap.val()?.stocks||null;
-
-    // 3. Stocks de l'autre boutique (pour avoir s1 et s2 complets)
+    // 2/3. Stocks: l'ancien nœud negoce/stocks n'est plus alimenté (il causait les sauts de stock).
+    // La source de vérité est désormais negoce/stock_qty, lu plus bas.
+    const stocksCloud=null,stocksAutre=null;
     const autreBoutique=boutique==='B1'?'B2':'B1';
-    const stocksAutreSnap=await fbDB.ref(`negoce/stocks/${autreBoutique}`).once('value');
-    const stocksAutre=stocksAutreSnap.val()?.stocks||null;
 
     // 4. Clients de la boutique courante
     const clientsSnap=await fbDB.ref(`negoce/clients/${boutique}`).once('value');
@@ -4875,7 +4908,9 @@ async function pullFromFirebase(){
         delete cleanCloud.clients;   // Clients gérés séparément par boutique
         const savedFactures=DB.factures;
         const savedClients=DB.clients;
+        const savedApiKey=DB.settings?.apiKey||'';
         Object.assign(DB,cleanCloud);
+        if(DB.settings)DB.settings.apiKey=savedApiKey; // clé API = locale uniquement
         DB.factures=savedFactures;
         DB.clients=savedClients;
         DB._syncTime=cloudTime;
@@ -5002,9 +5037,11 @@ function startRealtimeSync(){
       const currentUsers=DB.users;
       const currentFactures=DB.factures;
       const currentClients=DB.clients;
+      const currentApiKey=DB.settings?.apiKey||'';
       delete cleanCloud.factures;
       delete cleanCloud.clients;
       Object.assign(DB,cleanCloud);
+      if(DB.settings)DB.settings.apiKey=currentApiKey; // clé API = locale uniquement
       // Restaurer users avec fusion intelligente
       const merged2=currentUsers.map(lu=>{
         const cu=cleanCloud.users?.find(u=>u.id===lu.id);
