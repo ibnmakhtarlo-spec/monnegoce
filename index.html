@@ -5038,26 +5038,23 @@ function startRealtimeSync(){
     });
   };
 
-  // Écouter stocks de la boutique courante
-  fbDB.ref(`negoce/stocks/${boutique}`).on('value',snap=>{
+  // Écouter les stocks en temps réel — nœud atomique stock_qty, mis à jour à chaque
+  // vente/transfert par applyStockDelta(). Remplace l'ancien nœud negoce/stocks (plein tableau)
+  // qui causait des sauts de stock quand plusieurs caisses vendaient en même temps.
+  fbDB.ref('negoce/stock_qty').on('value',snap=>{
     if(fbSyncing)return;
-    // Ignorer si on vient de faire une vente dans les 10 dernières secondes
-    if(window._stocksPushTime&&Date.now()-window._stocksPushTime<10000)return;
-    const data=snap.val();if(!data||!data.stocks)return;
-    fbLoading=true;applyStocksRT(data.stocks,boutique);
+    const qtyMap=snap.val();if(!qtyMap)return;
+    fbLoading=true;
+    DB.produits=DB.produits.map(p=>{
+      const q=qtyMap[p.id];
+      if(q){if(typeof q.s1==='number')p.s1=q.s1;if(typeof q.s2==='number')p.s2=q.s2;}
+      return p;
+    });
     if(window._origSave)window._origSave();else save();
     fbLoading=false;
-  });
-
-  // Écouter stocks de l'autre boutique
-  fbDB.ref(`negoce/stocks/${autreBoutique}`).on('value',snap=>{
-    if(fbSyncing)return;
-    // Même protection anti-rebond que pour la boutique courante: ignorer si on vient nous-même de pousser
-    if(window._stocksPushTime&&Date.now()-window._stocksPushTime<10000)return;
-    const data=snap.val();if(!data||!data.stocks)return;
-    fbLoading=true;applyStocksRT(data.stocks,autreBoutique);
-    if(window._origSave)window._origSave();else save();
-    fbLoading=false;
+    // Rafraîchir l'affichage si les écrans concernés sont ouverts
+    try{if(typeof renderGrid==='function')renderGrid();}catch(e){}
+    try{if(typeof renderProduits==='function')renderProduits();}catch(e){}
   });
 
   // Écouter clients de la boutique courante
