@@ -1965,7 +1965,7 @@ let DB={
   salaires:LS('salaires')||[{id:'SAL001',nom:'Vendeur Alpha',role:'Vendeur',boutique:'B1',base:80000,prime:5000,statut:'en_attente'}],
   depenses:LS('depenses')||[],
   nextIds:LS('nextIds')||{p:9,cl:3,fn:2,f:1,dv:1,rt:1,sal:2,dep:1},
-  settings:LS('settings')||{appNom:'Mon Négoce',apiKey:'',theme:'dark',B1:{nom:'Boutique 1 — Centre',adr:'Rue Principale, Ville',tel:'',ninea:'',rc:'',logo:'🏪'},B2:{nom:'Boutique 2 — Marché',adr:'Marché Central, Ville',tel:'',ninea:'',rc:'',logo:'🏬'}},
+  settings:LS('settings')||{appNom:'Mon Négoce',apiKey:'',theme:'dark',B1:{nom:'Rahma Telecom',adr:'Rue Principale, Ville',tel:'',ninea:'',rc:'',logo:'🏪'},B2:{nom:'Rayane Telecom',adr:'Marché Central, Ville',tel:'',ninea:'',rc:'',logo:'🏬'}},
 };
 
 let session={user:null,boutique:'B1',caisse:'C1'};
@@ -2237,6 +2237,16 @@ async function doLogin(){
   const userFound=DB.users.find(u=>u.id===id);
   let u=null;
   if(userFound&&userFound.actif!==false&&await checkPwd(pwd,userFound.pwd)){
+    // Verrouillage par boutique: un user assigné à B1 ne peut pas se connecter sur B2, et vice-versa
+    const selBoutique=document.getElementById('l-boutique').value;
+    if(userFound.boutique&&userFound.boutique!=='all'&&userFound.boutique!==selBoutique){
+      soundErr();
+      const nomSel=DB.settings[selBoutique]?.nom||selBoutique;
+      const nomUser=DB.settings[userFound.boutique]?.nom||userFound.boutique;
+      toast('🚫 '+userFound.nom+' n\'est pas autorisé(e) sur '+nomSel+' (assigné à '+nomUser+')','err');
+      logAction&&logAction('Sécurité','Tentative connexion '+id+' hors de sa boutique ('+userFound.boutique+' → '+selBoutique+')');
+      return;
+    }
     u=userFound;
     // Migration auto: si l'ancien mdp était en clair, le hasher maintenant
     if(userFound.pwd.length<20){
@@ -2327,7 +2337,7 @@ function startApp(){
     initFirebase();
     onFbAuthReady(()=>setTimeout(startRealtimeSync,500));
     // Pull users seulement si DB.users est vide (premier démarrage)
-    onFbAuthReady(()=>setTimeout(()=>{if(DB.users.length<=1)pullUsersFromFirebase();},500));
+    onFbAuthReady(()=>setTimeout(()=>{pullUsersFromFirebase();},500));
   },800);
 }
 
@@ -4636,6 +4646,7 @@ function initFirebase(){
         _fbAuthReadyCallbacks=[];
       }
       fbDB.ref('.info/connected').on('value',snap=>{
+        const wasConnected=fbConnected;
         fbConnected=snap.val()===true;
         updateSyncUI(fbConnected?'connected':'offline');
         if(fbConnected){
@@ -4643,6 +4654,11 @@ function initFirebase(){
             fbFirstConnect=false;
             toast('☁️ Firebase connecté !','ok');
             pullFromFirebase();
+          } else if(!wasConnected){
+            // Reconnexion après une coupure: on renvoie les changements faits hors-ligne
+            toast('☁️ Connexion rétablie — synchronisation...','info');
+            pushToFirebase();
+            pushUsersToFirebase();
           }
         } else toast('📴 Hors ligne — données locales','warn');
       });
