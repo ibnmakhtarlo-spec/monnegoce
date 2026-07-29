@@ -3469,7 +3469,10 @@ function transfertStock(){
   logAction('Transfert stock',p.nom+' x'+qte+' '+sens);
   save();renderProduits();toast('✅ Transfert: '+p.nom+' x'+qte,'ok');
 }
-function delProd(id){const p=DB.produits.find(x=>x.id===id);if(!p)return;safeDelete(`Produit : ${p.nom}`,()=>{DB.produits=DB.produits.filter(x=>x.id!==id);logAction&&logAction('Suppression produit',p.nom);save();renderProduits();});}
+function delProd(id){const p=DB.produits.find(x=>x.id===id);if(!p)return;safeDelete(`Produit : ${p.nom}`,()=>{DB.produits=DB.produits.filter(x=>x.id!==id);
+  // Nettoyer aussi le stock sur Firebase, sinon l'entrée reste orpheline
+  if(fbConnected&&fbDB){fbDB.ref('negoce/stock_qty/'+id).remove().catch(e=>console.error('del stock_qty:',e));}
+  logAction&&logAction('Suppression produit',p.nom);save();renderProduits();});}
 
 // ══ FOURNISSEURS ══
 function saveFourn(){const nom=document.getElementById('mf-nom').value.trim();if(!nom){soundErr();toast('Nom obligatoire','err');return;}const eid=document.getElementById('mf-id').value;const f={id:eid||('FN'+Date.now().toString(36).toUpperCase().slice(-5)),nom,tel:document.getElementById('mf-tel').value,ville:document.getElementById('mf-ville').value,prods:document.getElementById('mf-prods').value};if(eid){const i=DB.fournisseurs.findIndex(x=>x.id===eid);DB.fournisseurs[i]=f;}else DB.fournisseurs.push(f);save();closeModal('modal-fourn');renderFourn();refreshAllSelects();document.getElementById('mf-id').value='';['mf-nom','mf-tel','mf-ville','mf-prods'].forEach(i=>document.getElementById(i).value='');toast('Enregistré ✅','ok');}
@@ -4009,7 +4012,7 @@ async function iaRapport(){const zone=document.getElementById('ia-rapport-zone')
 async function askIA(){const q=document.getElementById('ia-question')?.value.trim();if(!q){toast('Posez une question','err');return;}const result=document.getElementById('ia-modal-result');if(!result)return;result.innerHTML='<div class="ia-panel"><div class="ia-loading"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div></div></div>';await callIA(`${buildContext()}\nQuestion: ${q}`,r=>{result.innerHTML=`<div class="ia-panel"><div class="ia-title">🤖 Réponse</div><div class="ia-msg">${r.replace(/\n/g,'<br>')}</div></div>`;},e=>{result.innerHTML=`<div class="empty">❌ ${e}</div>`;});}
 
 // ══ EXPORT / IMPORT ══
-function exportJSON(){const data=JSON.stringify({produits:DB.produits,clients:DB.clients,fournisseurs:DB.fournisseurs,factures:DB.factures,devis:DB.devis,retours:DB.retours,salaires:DB.salaires,depenses:DB.depenses,caisses:DB.caisses,settings:DB.settings,exported:new Date().toISOString()},null,2);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=`MonNegoce_${today()}.json`;a.click();toast('Export téléchargé ✅','ok');}
+function exportJSON(){const _st={...DB.settings};delete _st.apiKey;const data=JSON.stringify({produits:DB.produits,clients:DB.clients,fournisseurs:DB.fournisseurs,factures:DB.factures,devis:DB.devis,retours:DB.retours,salaires:DB.salaires,depenses:DB.depenses,caisses:DB.caisses,settings:_st,exported:new Date().toISOString()},null,2);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=`MonNegoce_${today()}.json`;a.click();toast('Export téléchargé ✅','ok');}
 function exportFullBackup(){
   // Exclure les mots de passe hachés de la sauvegarde visible, mais garder le reste
   const backup={
@@ -4025,7 +4028,7 @@ function exportFullBackup(){
     salaires:DB.salaires,
     caisses:DB.caisses,
     clotures:DB.clotures,
-    settings:DB.settings,
+    settings:(()=>{const s={...DB.settings};delete s.apiKey;return s;})(), // clé API jamais exportée
     taches:DB.taches,
     users:DB.users.map(u=>({id:u.id,nom:u.nom,role:u.role,boutique:u.boutique,caisse:u.caisse,actif:u.actif,perms:u.perms})), // Sans mots de passe
   };
@@ -4038,7 +4041,7 @@ function exportFullBackup(){
   toast('💾 Sauvegarde complète exportée ✅','ok');
 }
 function exportCSV(){const header='Facture,Boutique,Caisse,Client,Total,Mode,Vendeur,Date';const rows=DB.factures.map(f=>`${f.id},${getBName(f.boutique)},${f.caisse},${f.client},${f.total},${f.mode},${f.vendeur||''},${f.date.slice(0,10)}`);const csv=header+'\n'+rows.join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`Factures_${today()}.csv`;a.click();toast('CSV exporté ✅','ok');}
-function importJSON(input){const file=input.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{try{const data=JSON.parse(e.target.result);if(!confirm('⚠️ Restaurer ces données du '+(data.exportDate?new Date(data.exportDate).toLocaleString('fr-FR'):'?')+' ?\nLes données actuelles seront REMPLACÉES. Cette action est irréversible.'))return;['produits','clients','fournisseurs','factures','devis','retours','salaires','depenses','caisses','clotures','settings','taches'].forEach(k=>{if(data[k])DB[k]=data[k];});
+function importJSON(input){const file=input.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{try{const data=JSON.parse(e.target.result);if(!confirm('⚠️ Restaurer ces données du '+(data.exportDate?new Date(data.exportDate).toLocaleString('fr-FR'):'?')+' ?\nLes données actuelles seront REMPLACÉES. Cette action est irréversible.'))return;const _localKey=DB.settings?.apiKey||'';['produits','clients','fournisseurs','factures','devis','retours','salaires','depenses','caisses','clotures','settings','taches'].forEach(k=>{if(data[k])DB[k]=data[k];});if(DB.settings)DB.settings.apiKey=_localKey; // conserver la clé API locale
   // Restaurer les users sans écraser les mots de passe (le backup ne les contient pas)
   if(data.users){
     data.users.forEach(bu=>{
@@ -4675,7 +4678,10 @@ function initFirebase(){
           if(fbFirstConnect){
             fbFirstConnect=false;
             toast('☁️ Firebase connecté !','ok');
-            pullFromFirebase();
+            // IMPORTANT: vider d'abord la file des mouvements faits hors-ligne, SINON
+            // le stock du serveur (qui ne les contient pas) écrase le stock local
+            // et les ventes hors-ligne sont perdues au rechargement de la page.
+            flushPendingStockOps().finally(()=>pullFromFirebase());
           } else if(!wasConnected){
             // Reconnexion après une coupure: on renvoie les changements faits hors-ligne
             toast('☁️ Connexion rétablie — synchronisation...','info');
@@ -4706,14 +4712,23 @@ let fbPushTimer=null;
 function applyStockDelta(productId,field,delta){
   const p=DB.produits.find(x=>x.id===productId);
   if(!p)return;
-  p[field]=(p[field]||0)+delta;
+  const avant=(p[field]||0);
+  p[field]=avant+delta;
+
+  // Le mouvement est TOUJOURS inscrit d'abord dans la file locale (journal durable).
+  // Il n'en sort que lorsque Firebase a confirmé l'écriture. Ainsi une vente n'est
+  // jamais perdue, même si l'appareil est fermé ou la connexion coupe juste après.
+  const op={id:productId,field,delta,t:Date.now()+Math.random()};
+  const q=LS('pendingStockOps')||[];q.push(op);SS('pendingStockOps',q);
+
   if(fbConnected&&fbDB){
     fbDB.ref(`negoce/stock_qty/${productId}/${field}`).transaction(cur=>{
-      const base=(typeof cur==='number')?cur:(p[field]-delta);
+      const base=(typeof cur==='number')?cur:avant;
       return base+delta;
-    }).catch(e=>{console.error('Stock atomique:',e);queueStockDelta(productId,field,delta);});
-  } else {
-    queueStockDelta(productId,field,delta);
+    }).then(()=>{
+      const reste=(LS('pendingStockOps')||[]).filter(x=>x.t!==op.t);
+      SS('pendingStockOps',reste);
+    }).catch(e=>{console.error('Stock atomique:',e);/* reste en file, renvoyé plus tard */});
   }
 }
 // Écriture ABSOLUE du stock d'un produit (création produit, ajustement manuel).
@@ -4729,17 +4744,28 @@ function queueStockDelta(productId,field,delta){
   q.push({id:productId,field,delta,t:Date.now()});
   SS('pendingStockOps',q);
 }
+let _flushingStock=false;
 async function flushPendingStockOps(){
+  if(_flushingStock)return;              // jamais deux envois en parallèle (risque de double déduction)
   if(!fbConnected||!fbDB)return;
   const q=LS('pendingStockOps')||[];
   if(!q.length)return;
-  SS('pendingStockOps',[]); // vider tout de suite pour éviter double-envoi si ça relance entre-temps
-  for(const op of q){
-    try{
-      await fbDB.ref(`negoce/stock_qty/${op.id}/${op.field}`).transaction(cur=>(typeof cur==='number'?cur:0)+op.delta);
-    }catch(e){console.error('Flush stock op:',e);}
-  }
-  toast('☁️ '+q.length+' mouvement(s) de stock hors-ligne synchronisé(s)','ok');
+  _flushingStock=true;
+  const echecs=[];let ok=0;
+  try{
+    for(const op of q){
+      try{
+        await fbDB.ref(`negoce/stock_qty/${op.id}/${op.field}`).transaction(cur=>(typeof cur==='number'?cur:0)+op.delta);
+        ok++;
+        // Retirer l'opération de la file DÈS qu'elle est confirmée, une par une:
+        // si la connexion coupe en cours de route, rien n'est perdu ni envoyé deux fois.
+        const reste=(LS('pendingStockOps')||[]).filter(x=>!(x.id===op.id&&x.field===op.field&&x.t===op.t));
+        SS('pendingStockOps',reste);
+      }catch(e){console.error('Flush stock op:',e);echecs.push(op);}
+    }
+  } finally { _flushingStock=false; }
+  if(ok)toast('☁️ '+ok+' mouvement(s) de stock hors-ligne synchronisé(s)','ok');
+  if(echecs.length)toast('⚠️ '+echecs.length+' mouvement(s) en attente — réessai à la prochaine connexion','warn');
 }
 
 function pushToFirebase(){
@@ -5092,6 +5118,69 @@ function startRealtimeSync(){
     // Rafraîchir l'affichage si les écrans concernés sont ouverts
     try{if(typeof renderGrid==='function')renderGrid();}catch(e){}
     try{if(typeof renderProduits==='function')renderProduits();}catch(e){}
+  });
+
+  // ══ CATALOGUE PRODUITS EN TEMPS RÉEL ══
+  // Quand l'admin (ou un superviseur) crée ou modifie un produit, tous les appareils
+  // le reçoivent immédiatement, sans rechargement de page.
+  // IMPORTANT: ce listener ne touche JAMAIS aux quantités s1/s2 — le stock est géré
+  // exclusivement par stock_qty ci-dessus. Aucun risque de faire "sauter" le stock.
+  fbDB.ref('negoce/shared/data/produits').on('value',snap=>{
+    if(fbSyncing)return;
+    const cloudProds=snap.val();if(!cloudProds)return;
+    const liste=Array.isArray(cloudProds)?cloudProds:Object.values(cloudProds);
+    if(!liste.length)return;
+    const localIds=new Set(DB.produits.map(p=>p.id));
+    let nouveaux=0,modifies=0;
+    liste.forEach(cp=>{
+      if(!cp||!cp.id)return;
+      if(!localIds.has(cp.id)){
+        // Nouveau produit créé sur un autre appareil: on l'ajoute.
+        // Le stock viendra de stock_qty (0 en attendant).
+        DB.produits.push({...cp,s1:0,s2:0});
+        nouveaux++;
+      } else {
+        // Produit connu: on met à jour la fiche (nom, prix, réf, photo...) sans toucher au stock
+        const lp=DB.produits.find(x=>x.id===cp.id);
+        if(!lp)return;
+        const {s1,s2,...fiche}=cp;
+        let change=false;
+        Object.keys(fiche).forEach(k=>{if(JSON.stringify(lp[k])!==JSON.stringify(fiche[k])){lp[k]=fiche[k];change=true;}});
+        if(change)modifies++;
+      }
+    });
+    if(nouveaux||modifies){
+      fbLoading=true;
+      if(window._origSave)window._origSave();else save();
+      fbLoading=false;
+      try{if(typeof renderGrid==='function')renderGrid();}catch(e){}
+      try{if(typeof renderProduits==='function')renderProduits();}catch(e){}
+      if(nouveaux){
+        toast('📦 '+nouveaux+' nouveau(x) produit(s) reçu(s)','ok');
+        // Aller chercher tout de suite le stock des nouveaux produits, sinon ils
+        // resteraient affichés à 0 jusqu'au prochain mouvement de stock.
+        fbDB.ref('negoce/stock_qty').once('value').then(s=>{
+          const m=s.val();if(!m)return;
+          fbLoading=true;
+          DB.produits.forEach(p=>{const q=m[p.id];if(q){if(typeof q.s1==='number')p.s1=q.s1;if(typeof q.s2==='number')p.s2=q.s2;}});
+          if(window._origSave)window._origSave();else save();
+          fbLoading=false;
+          try{if(typeof renderGrid==='function')renderGrid();}catch(e){}
+          try{if(typeof renderProduits==='function')renderProduits();}catch(e){}
+        }).catch(e=>console.error('stock nouveaux produits:',e));
+      }
+    }
+  });
+
+  // Fournisseurs en temps réel
+  fbDB.ref('negoce/shared/data/fournisseurs').on('value',snap=>{
+    if(fbSyncing)return;
+    const cf=snap.val();if(!cf)return;
+    const liste=Array.isArray(cf)?cf:Object.values(cf);
+    const ids=new Set((DB.fournisseurs||[]).map(f=>f.id));
+    let add=0;
+    liste.forEach(f=>{if(f&&f.id&&!ids.has(f.id)){DB.fournisseurs.push(f);add++;}});
+    if(add){fbLoading=true;if(window._origSave)window._origSave();else save();fbLoading=false;}
   });
 
   // Écouter clients de la boutique courante
