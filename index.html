@@ -518,7 +518,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="ni admin-nav" onclick="nav('mouvements')"><span class="ic">🔄</span> Mouvements Stock</div>
   <div class="ni admin-nav" onclick="nav('comparaison')"><span class="ic">📊</span> Comparaison Boutiques</div>
   <div class="ni admin-nav" onclick="nav('previsions')"><span class="ic">🤖</span> IA Prévisions</div>
-  <div class="ni admin-nav" onclick="nav('ia-centre')"><span class="ic">🤖</span> Centre IA</div>
+  <div class="ni" onclick="nav('ia-centre')"><span class="ic">🤖</span> Centre IA</div>
   <div class="ni admin-nav" onclick="nav('agenda')"><span class="ic">📅</span> Agenda</div>
   <div class="ni admin-nav" onclick="nav('heures-fortes')"><span class="ic">🔥</span> Heures Fortes</div>
   <div class="ni admin-nav" onclick="nav('produits-lents')"><span class="ic">🐢</span> Produits Lents</div>
@@ -916,7 +916,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
         <button class="btn btn-purple" style="width:100%;margin-top:6px;" onclick="iaCreerFacture()">🤖 Créer</button>
         <div id="ia-fac-result" style="margin-top:8px;"></div>
       </div>
-      <div class="card" style="padding:13px;">
+      <div class="card ia-admin-only" style="padding:13px;">
         <h3 style="font-size:13px;font-weight:800;color:var(--purple);margin-bottom:9px;">📊 Analyses IA</h3>
         <button class="btn btn-purple" style="width:100%;margin-bottom:6px;" onclick="iaAnalyseVentes()">📈 Analyser ventes</button>
         <button class="btn btn-blue" style="width:100%;margin-bottom:6px;" onclick="iaPrevisionStock()">🔮 Prévisions stock</button>
@@ -950,7 +950,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <div id="ia-tache-result" style="margin-top:8px;"></div>
       <div id="ia-taches-liste" style="margin-top:10px;max-height:220px;overflow-y:auto;"></div>
     </div>
-    <div class="card" style="padding:13px;margin-bottom:11px;border-color:rgba(139,92,246,.3);">
+    <div class="card ia-admin-only" style="padding:13px;margin-bottom:11px;border-color:rgba(139,92,246,.3);">
       <h3 style="font-size:12px;font-weight:800;color:var(--purple);margin-bottom:8px;">🔑 Clé API Claude</h3>
       <div style="display:flex;gap:7px;">
         <input type="password" id="ia-centre-apikey" placeholder="sk-ant-..." style="flex:1;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;color:var(--text);font-family:var(--font);font-size:12px;outline:none;">
@@ -1936,9 +1936,9 @@ const ALL_PERMS=[
 
 const ROLE_PERMS={
   admin:ALL_PERMS.map(p=>p.id),
-  superviseur:['caisse','factures','devis','retours','depenses','produits','produits_edit','fournisseurs','clients','dashboard','ventes_jour','inventaire','rapports','admin_menus'],
-  vendeur:['caisse','factures','devis','retours','produits','produits_edit','clients'],
-  caissier:['caisse','factures','produits','produits_edit'],
+  superviseur:['caisse','factures','devis','retours','depenses','produits','produits_edit','fournisseurs','clients','dashboard','ventes_jour','inventaire','rapports','ia','admin_menus'],
+  vendeur:['caisse','factures','devis','retours','produits','produits_edit','clients','ia'],
+  caissier:['caisse','factures','produits','produits_edit','ia'],
 };
 
 let DB={
@@ -2360,11 +2360,11 @@ function startApp(){
 // des produits. Sans ça, les comptes déjà enregistrés (VEN01, CAS01...) gardent leurs
 // anciennes permissions et ne verraient pas le bouton "Nouveau produit".
 function migrerPermsProduits(){
-  if(LS('migr_prodPerms'))return;
+  if(LS('migr_prodPerms_v2'))return;
   let modif=0;
   (DB.users||[]).forEach(u=>{
     if(!u.perms)u.perms=[];
-    ['produits','produits_edit'].forEach(pm=>{
+    ['produits','produits_edit','ia'].forEach(pm=>{
       if(!u.perms.includes(pm)){u.perms.push(pm);modif++;}
     });
     if(modif)u._updated=Date.now();
@@ -2374,10 +2374,10 @@ function migrerPermsProduits(){
     try{if(typeof pushUsersToFirebase==='function')pushUsersToFirebase();}catch(e){}
     console.log('Permissions produits accordées à tous les utilisateurs');
   }
-  SS('migr_prodPerms',1);
+  SS('migr_prodPerms_v2',1);
   // Mettre à jour la session en cours pour que le bouton apparaisse sans reconnexion
   if(session.user){
-    ['produits','produits_edit'].forEach(pm=>{
+    ['produits','produits_edit','ia'].forEach(pm=>{
       if(!session.user.perms)session.user.perms=[];
       if(!session.user.perms.includes(pm))session.user.perms.push(pm);
     });
@@ -4130,7 +4130,11 @@ function saveSettings(b){const n=b==='B1'?1:2;const s=DB.settings[b];const get=i
 function saveSettingsGen(){DB.settings.appNom=document.getElementById('set-app-nom')?.value||'Mon Négoce';DB.settings.apiKey=document.getElementById('set-api-key')?.value||'';save();const sb=document.getElementById('sb-brand');if(sb)sb.textContent=DB.settings.appNom;toast('Paramètres enregistrés ✅','ok');}
 
 // ══ CENTRE IA ══
-function renderIACentre(){renderTachesListe();const b=document.getElementById('ia-api-banner');if(b)b.style.display=DB.settings.apiKey?'none':'block';const inp=document.getElementById('ia-centre-apikey');if(inp&&DB.settings.apiKey)inp.value=DB.settings.apiKey;const s=document.getElementById('ia-api-status');if(s)s.innerHTML=DB.settings.apiKey?'<span style="color:var(--green)">✅ Clé API active</span>':'<span style="color:var(--orange)">⚠️ Aucune clé</span>';}
+function renderIACentre(){renderTachesListe();
+  // Masquer les zones sensibles (clé API, marges, prix d'achat) pour les non-admins
+  const estAdmin=session.user?.role==='admin';
+  document.querySelectorAll('#page-ia-centre .ia-admin-only').forEach(el=>{el.style.display=estAdmin?'':'none';});
+const b=document.getElementById('ia-api-banner');if(b)b.style.display=(DB.settings.apiKey||!estAdmin)?'none':'block';const inp=document.getElementById('ia-centre-apikey');if(inp&&DB.settings.apiKey)inp.value=DB.settings.apiKey;const s=document.getElementById('ia-api-status');if(s)s.innerHTML=DB.settings.apiKey?'<span style="color:var(--green)">✅ Clé API active</span>':'<span style="color:var(--orange)">⚠️ Aucune clé</span>';}
 function saveAPIKey(){const key=document.getElementById('ia-centre-apikey')?.value.trim()||'';if(!key.startsWith('sk-')){const s=document.getElementById('ia-api-status');if(s)s.innerHTML='<span style="color:var(--red)">❌ Clé invalide (doit commencer par sk-)</span>';return;}DB.settings.apiKey=key;save();const el=document.getElementById('set-api-key');if(el)el.value=key;const s=document.getElementById('ia-api-status');if(s)s.innerHTML='<span style="color:var(--green)">✅ Clé enregistrée !</span>';const b=document.getElementById('ia-api-banner');if(b)b.style.display='none';toast('Clé API sauvegardée ✅','ok');}
 
 // ══ IA ══
