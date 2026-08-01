@@ -3226,15 +3226,92 @@ function stopVoiceRecording(){
   const texte=(window._voiceTranscriptFinal?window._voiceTranscriptFinal():'').trim()||document.getElementById('ia-voice-transcript').textContent.trim();
   if(texte&&texte!=='🎤 Écoute en cours...')traiterNoteVocale(texte);
 }
-async function traiterNoteVocale(texte){
-  const resultEl=document.getElementById('ia-voice-result');
-  if(!DB.settings.apiKey){resultEl.innerHTML='<div style="color:var(--red);font-size:11px;">⚠️ Clé API requise pour traiter la note</div>';return;}
-  resultEl.innerHTML='<div class="ia-panel"><div class="ia-loading"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div> <span>Traitement...</span></div></div>';
-  const todayISO=new Date().toISOString();
-  await callIA(`Date: ${todayISO}\\nTexte dicté par un commerçant: "${texte}"\\nDétermine le type d'action et extrait les infos. JSON UNIQUEMENT:\\n{"type":"vente|tache|produit","details":{},"resume":"phrase courte de confirmation"}\\nPour vente: details={"produit":"","qte":1,"client":"Anonyme","mode":"especes"}\\nPour tache: details={"titre":"","date":"YYYY-MM-DDTHH:mm:00","priorite":"normale"}\\nPour produit: details={"nom":"","prix_vente":0,"prix_achat":0,"qte":0}`,
-    txt=>{
-      try{
-        const r=JSON.parse(txt.replace(/```json|```/g,'').trim());
+// ══ ANALYSE VOCALE LOCALE (100% GRATUITE, HORS-LIGNE) ══
+// Comprend les commandes courantes sans appeler aucune IA payante.
+// Ne fait appel à Claude qu'en dernier recours, si la phrase n'est pas reconnue.
+const _norm=s=>(s||'').toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+
+const _MOTS_NB={un:1,une:1,deux:2,trois:3,quatre:4,cinq:5,six:6,sept:7,huit:8,neuf:9,dix:10,
+  onze:11,douze:12,treize:13,quatorze:14,quinze:15,seize:16,vingt:20,trente:30,quarante:40,cinquante:50,cent:100};
+
+function _extraireNombres(t){
+  const out=[];
+  t.split(' ').forEach(m=>{
+    if(/^\d+$/.test(m))out.push(parseInt(m,10));
+    else if(_MOTS_NB[m]!==undefined)out.push(_MOTS_NB[m]);
+  });
+  return out;
+}
+
+// Trouve le produit du catalogue qui correspond le mieux à la phrase dictée
+function _matchProduit(t){
+  const motsT=_norm(t).split(' ').filter(m=>m.length>2);
+  let best=null,bestScore=0;
+  (DB.produits||[]).forEach(p=>{
+    const motsP=_norm(p.nom).split(' ').filter(m=>m.length>2);
+    if(!motsP.length)return;
+    let score=0;
+    motsP.forEach(mp=>{
+      if(motsT.includes(mp))score+=2;
+      else if(motsT.some(mt=>mt.startsWith(mp.slice(0,4))||mp.startsWith(mt.slice(0,4))))score+=1;
+    });
+    score=score/motsP.length; // favorise une correspondance complète du nom
+    if(score>bestScore){bestScore=score;best=p;}
+  });
+  return bestScore>=1?best:null;
+}
+
+function _detectMode(t){
+  if(/\bwave\b/.test(t))return 'wave';
+  if(/orange|om\b/.test(t))return 'orange';
+  if(/mobile/.test(t))return 'mobile';
+  if(/carte|cb\b/.test(t))return 'carte';
+  if(/credit|dette|doit/.test(t))return 'credit';
+  return 'especes';
+}
+
+// Renvoie un objet {type,details,resume} identique à celui de l'IA, ou null si non reconnu
+function analyseVocaleLocale(texte){
+  const t=_norm(texte);
+  if(!t)return null;
+
+  // — Intention: nouveau produit —
+  if(/(nouveau|nouvel|ajoute[rz]?|cree[rz]?|creer|enregistre) (un )?(produit|article)/.test(t)){
+    const nbs=_extraireNombres(t);
+    return {type:'produit',details:{
+      nom:texte.replace(/.*?(produit|article)\s*/i,'').trim()||texte.trim(),
+      prix_vente:nbs[0]||0,prix_achat:nbs[1]||0,qte:nbs[2]||0
+    },resume:'Nouveau produit détecté',_local:true};
+  }
+
+  // — Intention: tâche / rappel —
+  if(/(rappel|rappelle|tache|tâche|noubli|n oubli|penser a|penser à|todo)/.test(t)){
+    const d=new Date();
+    if(/demain/.test(t))d.setDate(d.getDate()+1);
+    return {type:'tache',details:{
+      titre:texte.trim(),date:d.toISOString().slice(0,16)+':00',priorite:/urgent|important/.test(t)?'haute':'normale'
+    },resume:'Rappel enregistré',_local:true};
+  }
+
+  // — Intention: vente —
+  if(/(vend|vendu|vente|sortie|encaisse|client (a|prend)|donne)/.test(t)){
+    const prod=_matchProduit(texte);
+    if(!prod)return null; // produit non identifié: on laisse l'IA essayer
+    const nbs=_extraireNombres(t);
+    // La quantité est le premier petit nombre; les gros nombres sont des montants
+    const qte=nbs.find(n=>n>0&&n<=100)||1;
+    return {type:'vente',details:{
+      produit:prod.nom,qte,client:'Anonyme',mode:_detectMode(t)
+    },resume:`${qte} × ${prod.nom}`,_local:true};
+  }
+
+  return null;
+}
+
+function appliquerResultatVocal(r,texte,resultEl,todayISO){
+  try{
         if(r.type==='tache'){
           const tache={id:'TK'+Date.now().toString(36).toUpperCase().slice(-6),titre:r.details.titre||texte,date:r.details.date||todayISO,priorite:r.details.priorite||'normale',done:false,createdBy:session.user?.nom||'?',createdAt:todayISO};
           if(!DB.taches)DB.taches=[];DB.taches.push(tache);save();renderTachesListe&&renderTachesListe();
@@ -3257,6 +3334,40 @@ async function traiterNoteVocale(texte){
         }
         document.getElementById('ia-voice-transcript').textContent='';
         soundOk&&soundOk();
+    return true;
+  }catch(e){
+    console.error('appliquerResultatVocal:',e);
+    resultEl.innerHTML='<div style="color:var(--red);font-size:11px;">❌ Commande non comprise, réessayez</div>';
+    return false;
+  }
+}
+
+async function traiterNoteVocale(texte){
+  const resultEl=document.getElementById('ia-voice-result');
+  const todayISO=new Date().toISOString();
+
+  // 1) ANALYSE LOCALE GRATUITE — aucun appel payant, fonctionne hors connexion
+  const local=analyseVocaleLocale(texte);
+  if(local){
+    const ok=appliquerResultatVocal(local,texte,resultEl,todayISO);
+    if(ok){
+      const badge='<div style="font-size:9px;color:var(--text2);margin-top:4px;">⚡ Traité localement (gratuit)</div>';
+      resultEl.innerHTML+=badge;
+      return;
+    }
+  }
+
+  // 2) Repli sur l'IA seulement si la phrase n'a pas été comprise localement
+  if(!DB.settings.apiKey){
+    resultEl.innerHTML='<div style="color:var(--red);font-size:11px;">❌ Commande non reconnue.<br><span style="color:var(--text2);font-weight:400;">Essayez par exemple : « vends 3 câble gris », « nouveau produit chargeur 2000 », « rappelle-moi de commander ».</span></div>';
+    return;
+  }
+  resultEl.innerHTML='<div class="ia-panel"><div class="ia-loading"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div> <span>Traitement IA...</span></div></div>';
+  await callIA(`Date: ${todayISO}\\nTexte dicté par un commerçant: "${texte}"\\nDétermine le type d'action et extrait les infos. JSON UNIQUEMENT:\\n{"type":"vente|tache|produit","details":{},"resume":"phrase courte de confirmation"}\\nPour vente: details={"produit":"","qte":1,"client":"Anonyme","mode":"especes"}\\nPour tache: details={"titre":"","date":"YYYY-MM-DDTHH:mm:00","priorite":"normale"}\\nPour produit: details={"nom":"","prix_vente":0,"prix_achat":0,"qte":0}`,
+    txt=>{
+      try{
+        const r=JSON.parse(txt.replace(/```json|```/g,'').trim());
+        appliquerResultatVocal(r,texte,resultEl,todayISO);
       }catch(e){resultEl.innerHTML='<div style="color:var(--red);font-size:11px;">❌ Format invalide, réessayez</div>';}
     },
     e=>{resultEl.innerHTML=`<div style="color:var(--red);font-size:11px;">❌ ${e}</div>`;}
@@ -5394,9 +5505,9 @@ function openScanner(){
   document.getElementById('barcode-manual').value='';
   document.getElementById('scanner-result').style.display='none';
   document.getElementById('scanner-status').textContent='📷 Démarrage caméra...';
-  startCamera();
+  startScannerCamera();
 }
-async function startCamera(){
+async function startScannerCamera(){
   try{
     scannerStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
     const video=document.getElementById('scanner-video');
