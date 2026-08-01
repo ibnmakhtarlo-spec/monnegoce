@@ -1106,6 +1106,10 @@ canvas.chart-canvas{display:block;width:100%!important;}
       </div>
       <div style="font-size:11px;color:var(--text2);margin-bottom:7px;">Message de relance :</div>
       <textarea id="cr-msg-relance" style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:8px;color:var(--text);font-family:var(--font);font-size:11px;min-height:60px;outline:none;resize:vertical;">Bonjour {NOM} 🙏, nous vous rappelons qu'une créance de {MONTANT} FCFA est en attente. Merci de bien vouloir régulariser votre situation. Cordialement.</textarea>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+        <button class="btn btn-sm" onclick="ouvrirModelesMsg('cr-msg-relance')">📝 Modèles</button>
+        <button class="btn btn-sm ia-payante" onclick="reformulerTexte('cr-msg-relance','professionnel et courtois')" title="Nécessite une clé API">✨ Reformuler (IA)</button>
+      </div>
     </div>
   </div>
 
@@ -2485,6 +2489,8 @@ function nav(page){
   const ni=document.querySelector(`.ni[onclick="nav('${page}')"]`);if(ni)ni.classList.add('active');
   document.getElementById('tb-title').innerHTML=TITLES[page]||page;
   if(RENDERS[page])RENDERS[page]();
+  // Ajouter les boutons micro aux champs de texte de la page
+  try{installerBoutonsDictee();}catch(e){}
 }
 
 // ══ CLIENT SEARCH (POS) ══
@@ -3226,6 +3232,155 @@ function stopVoiceRecording(){
   const texte=(window._voiceTranscriptFinal?window._voiceTranscriptFinal():'').trim()||document.getElementById('ia-voice-transcript').textContent.trim();
   if(texte&&texte!=='🎤 Écoute en cours...')traiterNoteVocale(texte);
 }
+// ══ AIDE À LA RÉDACTION ══
+// Modèles prêts à l'emploi (gratuits) + reformulation IA en option.
+const MODELES_MSG={
+  relance_douce:{t:'Relance douce',v:"Bonjour {NOM} 🙏, j'espère que vous allez bien. Je me permets de vous rappeler qu'une créance de {MONTANT} FCFA reste en attente. Merci de votre compréhension. Cordialement."},
+  relance_ferme:{t:'Relance ferme',v:"Bonjour {NOM}, votre créance de {MONTANT} FCFA est échue depuis plusieurs jours. Merci de bien vouloir régulariser votre situation dans les meilleurs délais. Cordialement."},
+  relance_derniere:{t:'Dernier rappel',v:"Bonjour {NOM}, malgré nos relances, votre créance de {MONTANT} FCFA demeure impayée. Sans règlement de votre part sous 7 jours, nous serons contraints de suspendre nos services. Cordialement."},
+  remerciement:{t:'Remerciement',v:"Bonjour {NOM} 🙏, merci pour votre confiance et votre fidélité. Nous restons à votre disposition pour tous vos besoins en accessoires téléphone. À très bientôt !"},
+  promo:{t:'Promotion',v:"Bonjour {NOM} 🎉 ! Profitez de nos nouvelles arrivées en accessoires téléphone : écouteurs, chargeurs, câbles et protections. Passez nous voir en boutique !"},
+  nouveaute:{t:'Nouveau stock',v:"Bonjour {NOM}, nous venons de recevoir un nouvel arrivage d'accessoires. Venez découvrir nos nouveautés en boutique. À bientôt !"}
+};
+
+function ouvrirModelesMsg(champId){
+  const champ=document.getElementById(champId);
+  if(!champ)return;
+  const liste=Object.entries(MODELES_MSG)
+    .map(([k,m])=>`<button class="btn btn-sm" style="width:100%;margin-bottom:5px;text-align:left;justify-content:flex-start;" onclick="appliquerModeleMsg('${champId}','${k}')">${m.t}</button>`)
+    .join('');
+  let box=document.getElementById('modeles-msg-box');
+  if(!box){
+    box=document.createElement('div');
+    box.id='modeles-msg-box';
+    box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    document.body.appendChild(box);
+  }
+  box.innerHTML=`<div style="background:var(--surf);border:1px solid var(--border2);border-radius:12px;padding:16px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <strong style="font-size:14px;">📝 Choisir un modèle</strong>
+      <button class="btn btn-sm" onclick="document.getElementById('modeles-msg-box').remove()">✕</button>
+    </div>${liste}
+    <div style="font-size:10px;color:var(--text2);margin-top:8px;">{NOM} et {MONTANT} sont remplacés automatiquement.</div>
+  </div>`;
+  box.style.display='flex';
+}
+
+function appliquerModeleMsg(champId,cle){
+  const champ=document.getElementById(champId);
+  const m=MODELES_MSG[cle];
+  if(champ&&m){
+    champ.value=m.v;
+    try{champ.dispatchEvent(new Event('input',{bubbles:true}));}catch(e){}
+    toast('Modèle appliqué ✅','ok');
+  }
+  const box=document.getElementById('modeles-msg-box');
+  if(box)box.remove();
+}
+
+// Reformulation par l'IA (nécessite une clé API)
+async function reformulerTexte(champId,style){
+  const champ=document.getElementById(champId);
+  if(!champ||!champ.value.trim()){soundErr&&soundErr();toast('Écrivez d\'abord un texte','err');return;}
+  if(!DB.settings.apiKey){
+    soundErr&&soundErr();
+    toast('Reformulation IA : clé API requise. Utilisez 📝 Modèles à la place.','err');
+    return;
+  }
+  const original=champ.value;
+  toast('🤖 Reformulation en cours...','info');
+  await callIA(
+    `Reformule ce message commercial en français, ton ${style||'professionnel et courtois'}, concis. Garde les variables {NOM} et {MONTANT} intactes si présentes. Réponds UNIQUEMENT avec le texte reformulé, sans explication.\n\n"${original}"`,
+    r=>{champ.value=r.trim();try{champ.dispatchEvent(new Event('input',{bubbles:true}));}catch(e){}toast('✅ Texte reformulé','ok');},
+    e=>{soundErr&&soundErr();toast('Erreur IA: '+e,'err');}
+  );
+}
+
+// ══ DICTÉE UNIVERSELLE (GRATUITE) ══
+// Ajoute un bouton micro à côté des champs de texte pour dicter au lieu de taper.
+let _dicteeRec=null,_dicteeCible=null,_dicteeBase='';
+
+function dicteeDisponible(){
+  return ('webkitSpeechRecognition' in window)||('SpeechRecognition' in window);
+}
+
+function toggleDictee(champId,btn){
+  if(!dicteeDisponible()){
+    soundErr&&soundErr();
+    toast('Dictée non supportée — utilisez Chrome ou Edge','err');
+    return;
+  }
+  // Si on écoute déjà, on arrête (que ce soit le même champ ou un autre)
+  if(_dicteeRec){
+    try{_dicteeRec.stop();}catch(e){}
+    return;
+  }
+  const champ=document.getElementById(champId);
+  if(!champ)return;
+
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  _dicteeRec=new SR();
+  _dicteeRec.lang='fr-FR';
+  _dicteeRec.continuous=true;
+  _dicteeRec.interimResults=true;
+  _dicteeCible=champ;
+  _dicteeBase=champ.value?champ.value.trim()+' ':'';
+
+  const majBouton=(actif)=>{
+    document.querySelectorAll('.btn-dictee').forEach(b=>{
+      b.textContent='🎤';b.style.background='';b.style.color='';b.title='Dicter';
+    });
+    if(actif&&btn){
+      btn.textContent='⏹️';btn.style.background='var(--red)';btn.style.color='#fff';
+      btn.title='Arrêter la dictée';
+    }
+  };
+
+  _dicteeRec.onstart=()=>{majBouton(true);toast('🎤 Parlez...','info');};
+
+  _dicteeRec.onresult=e=>{
+    let texte='';
+    for(let i=0;i<e.results.length;i++)texte+=e.results[i][0].transcript;
+    _dicteeCible.value=_dicteeBase+texte;
+    // Prévenir les scripts qui écoutent les changements (calculs, aperçus...)
+    try{_dicteeCible.dispatchEvent(new Event('input',{bubbles:true}));}catch(err){}
+  };
+
+  _dicteeRec.onerror=e=>{
+    majBouton(false);_dicteeRec=null;
+    if(e.error==='not-allowed')toast('Micro refusé — autorisez-le dans le navigateur','err');
+    else if(e.error!=='aborted'&&e.error!=='no-speech')toast('Erreur micro: '+e.error,'err');
+  };
+
+  _dicteeRec.onend=()=>{
+    majBouton(false);
+    _dicteeRec=null;
+    if(_dicteeCible){
+      try{_dicteeCible.dispatchEvent(new Event('change',{bubbles:true}));}catch(err){}
+    }
+  };
+
+  try{_dicteeRec.start();}
+  catch(e){_dicteeRec=null;majBouton(false);toast('Impossible de démarrer le micro','err');}
+}
+
+// Place automatiquement un bouton micro à côté des champs listés
+function installerBoutonsDictee(){
+  if(!dicteeDisponible())return;
+  const champs=['mp-desc','mp-nom','cr-msg-relance','md-notes','md-arts','ae-note',
+                'ia-question','ia-fac-input','ia-tache-input','mp-ia-text-input'];
+  champs.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el||el.dataset.dicteeOk)return;
+    el.dataset.dicteeOk='1';
+    const b=document.createElement('button');
+    b.type='button';b.className='btn btn-sm btn-dictee';b.textContent='🎤';b.title='Dicter';
+    b.style.cssText='margin-top:5px;padding:4px 12px;font-size:13px;';
+    b.onclick=(ev)=>{ev.preventDefault();toggleDictee(id,b);};
+    if(el.parentNode)el.parentNode.insertBefore(b,el.nextSibling);
+  });
+}
+
 // ══ ANALYSE VOCALE LOCALE (100% GRATUITE, HORS-LIGNE) ══
 // Comprend les commandes courantes sans appeler aucune IA payante.
 // Ne fait appel à Claude qu'en dernier recours, si la phrase n'est pas reconnue.
@@ -6143,7 +6298,7 @@ function cwSet(key,val){cwConf[key]=val;renderClock();}
 function cwChangeVille(){const v=document.getElementById('cp-ville-input')?.value?.trim();if(v){cwConf.ville=v;cwWeather=null;fetchWeather(v);}}
 
 // ══ UTILS ══
-function openModal(id){const el=document.getElementById(id);if(el)el.classList.add('open');}
+function openModal(id){const el=document.getElementById(id);if(el)el.classList.add('open');try{installerBoutonsDictee();}catch(e){}}
 function closeModal(id){const el=document.getElementById(id);if(el)el.classList.remove('open');}
 function toast(msg,type='ok'){const el=document.getElementById('toast');if(!el)return;el.textContent=({ok:'✅',err:'❌',info:'ℹ️'}[type]||'ℹ️')+' '+msg;el.className=`toast show ${type}`;clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),3500);}
 function refreshFournSel(sid,val=''){const s=document.getElementById(sid);if(!s)return;s.innerHTML='<option value="">— Aucun —</option>'+DB.fournisseurs.map(f=>`<option value="${f.id}"${f.id===val?' selected':''}>${f.nom}</option>`).join('');}
