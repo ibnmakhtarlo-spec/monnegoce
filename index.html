@@ -2627,6 +2627,7 @@ function validerVente(){
   const _fid='F'+session.user.id.replace(/[^A-Z0-9]/g,'').substring(0,3)+Date.now().toString(36).toUpperCase().slice(-5);
   DB.nextIds.f++;
   const fac={id:_fid,boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:cart.map(i=>({id:i.id,nom:String(i.nom),prix:Number(i.prix),achat:Number(i.achat||0),qty:Number(i.qty),unite:String(i.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,acompteVerse:mode==='acompte'?acompteVerse:0,soldeAcompte:mode==='acompte'?soldeAcompte:0,date:new Date().toISOString()};
+  if(!fbConnected)fac._offline=true; // vente hors-ligne: à renvoyer dès le retour du réseau
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;
     // Points fidélité: 1 point par 1000 FCFA
     const newPoints=Math.floor(total/1000);
@@ -2988,6 +2989,7 @@ function nfValider(){
   const nfDateVal=document.getElementById('nf-date')?.value;
   const nfDate=nfDateVal?new Date(nfDateVal+'T'+new Date().toTimeString().slice(0,8)).toISOString():new Date().toISOString();
   const fac={id:_fid,boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:nfLignes.map(l=>({id:l.id,nom:String(l.nom),prix:Number(l.prix),achat:Number(l.achat||0),qty:Number(l.qty),unite:String(l.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,date:nfDate};
+  if(!fbConnected)fac._offline=true; // vente hors-ligne: à renvoyer dès le retour du réseau
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;
     // Points fidélité: 1 point par 1000 FCFA
     const newPoints=Math.floor(total/1000);
@@ -3482,7 +3484,8 @@ function appliquerResultatVocal(r,texte,resultEl,todayISO){
           applyStockDelta(p.id,session.boutique==='B1'?'s1':'s2',-qte);
           logMouvement(p.id,p.nom,'vente',-qte,session.boutique,'Note vocale');
           const fac={id:'F'+session.user.id.replace(/[^A-Z0-9]/g,'').substring(0,3)+Date.now().toString(36).toUpperCase().slice(-5),boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:r.details.client||'Anonyme',clientId:null,items:[{id:p.id,nom:String(p.nom),prix:Number(p.prix),achat:Number(p.achat||0),qty:qte,unite:String(p.unite||'pièce')}],sousTotal:p.prix*qte,remise:0,total:p.prix*qte,mode:r.details.mode||'especes',date:todayISO};
-          DB.factures.push(fac);DB.nextIds.f++;
+          if(!fbConnected)fac._offline=true; // vente hors-ligne: à renvoyer dès le retour du réseau
+  DB.factures.push(fac);DB.nextIds.f++;
           logAction&&logAction('Vente (note vocale)','Facture '+fac.id+' — '+fmt(fac.total));
           save();
           resultEl.innerHTML=`<div class="ia-panel"><div class="ia-title">✅ Vente enregistrée</div><div class="ia-msg">${escapeHtml(r.resume||(fac.id+' — '+fmt(fac.total)))}</div></div>`;
@@ -5189,9 +5192,13 @@ function pushToFirebase(){
         // Aussi assigner si userId correspond au vendeur (userId stocké dans la facture)
         if(f.userId===userId&&!f._author)f._author=userId;
       });
+      // Inclure aussi les factures créées hors-ligne qui n'ont pas encore d'auteur
       const myFactures=DB.factures.filter(f=>
-        (f._author===userId||f.userId===userId)&&!f.id.startsWith('OLD_')
+        f&&f.id&&!f.id.startsWith('OLD_')&&
+        (f._author===userId||f.userId===userId||f._offline===true)
       );
+      // Une fois envoyées, elles ne sont plus "hors-ligne"
+      myFactures.forEach(f=>{if(f._offline){f._author=f._author||userId;delete f._offline;}});
       await fbDB.ref(`negoce/factures/${userId}`).set(myFactures.length>0?myFactures:null);
 
       // 5. Pousser dans all_factures — JAMAIS si admin, et seulement si on a des factures à pousser
@@ -5374,7 +5381,19 @@ async function pullFromFirebase(){
     allFactures.sort((a,b)=>new Date(b.date)-new Date(a.date));
 
     console.log('📊 Pull: allFactures count=',allFactures.length);
-    if(allFactures.length>0)DB.factures=allFactures;
+    // FUSION (jamais un remplacement): les factures créées hors-ligne n'existent pas
+    // encore sur le serveur. Les écraser ici faisait perdre toutes les ventes hors-ligne.
+    if(allFactures.length>0){
+      const cloudIds=new Set(allFactures.map(f=>f.id));
+      const localesNonSync=(DB.factures||[]).filter(f=>f&&f.id&&!cloudIds.has(f.id));
+      DB.factures=[...allFactures,...localesNonSync];
+      DB.factures.sort((a,b)=>new Date(b.date)-new Date(a.date));
+      if(localesNonSync.length){
+        console.log('📤 Factures locales à renvoyer:',localesNonSync.length);
+        toast('📤 '+localesNonSync.length+' vente(s) hors-ligne à synchroniser...','info');
+        setTimeout(()=>{try{pushToFirebase();}catch(e){console.error(e);}},1200);
+      }
+    }
 
     // Fusion users: ne pas écraser les permissions modifiées récemment
     const mergedUsers=currentUsers.map(lu=>{
