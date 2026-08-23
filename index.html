@@ -941,9 +941,15 @@ canvas.chart-canvas{display:block;width:100%!important;}
       </div>
       <div class="card ia-admin-only" style="padding:13px;">
         <h3 style="font-size:13px;font-weight:800;color:var(--purple);margin-bottom:9px;">📊 Analyses IA</h3>
-        <button class="btn btn-purple" style="width:100%;margin-bottom:6px;" onclick="iaAnalyseVentes()">📈 Analyser ventes</button>
-        <button class="btn btn-blue" style="width:100%;margin-bottom:6px;" onclick="iaPrevisionStock()">🔮 Prévisions stock</button>
-        <button class="btn btn-cyan" style="width:100%;" onclick="iaSuggestionPrix()">💰 Suggestion prix</button>
+        <div style="font-size:9px;color:var(--green);font-weight:700;margin-bottom:6px;">⚡ GRATUIT — aucune clé API requise</div>
+        <button class="btn btn-purple" style="width:100%;margin-bottom:6px;" onclick="analyseVentesGratuite()">📈 Analyser les ventes</button>
+        <button class="btn btn-blue" style="width:100%;margin-bottom:6px;" onclick="previsionStockGratuite()">🔮 Prévision stock &amp; achats</button>
+        <button class="btn btn-cyan" style="width:100%;margin-bottom:6px;" onclick="controlePrixGratuit()">💰 Contrôle des prix</button>
+        <button class="btn btn-gold" style="width:100%;margin-bottom:6px;" onclick="analyseFournisseursGratuite()">🚚 Analyse fournisseurs</button>
+        <div class="ia-admin-only" style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;">
+          <div style="font-size:9px;color:var(--text2);font-weight:700;margin-bottom:5px;">🔑 Avec clé API (payant)</div>
+          <button class="btn btn-ghost btn-sm" style="width:100%;" onclick="iaAnalyseVentes()">🤖 Analyse approfondie IA</button>
+        </div>
         <div id="ia-analyse-result" style="margin-top:8px;"></div>
       </div>
     </div>
@@ -1584,6 +1590,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
         <div class="fg"><label>Stock B1</label><input type="number" id="mp-s1" min="0" value="0"></div>
         <div class="fg"><label>Stock B2</label><input type="number" id="mp-s2" min="0" value="0"></div>
         <div class="fg"><label>Seuil Alerte</label><input type="number" id="mp-al" value="1" min="0"></div>
+        <button type="button" class="btn btn-sm" style="width:100%;margin-bottom:8px;" onclick="genererDescriptionLocale()">✨ Générer description &amp; prix conseillé (gratuit)</button>
         <div class="fg"><label>Unité</label><select id="mp-un"><option>pièce</option><option>unité</option><option>boîte</option><option>carton</option></select></div>
         <div class="fg full"><label>Description</label><textarea id="mp-desc" style="min-height:55px" placeholder="Caractéristiques, compatibilité, couleurs..."></textarea></div>
         <div class="fg full">
@@ -2646,6 +2653,22 @@ function validerVente(){
     return;
   }
   const sub=cart.reduce((s,i)=>s+i.prix*i.qty,0);const r=parseFloat(document.getElementById('p-rem').value)||0;const total=sub*(1-r/100);const mode=document.getElementById('pay-mode').value;
+  // ══ PROTECTION VENTE À PERTE (remise incluse) ══
+  // Une remise trop forte peut faire passer le prix réel sous le prix d'achat.
+  const coutTotal=cart.reduce((s,i)=>s+(Number(i.achat)||0)*i.qty,0);
+  if(coutTotal>0&&total<coutTotal){
+    soundErr();
+    const perte=coutTotal-total;
+    const detail=cart.filter(i=>(i.prix*(1-r/100))<(Number(i.achat)||0))
+      .map(i=>'• '+i.nom+' : '+fmt(i.prix*(1-r/100))+' au lieu de '+fmt(i.achat)+' minimum').join('\n');
+    if(!confirm('🚨 VENTE À PERTE !\n\nCoût d\'achat : '+fmt(coutTotal)+'\nEncaissé : '+fmt(total)+(r>0?' (remise '+r+'%)':'')+'\nPERTE : '+fmt(perte)+'\n\n'+(detail?detail+'\n\n':'')+'Valider quand même ?')){
+      toast('Vente annulée — réduisez la remise','err');
+      return;
+    }
+    logAction&&logAction('Alerte prix','Vente à perte validée: '+fmt(perte)+' de perte (remise '+r+'%)');
+  } else if(coutTotal>0&&total===coutTotal){
+    if(!confirm('⚠️ MARGE NULLE\n\nCette vente ne rapporte aucun bénéfice.\n\nValider quand même ?'))return;
+  }
   const cid=document.getElementById('pos-cl-id').value||'';const client=DB.clients.find(c=>c.id===cid);
   // Mode Acompte: exige un client sélectionné
   let acompteVerse=0,soldeAcompte=0;
@@ -2793,7 +2816,13 @@ async function confirmDelFact(){
     if(u.role==='admin'&&u.actif!==false&&await checkPwd(pwd,u.pwd)){admin=u;break;}
   }
   if(!admin){soundErr();toast('Code administrateur incorrect','err');return;}
-  DB.factures=DB.factures.filter(f=>f.id!==id);save();closeModal('modal-del-fact');renderFactures();
+  const _fSupp=DB.factures.find(f=>f.id===id);
+  DB.factures=DB.factures.filter(f=>f.id!==id);
+  // Enregistrer la suppression dans un registre partagé, sinon les autres caisses
+  // continuent d'afficher la facture (la fusion des ventes est volontairement additive).
+  marquerFactureSupprimee(id,admin.nom,_fSupp);
+  save();closeModal('modal-del-fact');renderFactures();
+  logAction&&logAction('Suppression facture',id+' (validé par '+admin.nom+')');
   toast(`Facture supprimée (validé par ${admin.nom}) ✅`,'ok');
 }
 
@@ -3278,6 +3307,353 @@ function stopVoiceRecording(){
   const texte=(window._voiceTranscriptFinal?window._voiceTranscriptFinal():'').trim()||document.getElementById('ia-voice-transcript').textContent.trim();
   if(texte&&texte!=='🎤 Écoute en cours...')traiterNoteVocale(texte);
 }
+// Remplit description + prix conseillé à partir du nom (gratuit, hors-ligne)
+function genererDescriptionLocale(){
+  const nom=document.getElementById('mp-nom')?.value.trim();
+  if(!nom){soundErr&&soundErr();toast('Saisissez d\'abord le nom du produit','err');return;}
+  const cat=document.getElementById('mp-cat')?.value.trim()||'';
+  const achat=parseFloat(document.getElementById('mp-achat')?.value)||0;
+  const d=descriptionProduitLocale(nom,cat,achat);
+  const champDesc=document.getElementById('mp-desc');
+  if(champDesc){
+    champDesc.value=d.description+'\n\nCaractéristiques :\n- '+d.caracteristiques.join('\n- ')
+      +'\n\nAvantages :\n- '+d.avantages.join('\n- ');
+    try{champDesc.dispatchEvent(new Event('input',{bubbles:true}));}catch(e){}
+  }
+  const champPrix=document.getElementById('mp-prix');
+  if(champPrix&&d.prixConseille>0&&!parseFloat(champPrix.value)){
+    champPrix.value=d.prixConseille;
+    toast('✨ Description générée · prix conseillé '+fmt(d.prixConseille)+' (marge '+d.margeReference+'%)','ok');
+  } else if(d.prixConseille>0){
+    toast('✨ Description générée · prix conseillé : '+fmt(d.prixConseille),'ok');
+  } else {
+    toast('✨ Description générée (saisissez le prix d\'achat pour un prix conseillé)','ok');
+  }
+}
+
+// ══ AFFICHAGE DES ANALYSES LOCALES ══
+function _renduAnalyse(o){
+  if(!o)return '';
+  let h='<div class="ia-panel"><div class="ia-title">'+o.titre+'</div><div class="ia-msg">';
+  if(o.texte)h+=escapeHtml(o.texte);
+  if(o.lignes&&o.lignes.length)
+    h+='<div style="line-height:1.9;">'+o.lignes.map(l=>'• '+escapeHtml(l)).join('<br>')+'</div>';
+  if(o.pied)h+='<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--border);font-weight:700;color:var(--gold);">'+escapeHtml(o.pied)+'</div>';
+  h+='<div style="font-size:9px;color:var(--text2);margin-top:6px;">⚡ Analyse locale — gratuite</div>';
+  return h+'</div></div>';
+}
+function _afficher(o){document.getElementById('ia-analyse-result').innerHTML=_renduAnalyse(o);}
+
+function analyseVentesGratuite(){
+  const a=analyseVentesLocale(30);
+  if(!a.nbVentes)return _afficher({titre:'📈 Analyse des ventes',texte:'Aucune vente sur les 30 derniers jours.'});
+  const l=[];
+  l.push(`CA 30 j : ${fmt(a.caTotal)} · Bénéfice : ${fmt(a.benefTotal)} · ${a.nbVentes} ventes`);
+  l.push('— TOP VENTES —');
+  a.top.slice(0,5).forEach((x,i)=>l.push(`${i+1}. ${x.nom} : ${x.qty} vendus (${fmt(x.ca)})`));
+  if(a.categories.length){
+    l.push('— MEILLEURES CATÉGORIES —');
+    a.categories.slice(0,3).forEach((x,i)=>l.push(`${i+1}. ${x.cat} : ${fmt(x.ca)}`));
+  }
+  if(a.dormants.length){
+    l.push('— NE SE VENDENT PAS —');
+    a.dormants.slice(0,5).forEach(p=>l.push(`${p.nom} : ${(p.s1||0)+(p.s2||0)} en stock (${fmt(p.valeur)} bloqués)`));
+  }
+  _afficher({titre:'📈 Analyse des ventes (30 j)',lignes:l,
+    pied:a.argentDormant>0?`Argent dormant : ${fmt(a.argentDormant)}`:`Marge moyenne : ${a.caTotal>0?Math.round(a.benefTotal/a.caTotal*100):0}%`});
+}
+
+function previsionStockGratuite(){
+  const prev=previsionStockLocale(30);
+  if(!prev.length)return _afficher({titre:'🔮 Prévision de stock',texte:'Pas assez d\'historique de ventes pour estimer les ruptures. Enregistrez des ventes pendant quelques jours.'});
+  const urgents=prev.filter(x=>x.joursRestants<=14);
+  const l=[];
+  (urgents.length?urgents:prev.slice(0,10)).forEach(x=>{
+    const ic=x.joursRestants<=3?'🔴':x.joursRestants<=7?'🟠':'🟡';
+    l.push(`${ic} ${x.nom} : ${x.stock} en stock · ${x.parJour}/jour → rupture dans ${x.joursRestants} j · commander ${x.recommande}`);
+  });
+  const cout=(urgents.length?urgents:prev.slice(0,10)).reduce((s,x)=>s+x.cout,0);
+  _afficher({titre:'🔮 Prévision de stock & réapprovisionnement',lignes:l,
+    pied:`Budget de commande estimé : ${fmt(cout)}`});
+}
+
+function controlePrixGratuit(){
+  const cp=controlePrixLocal();
+  if(!cp.pertes.length&&!cp.faibles.length)
+    return _afficher({titre:'✅ Contrôle des prix',
+      texte:`Aucun problème détecté sur ${cp.nbOk} produits. Marge médiane : ${cp.margeMediane}%.`});
+  const l=[];
+  cp.pertes.forEach(x=>l.push(`🔴 ${x.nom} : achat ${fmt(x.achat)} > vente ${fmt(x.vente)} → PERTE ${fmt(x.perte)} · conseillé ${fmt(x.conseille)}`));
+  cp.faibles.slice(0,10).forEach(x=>l.push(`🟠 ${x.nom} : marge ${x.pct}% · conseillé ${fmt(x.conseille)}`));
+  _afficher({titre:'💰 Contrôle des prix',lignes:l,
+    pied:`${cp.pertes.length} à perte · ${cp.faibles.length} marge faible · ${cp.nbOk} corrects (médiane ${cp.margeMediane}%)`});
+}
+
+function analyseFournisseursGratuite(){
+  const a=analyseFournisseursLocale();
+  if(!a.fournisseurs.length)
+    return _afficher({titre:'🚚 Analyse fournisseurs',texte:'Aucun produit n\'est rattaché à un fournisseur. Renseignez le fournisseur dans les fiches produits pour activer cette analyse.'});
+  const l=[];
+  a.fournisseurs.slice(0,6).forEach((f,i)=>
+    l.push(`${i+1}. ${f.nom} : marge moyenne ${f.margeMoy}% · ${f.nbProduits} produits · ${fmt(f.valeurStock)} de stock`));
+  if(a.comparables.length){
+    l.push('— ÉCARTS DE PRIX D\'ACHAT —');
+    a.comparables.forEach(x=>l.push(`« ${x.cle} » : ${fmt(x.prixMin)} vs ${fmt(x.prixMax)} → ${x.ecart}% d\'écart`));
+  }
+  _afficher({titre:'🚚 Analyse des fournisseurs',lignes:l,
+    pied:a.fournisseurs[0]?`Le plus avantageux : ${a.fournisseurs[0].nom} (${a.fournisseurs[0].margeMoy}% de marge)`:''});
+}
+
+// ══════════════════════════════════════════════════════════
+// MOTEUR D'ANALYSE LOCAL — 100% GRATUIT, AUCUN APPEL API
+// Toutes ces analyses sont calculées sur vos données réelles.
+// ══════════════════════════════════════════════════════════
+
+// Ventes de la boutique courante sur les N derniers jours
+function _ventesRecentes(jours){
+  const lim=new Date();lim.setDate(lim.getDate()-(jours||30));
+  return (DB.factures||[]).filter(f=>f&&f.date&&f.boutique===session.boutique&&new Date(f.date)>=lim);
+}
+
+// Agrège les quantités et bénéfices vendus par produit
+function _statsParProduit(jours){
+  const st={};
+  _ventesRecentes(jours).forEach(f=>(f.items||[]).forEach(i=>{
+    const k=i.id||i.nom;
+    if(!st[k])st[k]={id:i.id,nom:i.nom,qty:0,ca:0,benef:0,ventes:0};
+    const q=Number(i.qty)||0,pv=Number(i.prix)||0,pa=Number(i.achat)||0;
+    st[k].qty+=q;st[k].ca+=pv*q;st[k].benef+=(pv-pa)*q;st[k].ventes++;
+  }));
+  return st;
+}
+
+// ── 1. ANALYSE DES VENTES ──
+function analyseVentesLocale(jours){
+  jours=jours||30;
+  const st=_statsParProduit(jours);
+  const arr=Object.values(st);
+  const top=[...arr].sort((a,b)=>b.qty-a.qty).slice(0,8);
+  const rentables=[...arr].sort((a,b)=>b.benef-a.benef).slice(0,5);
+
+  // Produits jamais vendus sur la période (mais en stock)
+  const vendus=new Set(arr.map(x=>x.id||x.nom));
+  const dormants=(DB.produits||[]).filter(p=>{
+    const stk=(p.s1||0)+(p.s2||0);
+    return stk>0&&!vendus.has(p.id)&&!vendus.has(p.nom);
+  }).map(p=>({...p,valeur:(Number(p.achat)||0)*((p.s1||0)+(p.s2||0))}))
+    .sort((a,b)=>b.valeur-a.valeur);
+
+  // Catégories
+  const cats={};
+  arr.forEach(x=>{
+    const prod=(DB.produits||[]).find(p=>p.id===x.id||p.nom===x.nom);
+    const cat=prod?.cat||'Non classé';
+    if(!cats[cat])cats[cat]={cat,qty:0,ca:0,benef:0};
+    cats[cat].qty+=x.qty;cats[cat].ca+=x.ca;cats[cat].benef+=x.benef;
+  });
+  const categories=Object.values(cats).sort((a,b)=>b.ca-a.ca);
+
+  const caTotal=arr.reduce((s,x)=>s+x.ca,0);
+  const benefTotal=arr.reduce((s,x)=>s+x.benef,0);
+  const argentDormant=dormants.reduce((s,p)=>s+p.valeur,0);
+
+  return {jours,top,rentables,dormants,categories,caTotal,benefTotal,argentDormant,
+          nbVentes:_ventesRecentes(jours).length};
+}
+
+// ── 2. PRÉVISION DE STOCK ──
+function previsionStockLocale(jours){
+  jours=jours||30;
+  const st=_statsParProduit(jours);
+  const res=[];
+  (DB.produits||[]).forEach(p=>{
+    const s=st[p.id]||st[p.nom];
+    const stk=(p.s1||0)+(p.s2||0);
+    if(!s||!s.qty)return;                    // jamais vendu: pas de prévision fiable
+    const parJour=s.qty/jours;
+    if(parJour<=0)return;
+    const joursRestants=Math.floor(stk/parJour);
+    // Recommandation: couvrir 30 jours + marge de sécurité 20%
+    const recommande=Math.max(0,Math.ceil(parJour*30*1.2-stk));
+    res.push({id:p.id,nom:p.nom,stock:stk,parJour:Math.round(parJour*10)/10,
+              joursRestants,recommande,cout:recommande*(Number(p.achat)||0)});
+  });
+  return res.sort((a,b)=>a.joursRestants-b.joursRestants);
+}
+
+// ── 3. CONTRÔLE DES PRIX ──
+function controlePrixLocal(){
+  const pertes=[],faibles=[],ok=[];
+  (DB.produits||[]).forEach(p=>{
+    const pa=Number(p.achat)||0,pv=Number(p.prix)||0;
+    if(pa<=0)return;                          // prix d'achat non renseigné
+    const marge=pv-pa;
+    const pct=pv>0?Math.round(marge/pv*100):0;
+    // Prix conseillé: aligné sur la marge médiane du catalogue
+    const item={id:p.id,nom:p.nom,achat:pa,vente:pv,marge,pct};
+    if(pv<pa)pertes.push({...item,perte:pa-pv});
+    else if(pct<15)faibles.push(item);
+    else ok.push(item);
+  });
+  // Marge médiane des produits sains, pour conseiller un prix cohérent
+  const marges=ok.map(x=>x.pct).sort((a,b)=>a-b);
+  const mediane=marges.length?marges[Math.floor(marges.length/2)]:30;
+  const conseil=x=>Math.ceil((x.achat/(1-mediane/100))/50)*50;  // arrondi à 50 FCFA
+  pertes.forEach(x=>x.conseille=conseil(x));
+  faibles.forEach(x=>x.conseille=conseil(x));
+  return {pertes,faibles,nbOk:ok.length,margeMediane:mediane};
+}
+
+// ── 4. ANALYSE DES FOURNISSEURS ──
+function analyseFournisseursLocale(){
+  const parFourn={};
+  (DB.produits||[]).forEach(p=>{
+    if(!p.fourn)return;
+    const f=(DB.fournisseurs||[]).find(x=>x.id===p.fourn);
+    const nom=f?.nom||p.fourn;
+    if(!parFourn[nom])parFourn[nom]={nom,nbProduits:0,valeurStock:0,margeMoy:0,_marges:[]};
+    const pa=Number(p.achat)||0,pv=Number(p.prix)||0;
+    parFourn[nom].nbProduits++;
+    parFourn[nom].valeurStock+=pa*((p.s1||0)+(p.s2||0));
+    if(pa>0&&pv>0)parFourn[nom]._marges.push(Math.round((pv-pa)/pv*100));
+  });
+  const arr=Object.values(parFourn).map(f=>{
+    f.margeMoy=f._marges.length?Math.round(f._marges.reduce((a,b)=>a+b,0)/f._marges.length):0;
+    delete f._marges;return f;
+  }).sort((a,b)=>b.margeMoy-a.margeMoy);
+
+  // Produits similaires proposés par plusieurs fournisseurs -> comparaison de prix
+  const parNom={};
+  (DB.produits||[]).forEach(p=>{
+    const cle=_norm(p.nom).split(' ').slice(0,2).join(' ');
+    if(!cle)return;
+    if(!parNom[cle])parNom[cle]=[];
+    parNom[cle].push(p);
+  });
+  const comparables=[];
+  Object.entries(parNom).forEach(([cle,prods])=>{
+    const avecAchat=prods.filter(p=>(Number(p.achat)||0)>0);
+    if(avecAchat.length<2)return;
+    const tri=[...avecAchat].sort((a,b)=>a.achat-b.achat);
+    const moins=tri[0],plus=tri[tri.length-1];
+    if(moins.achat===plus.achat)return;
+    const ecart=Math.round((plus.achat-moins.achat)/plus.achat*100);
+    if(ecart<10)return;
+    comparables.push({cle,moinsCher:moins.nom,prixMin:moins.achat,
+                      plusCher:plus.nom,prixMax:plus.achat,ecart});
+  });
+  return {fournisseurs:arr,comparables:comparables.sort((a,b)=>b.ecart-a.ecart).slice(0,8)};
+}
+
+// ── 5. DESCRIPTION AUTOMATIQUE DE PRODUIT ──
+const _MOTS_CLES={
+  'cable':{c:['Connecteur renforcé','Transfert de données rapide','Gaine anti-torsion'],a:['Durable au quotidien','Compatible charge rapide']},
+  'chargeur':{c:['Charge rapide','Protection contre la surcharge','Compact'],a:['Recharge en un temps réduit','Sécurité de vos appareils']},
+  'ecouteur':{c:['Son clair','Micro intégré','Léger'],a:['Confort prolongé','Appels mains libres']},
+  'casque':{c:['Son immersif','Arceau ajustable','Coussinets confortables'],a:['Isolation du bruit','Confort longue durée']},
+  'batterie':{c:['Grande capacité','Charge multiple','Indicateur de niveau'],a:['Autonomie en déplacement','Recharge plusieurs appareils']},
+  'coque':{c:['Protection anti-chocs','Bords surélevés','Accès complet aux ports'],a:['Protège écran et caméra','Prise en main améliorée']},
+  'blinde':{c:['Verre trempé haute résistance','Anti-rayures','Pose sans bulles'],a:["Protège l'écran des chutes",'Toucher préservé']},
+  'miroir':{c:['Finition miroir','Verre trempé','Anti-traces'],a:['Effet miroir élégant','Protection renforcée']},
+  'prive':{c:['Filtre de confidentialité','Verre trempé','Vue restreinte de côté'],a:['Protège vos données des regards','Sécurité visuelle']},
+  'support':{c:['Fixation stable','Angle réglable','Montage rapide'],a:['Mains libres','Vision confortable']},
+  'adaptateur':{c:['Connexion universelle','Boîtier compact','Transmission stable'],a:['Relie vos appareils','Toujours dans la poche']},
+};
+
+function descriptionProduitLocale(nom,cat,achat){
+  const n=_norm(nom);
+  let carac=[],avant=[];
+  Object.entries(_MOTS_CLES).forEach(([mot,v])=>{
+    if(n.includes(mot)){carac=carac.concat(v.c);avant=avant.concat(v.a);}
+  });
+  if(!carac.length){
+    carac=['Qualité contrôlée','Finition soignée','Compatible avec la plupart des modèles'];
+    avant=['Rapport qualité-prix intéressant','Usage quotidien'];
+  }
+  carac=[...new Set(carac)].slice(0,4);
+  avant=[...new Set(avant)].slice(0,3);
+  const pa=Number(achat)||0;
+  const cp=controlePrixLocal();
+  const conseille=pa>0?Math.ceil((pa/(1-cp.margeMediane/100))/50)*50:0;
+  const desc=`${nom}${cat?' — '+cat:''}. ${carac.slice(0,2).join(', ')}. ${avant[0]||''}`.trim();
+  return {nom,description:desc,caracteristiques:carac,avantages:avant,
+          prixConseille:conseille,margeReference:cp.margeMediane};
+}
+
+// ── 6. ASSISTANT LOCAL (questions courantes, sans API) ──
+function assistantLocal(question){
+  const q=_norm(question);
+  if(!q)return null;
+
+  // Quels produits acheter / réapprovisionner
+  if(/(quoi|quel|que).*(achet|command|reapprovision|stock)|acheter|commander|reapprovisionner/.test(q)){
+    const prev=previsionStockLocale(30).filter(x=>x.joursRestants<=14&&x.recommande>0).slice(0,10);
+    if(!prev.length)return {titre:'🛒 À commander',texte:'Aucun réapprovisionnement urgent : tous vos produits qui se vendent ont plus de 14 jours de stock.'};
+    const cout=prev.reduce((s,x)=>s+x.cout,0);
+    return {titre:'🛒 Produits à commander en priorité',
+      lignes:prev.map(x=>`${x.nom} — reste ${x.joursRestants} j · commander ${x.recommande} (≈ ${fmt(x.cout)})`),
+      pied:`Budget total estimé : ${fmt(cout)}`};
+  }
+
+  // Produits qui font perdre de l'argent
+  if(/(perd|perte|coute|negatif|mauvais).*(argent|produit)|vente a perte|marge/.test(q)){
+    const cp=controlePrixLocal();
+    if(!cp.pertes.length&&!cp.faibles.length)
+      return {titre:'✅ Prix sains',texte:`Aucun produit vendu à perte. Marge médiane : ${cp.margeMediane}%.`};
+    const l=[];
+    cp.pertes.forEach(x=>l.push(`🔴 ${x.nom} — vendu ${fmt(x.vente)}, acheté ${fmt(x.achat)} → PERTE ${fmt(x.perte)}/unité (conseillé : ${fmt(x.conseille)})`));
+    cp.faibles.slice(0,8).forEach(x=>l.push(`🟠 ${x.nom} — marge ${x.pct}% seulement (conseillé : ${fmt(x.conseille)})`));
+    return {titre:'💸 Produits problématiques',lignes:l,
+      pied:`${cp.pertes.length} à perte · ${cp.faibles.length} à marge faible`};
+  }
+
+  // Catégories
+  if(/(categorie|famille|rayon)/.test(q)){
+    const a=analyseVentesLocale(30);
+    if(!a.categories.length)return {titre:'📂 Catégories',texte:'Aucune vente sur la période.'};
+    return {titre:'📂 Meilleures catégories (30 j)',
+      lignes:a.categories.slice(0,6).map((c,i)=>`${i+1}. ${c.cat} — ${fmt(c.ca)} de CA · ${c.qty} articles · ${fmt(c.benef)} de bénéfice`)};
+  }
+
+  // Meilleur produit
+  if(/(meilleur|top|plus vendu|best|rentable|marche bien)/.test(q)){
+    const a=analyseVentesLocale(30);
+    if(!a.top.length)return {titre:'📊 Meilleurs produits',texte:'Aucune vente enregistrée sur les 30 derniers jours.'};
+    return {titre:'🏆 Vos meilleurs produits (30 j)',
+      lignes:a.top.slice(0,5).map((x,i)=>`${i+1}. ${x.nom} — ${x.qty} vendus · ${fmt(x.ca)} de CA · ${fmt(x.benef)} de bénéfice`),
+      pied:`Le plus rentable : ${a.rentables[0]?.nom||'—'} (${fmt(a.rentables[0]?.benef||0)})`};
+  }
+
+  // Produits qui ne se vendent pas
+  if(/(ne se vend|dormant|invendu|stagne|bouge pas|mort)/.test(q)){
+    const a=analyseVentesLocale(30);
+    if(!a.dormants.length)return {titre:'✅ Aucun invendu',texte:'Tous vos produits en stock ont été vendus au moins une fois ce mois.'};
+    return {titre:'😴 Produits qui ne se vendent pas (30 j)',
+      lignes:a.dormants.slice(0,10).map(p=>`${p.nom} — ${(p.s1||0)+(p.s2||0)} en stock · ${fmt(p.valeur)} immobilisés`),
+      pied:`Argent dormant total : ${fmt(a.argentDormant)}`};
+  }
+
+  // Rupture / prévision
+  if(/(rupture|manque|bientot fini|epuise|prevision)/.test(q)){
+    const prev=previsionStockLocale(30).filter(x=>x.joursRestants<=10).slice(0,10);
+    if(!prev.length)return {titre:'✅ Stock confortable',texte:'Aucune rupture prévue dans les 10 prochains jours.'};
+    return {titre:'⚠️ Ruptures prévues',
+      lignes:prev.map(x=>`${x.nom} — ${x.stock} en stock · ${x.parJour}/jour → rupture dans ${x.joursRestants} j`)};
+  }
+
+  // Chiffre d'affaires / bénéfice
+  if(/(chiffre|ca\b|benefice|gagne|rapporte|combien)/.test(q)){
+    const a=analyseVentesLocale(30);
+    return {titre:'💰 Bilan 30 jours',
+      lignes:[`Chiffre d'affaires : ${fmt(a.caTotal)}`,
+              `Bénéfice brut : ${fmt(a.benefTotal)}`,
+              `Nombre de ventes : ${a.nbVentes}`,
+              `Marge moyenne : ${a.caTotal>0?Math.round(a.benefTotal/a.caTotal*100):0}%`]};
+  }
+
+  return null;  // question non reconnue: l'IA payante prendra le relais si disponible
+}
+
 // ══ AIDE À LA RÉDACTION ══
 // Modèles prêts à l'emploi (gratuits) + reformulation IA en option.
 const MODELES_MSG={
@@ -3593,6 +3969,24 @@ function saveProd(){
   // Avertir si prix achat = 0
   const achatVal=parseFloat(document.getElementById('mp-achat').value)||0;
   if(achatVal===0&&!eid){if(!confirm('⚠️ Prix d\'achat = 0 FCFA. Continuer quand même ?')){return;}}
+  // ══ PROTECTION VENTE À PERTE ══
+  if(achatVal>0){
+    if(prix<achatVal){
+      soundErr();
+      const perte=achatVal-prix;
+      if(!confirm('🚨 VENTE À PERTE !\n\nPrix d\'achat : '+fmt(achatVal)+'\nPrix de vente : '+fmt(prix)+'\nPerte : '+fmt(perte)+' par unité\n\nEnregistrer quand même ?')){
+        toast('Enregistrement annulé — vérifiez les prix','err');
+        return;
+      }
+      logAction&&logAction('Alerte prix','Vente à perte acceptée: '+nom+' (achat '+achatVal+' > vente '+prix+')');
+    } else if(prix===achatVal){
+      if(!confirm('⚠️ MARGE NULLE\n\nLe prix de vente est identique au prix d\'achat ('+fmt(prix)+').\nAucun bénéfice sur ce produit.\n\nContinuer ?')){return;}
+    } else {
+      // Marge très faible: simple avertissement, sans blocage
+      const mPct=Math.round((prix-achatVal)/prix*100);
+      if(mPct<5)toast('⚠️ Marge très faible : '+mPct+'% seulement','warn');
+    }
+  }
   // ID unique par timestamp pour éviter collisions entre appareils
   const _pid=eid||('P'+Date.now().toString(36).toUpperCase().slice(-6));
   if(!eid)DB.nextIds.p++;
@@ -3805,7 +4199,11 @@ function renderProduits(){
   const canEdit=hasPerm('produits_edit')||session.user?.role==='admin';
   document.getElementById('tb-p').innerHTML=list.length?list.map(p=>{
     const _t=(p.s1||0)+(p.s2||0);const st=_t<=0?'br':_t<=(p.alerte||1)?'by':'bg';const sl=_t<=0?'Rupture':_t<=(p.alerte||1)?'Faible':'En stock';
-    return`<tr><td>${p.photo?`<img src="${p.photo}" style="width:30px;height:30px;border-radius:4px;object-fit:cover;">`:'<div style="width:30px;height:30px;border-radius:4px;background:var(--surf3);display:inline-flex;align-items:center;justify-content:center;font-size:13px;">📦</div>'}</td><td class="mono" style="font-size:9px;color:var(--orange)">${p.ref||'—'}</td><td><b>${escapeHtml(p.nom)}</b>${p.desc?`<br><span style="font-size:9px;color:var(--text2)">${escapeHtml(p.desc).substring(0,35)}...</span>`:''}</td><td><span class="badge bb">${escapeHtml(p.cat)}</span></td><td class="mono" style="color:var(--green);font-weight:700">${fmt(p.prix)}</td>${adm?`<td class="mono" style="color:var(--text2)">${fmt(p.achat)}</td>`:''}<td style="font-weight:700;color:${p.s1<=(p.alerte||1)?'var(--red)':'inherit'}">${p.s1}</td><td style="font-weight:700;color:${p.s2<=(p.alerte||1)?'var(--red)':'inherit'}">${p.s2}</td><td>${p.alerte||1}</td><td><span class="badge ${st}">${sl}</span></td><td style="display:flex;gap:3px;">${canEdit?`<button class="btn btn-ghost btn-xs" onclick="editProd('${p.id}')">✏️</button><button class="btn btn-red btn-xs" onclick="delProd('${p.id}')">🗑</button>`:'—'}</td></tr>`;
+    // Signaler visuellement les prix incohérents (vente à perte / marge nulle)
+    const _ach=Number(p.achat)||0;const _perte=_ach>0&&p.prix<_ach;const _nulle=_ach>0&&p.prix===_ach;
+    const _badgePrix=_perte?'<span class="badge br" style="font-size:8px;margin-left:4px;" title="Prix de vente inférieur au prix d\'achat">🚨 PERTE</span>'
+      :(_nulle?'<span class="badge by" style="font-size:8px;margin-left:4px;" title="Aucune marge">⚠️ 0%</span>':'');
+    return`<tr><td>${p.photo?`<img src="${p.photo}" style="width:30px;height:30px;border-radius:4px;object-fit:cover;">`:'<div style="width:30px;height:30px;border-radius:4px;background:var(--surf3);display:inline-flex;align-items:center;justify-content:center;font-size:13px;">📦</div>'}</td><td class="mono" style="font-size:9px;color:var(--orange)">${p.ref||'—'}</td><td><b>${escapeHtml(p.nom)}</b>${_badgePrix}${p.desc?`<br><span style="font-size:9px;color:var(--text2)">${escapeHtml(p.desc).substring(0,35)}...</span>`:''}</td><td><span class="badge bb">${escapeHtml(p.cat)}</span></td><td class="mono" style="color:${_perte?'var(--red)':'var(--green)'};font-weight:700">${fmt(p.prix)}</td>${adm?`<td class="mono" style="color:var(--text2)">${fmt(p.achat)}</td>`:''}<td style="font-weight:700;color:${p.s1<=(p.alerte||1)?'var(--red)':'inherit'}">${p.s1}</td><td style="font-weight:700;color:${p.s2<=(p.alerte||1)?'var(--red)':'inherit'}">${p.s2}</td><td>${p.alerte||1}</td><td><span class="badge ${st}">${sl}</span></td><td style="display:flex;gap:3px;">${canEdit?`<button class="btn btn-ghost btn-xs" onclick="editProd('${p.id}')">✏️</button><button class="btn btn-red btn-xs" onclick="delProd('${p.id}')">🗑</button>`:'—'}</td></tr>`;
   }).join(''):`<tr><td colspan="11" class="empty"><div class="ei">📦</div>Aucun produit</td></tr>`;
 }
 function editProd(id){const p=DB.produits.find(x=>x.id===id);document.getElementById('mp-t').textContent='✏️ Modifier';document.getElementById('mp-id').value=p.id;document.getElementById('mp-nom').value=p.nom;document.getElementById('mp-ref').value=p.ref||'';document.getElementById('mp-cat').value=p.cat||'';document.getElementById('mp-prix').value=p.prix;document.getElementById('mp-achat').value=p.achat||0;document.getElementById('mp-s1').value=p.s1||0;document.getElementById('mp-s2').value=p.s2||0;document.getElementById('mp-al').value=p.alerte||1;document.getElementById('mp-un').value=p.unite||'pièce';document.getElementById('mp-desc').value=p.desc||'';if(p.photo){document.getElementById('mp-photo-data').value=p.photo;document.getElementById('mp-photo-preview').innerHTML=`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover;">`;document.getElementById('mp-photo-clear').style.display='inline-flex';}else clearProdPhoto();refreshFournSel('mp-fourn',p.fourn);mpShowTab('manuel');openModal('modal-prod');}
@@ -4540,7 +4938,20 @@ function toggleTache(id){const t=(DB.taches||[]).find(x=>x.id===id);if(t){t.done
 function delTache(id){const t=(DB.taches||[]).find(x=>x.id===id);DB.taches=(DB.taches||[]).filter(x=>x.id!==id);logAction&&logAction('Suppression tâche',t?.titre||id);save();renderTachesListe();}
 
 async function iaRapport(){const zone=document.getElementById('ia-rapport-zone');if(!zone)return;zone.innerHTML='<div class="ia-loading" style="justify-content:center;padding:16px;"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div></div>';await callIA(`${buildContext()}\nAnalyse stratégique: performance, forces, faiblesses, actions prioritaires.`,r=>{zone.innerHTML=`<div class="ia-panel"><div class="ia-title">🤖 Analyse</div><div class="ia-msg">${r.replace(/\n/g,'<br>')}</div></div>`;},e=>{zone.innerHTML=`<div class="empty">❌ ${e}</div>`;});}
-async function askIA(){const q=document.getElementById('ia-question')?.value.trim();if(!q){toast('Posez une question','err');return;}const result=document.getElementById('ia-modal-result');if(!result)return;result.innerHTML='<div class="ia-panel"><div class="ia-loading"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div></div></div>';await callIA(`${buildContext()}\nQuestion: ${q}`,r=>{result.innerHTML=`<div class="ia-panel"><div class="ia-title">🤖 Réponse</div><div class="ia-msg">${r.replace(/\n/g,'<br>')}</div></div>`;},e=>{result.innerHTML=`<div class="empty">❌ ${e}</div>`;});}
+async function askIA(){
+  const q=document.getElementById('ia-question')?.value.trim();
+  if(!q){toast('Posez une question','err');return;}
+  const result=document.getElementById('ia-modal-result');if(!result)return;
+  // 1) Tenter une réponse LOCALE gratuite (aucun appel payant)
+  const loc=assistantLocal(q);
+  if(loc){result.innerHTML=_renduAnalyse(loc);return;}
+  // 2) Sinon, IA payante si une clé est configurée
+  if(!DB.settings.apiKey){
+    result.innerHTML='<div class="ia-panel"><div class="ia-title">💡 Question non reconnue</div><div class="ia-msg">Essayez plutôt :<div style="line-height:1.9;margin-top:5px;">• Quels produits dois-je acheter ?<br>• Quels produits me font perdre de l\'argent ?<br>• Quel est mon meilleur produit ?<br>• Quels produits ne se vendent pas ?<br>• Quelles ruptures sont prévues ?<br>• Quel est mon chiffre d\'affaires ?<br>• Quelles sont mes meilleures catégories ?</div></div></div>';
+    return;
+  }
+  result.innerHTML='<div class="ia-panel"><div class="ia-loading"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div></div></div>';
+  await callIA(`${buildContext()}\nQuestion: ${q}`,r=>{result.innerHTML=`<div class="ia-panel"><div class="ia-title">🤖 Réponse</div><div class="ia-msg">${r.replace(/\n/g,'<br>')}</div></div>`;},e=>{result.innerHTML=`<div class="empty">❌ ${e}</div>`;});}
 
 // ══ EXPORT / IMPORT ══
 function exportJSON(){const _st={...DB.settings};delete _st.apiKey;const data=JSON.stringify({produits:DB.produits,clients:DB.clients,fournisseurs:DB.fournisseurs,factures:DB.factures,devis:DB.devis,retours:DB.retours,salaires:DB.salaires,depenses:DB.depenses,caisses:DB.caisses,settings:_st,exported:new Date().toISOString()},null,2);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=`MonNegoce_${today()}.json`;a.click();toast('Export téléchargé ✅','ok');}
@@ -4694,6 +5105,9 @@ function renderAccueil(){
   const alertes=[];
   if(stockCrit>0)alertes.push({icon:'🚨',text:`${stockCrit} produit(s) en rupture de stock`,type:'red',nav:'inventaire'});
   if(stockFaible>0)alertes.push({icon:'⚠️',text:`${stockFaible} produit(s) en stock faible`,type:'gold',nav:'inventaire'});
+  // Produits vendus à perte (prix de vente < prix d'achat)
+  const prixPerte=DB.produits.filter(p=>(Number(p.achat)||0)>0&&Number(p.prix)<Number(p.achat)).length;
+  if(prixPerte>0)alertes.push({icon:'🚨',text:`${prixPerte} produit(s) vendu(s) À PERTE — prix à corriger`,type:'red',nav:'produits'});
   if(totalCreances>0)alertes.push({icon:'💳',text:`${creances.length} client(s) avec créance — ${fmt(totalCreances)}`,type:'red',nav:'creances'});
   // Événements agenda aujourd'hui
   const eventsToday=AGENDA_EVENTS.filter(e=>e.date===todayStr);
@@ -5264,6 +5678,32 @@ function applyStockDelta(productId,field,delta){
     }).catch(e=>{console.error('Stock atomique:',e);/* reste en file, renvoyé plus tard */});
   }
 }
+// ══ REGISTRE DES FACTURES SUPPRIMÉES ══
+// La fusion des ventes est additive (pour ne jamais perdre une vente hors-ligne).
+// Conséquence: une suppression doit être diffusée explicitement, sinon les autres
+// caisses réajoutent la facture à chaque synchronisation.
+function getFacturesSupprimees(){
+  return LS('facturesSupprimees')||{};
+}
+function estFactureSupprimee(id){
+  return !!getFacturesSupprimees()[id];
+}
+function marquerFactureSupprimee(id,parQui,facture){
+  const reg=getFacturesSupprimees();
+  reg[id]={par:parQui||'?',t:Date.now(),total:facture?facture.total:0,client:facture?facture.client:''};
+  SS('facturesSupprimees',reg);
+  if(fbConnected&&fbDB){
+    fbDB.ref('negoce/factures_supprimees/'+id).set(reg[id])
+      .catch(e=>console.error('marquerFactureSupprimee:',e));
+  }
+}
+// Retire du tableau toutes les factures présentes dans le registre
+function filtrerSupprimees(liste){
+  const reg=getFacturesSupprimees();
+  if(!Object.keys(reg).length)return liste;
+  return (liste||[]).filter(f=>f&&f.id&&!reg[f.id]);
+}
+
 // Écriture ABSOLUE du stock d'un produit (création produit, ajustement manuel).
 // Indispensable: sans ça, un produit créé après l'initialisation n'a aucune entrée
 // dans stock_qty, et son stock revient à zéro sur les autres appareils au rechargement.
@@ -5363,7 +5803,7 @@ function pushToFirebase(){
       });
       // Inclure aussi les factures créées hors-ligne qui n'ont pas encore d'auteur
       const myFactures=DB.factures.filter(f=>
-        f&&f.id&&!f.id.startsWith('OLD_')&&
+        f&&f.id&&!f.id.startsWith('OLD_')&&!estFactureSupprimee(f.id)&&
         (f._author===userId||f.userId===userId||f._offline===true)
       );
       // Une fois envoyées, elles ne sont plus "hors-ligne"
@@ -5421,6 +5861,17 @@ async function pullFromFirebase(){
 
     // 5. Toutes les factures — nœud commun (prioritaire) + fallback par utilisateur
     let allFactures=[];
+    // Charger d'abord le registre des suppressions, pour ne pas réafficher
+    // une facture que l'admin a supprimée pendant qu'on était hors-ligne.
+    try{
+      const supSnap=await fbDB.ref('negoce/factures_supprimees').once('value');
+      const supCloud=supSnap.val();
+      if(supCloud){
+        const local=LS('facturesSupprimees')||{};
+        Object.keys(supCloud).forEach(id=>{if(!local[id])local[id]=supCloud[id];});
+        SS('facturesSupprimees',local);
+      }
+    }catch(e){console.error('pull factures_supprimees:',e);}
     const allFactSnap=await fbDB.ref('negoce/all_factures').once('value');
     const allFactFlat=allFactSnap.val();
     if(allFactFlat&&Array.isArray(allFactFlat)&&allFactFlat.length>0){
@@ -5555,7 +6006,8 @@ async function pullFromFirebase(){
     if(allFactures.length>0){
       const cloudIds=new Set(allFactures.map(f=>f.id));
       const localesNonSync=(DB.factures||[]).filter(f=>f&&f.id&&!cloudIds.has(f.id));
-      DB.factures=[...allFactures,...localesNonSync];
+      // Exclure les factures supprimées par l'admin (registre partagé)
+      DB.factures=filtrerSupprimees([...allFactures,...localesNonSync]);
       DB.factures.sort((a,b)=>new Date(b.date)-new Date(a.date));
       if(localesNonSync.length){
         console.log('📤 Factures locales à renvoyer:',localesNonSync.length);
@@ -5669,6 +6121,29 @@ function startRealtimeSync(){
     try{if(typeof renderProduits==='function')renderProduits();}catch(e){}
   });
 
+  // ══ FACTURES SUPPRIMÉES EN TEMPS RÉEL ══
+  // Dès que l'admin supprime une vente, toutes les caisses la retirent immédiatement.
+  fbDB.ref('negoce/factures_supprimees').on('value',snap=>{
+    const reg=snap.val();if(!reg)return;
+    const local=LS('facturesSupprimees')||{};
+    let nouveau=0;
+    Object.keys(reg).forEach(id=>{if(!local[id]){local[id]=reg[id];nouveau++;}});
+    if(!nouveau)return;
+    SS('facturesSupprimees',local);
+    const avant=(DB.factures||[]).length;
+    DB.factures=filtrerSupprimees(DB.factures);
+    const retirees=avant-DB.factures.length;
+    if(retirees>0){
+      fbLoading=true;
+      if(window._origSave)window._origSave();else save();
+      fbLoading=false;
+      toast('🗑️ '+retirees+' vente(s) supprimée(s) par l\'administrateur','warn');
+      try{if(typeof renderFactures==='function')renderFactures();}catch(e){}
+      try{if(typeof renderVentesJour==='function')renderVentesJour();}catch(e){}
+      try{if(typeof renderAccueil==='function')renderAccueil();}catch(e){}
+    }
+  });
+
   // ══ CATALOGUE PRODUITS EN TEMPS RÉEL ══
   // Quand l'admin (ou un superviseur) crée ou modifie un produit, tous les appareils
   // le reçoivent immédiatement, sans rechargement de page.
@@ -5764,7 +6239,7 @@ function startRealtimeSync(){
     fbLoading=true;
     // Toujours garder la vente la plus récente en tête (tri décroissant par heure)
     merged.sort((a,b)=>new Date(b.date)-new Date(a.date));
-    DB.factures=merged;
+    DB.factures=filtrerSupprimees(merged);
     if(window._origSave)window._origSave();else save();
     fbLoading=false;
     toast('🔄 '+cloudOnly.length+' nouvelle(s) vente(s) reçue(s) !','ok');
