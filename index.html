@@ -2416,18 +2416,30 @@ function startApp(){
 // anciennes permissions et ne verraient pas le bouton "Nouveau produit".
 function migrerPermsProduits(){
   if(LS('migr_prodPerms_v2'))return;
+  // SÉCURITÉ: ne jamais lancer cette migration sur des données par défaut non
+  // synchronisées. Sinon un poste réinitialisé (mise à jour système, cache vidé)
+  // republierait les comptes d'usine sur Firebase et écraserait les vrais
+  // mots de passe de tous les appareils.
+  const donneesParDefaut=(DB.users||[]).some(u=>
+    ['0000','1111','2222','3333','4444'].includes(u.pwd));
+  if(donneesParDefaut){
+    console.warn('Migration permissions reportée: comptes par défaut détectés (données non synchronisées).');
+    return;   // on réessaiera après la synchronisation
+  }
   let modif=0;
   (DB.users||[]).forEach(u=>{
     if(!u.perms)u.perms=[];
+    let ajout=false;
     ['produits','produits_edit','ia'].forEach(pm=>{
-      if(!u.perms.includes(pm)){u.perms.push(pm);modif++;}
+      if(!u.perms.includes(pm)){u.perms.push(pm);ajout=true;modif++;}
     });
-    if(modif)u._updated=Date.now();
+    // Ne dater que les fiches réellement modifiées (avant: toutes l'étaient)
+    if(ajout)u._updated=Date.now();
   });
   if(modif){
     save();
     try{if(typeof pushUsersToFirebase==='function')pushUsersToFirebase();}catch(e){}
-    console.log('Permissions produits accordées à tous les utilisateurs');
+    console.log('Permissions produits accordées à '+modif+' entrée(s)');
   }
   SS('migr_prodPerms_v2',1);
   // Mettre à jour la session en cours pour que le bouton apparaisse sans reconnexion
@@ -4464,6 +4476,12 @@ async function saveUser(){
     session.user={...session.user,...u,id:eid};
     applyNavPerms();
   }
+  // Modification VOLONTAIRE par l'administrateur: la publication doit toujours
+  // passer, même si d'autres comptes ont encore un mot de passe d'usine
+  // (sinon impossible de corriger les codes après une réinitialisation).
+  window._forcerPushUsers=true;
+  try{if(typeof pushUsersToFirebase==='function')pushUsersToFirebase();}
+  finally{window._forcerPushUsers=false;}
   // Forcer refresh de l'interface
   setTimeout(()=>renderUsers(),100);
 }
@@ -6261,6 +6279,19 @@ function syncNow(){
 // ══ SYNC USERS SUR FIREBASE ══
 function pushUsersToFirebase(){
   if(!fbInitialized||!fbDB||!fbConnected)return;
+  // ══ PROTECTION CONTRE L'ÉCRASEMENT DES VRAIS COMPTES ══
+  // Un poste réinitialisé (mise à jour système, cache vidé, nouveau navigateur)
+  // repart sur les comptes d'usine. S'il les publiait, il écraserait les vrais
+  // mots de passe sur TOUS les appareils. On refuse donc de publier une liste
+  // qui contient encore des mots de passe d'usine en clair.
+  const motsDePasseUsine=['0000','1111','2222','3333','4444'];
+  const suspect=(DB.users||[]).filter(u=>motsDePasseUsine.includes(u.pwd));
+  if(suspect.length>0&&!window._forcerPushUsers){
+    console.warn('⛔ Publication des utilisateurs bloquée: '+suspect.length+
+      ' compte(s) avec mot de passe d\'usine ('+suspect.map(u=>u.id).join(', ')+
+      '). Ce poste n\'est probablement pas synchronisé.');
+    return;
+  }
   const ts=Date.now();
   DB._usersUpdated=ts;
   fbDB.ref('negoce_users').set({
