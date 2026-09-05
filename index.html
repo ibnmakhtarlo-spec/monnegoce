@@ -549,6 +549,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="ni admin-nav" onclick="nav('users')"><span class="ic">🔐</span> Utilisateurs & Rôles</div>
   <div class="ni admin-nav" onclick="openTransfertStock()"><span class="ic">🔄</span> Transfert Stock</div>
   <div class="ni admin-nav" onclick="recalculerStockCloud()"><span class="ic">♻️</span> Recalculer le Stock</div>
+  <div class="ni admin-nav" onclick="nav('diagnostic')"><span class="ic">🩺</span> Diagnostic</div>
   <div class="ni admin-nav" onclick="nav('caisses-config')"><span class="ic">💰</span> Config Caisses</div>
   <div class="ni admin-nav" onclick="nav('salaires')"><span class="ic">💼</span> Salaires</div>
   <div class="ni admin-nav" onclick="nav('tresorerie')"><span class="ic">🏦</span> Trésorerie</div>
@@ -608,11 +609,11 @@ canvas.chart-canvas{display:block;width:100%!important;}
             </div>
             <div class="tline grand"><span>TOTAL</span><span id="p-tot">0 FCFA</span></div>
             <div class="paybtns">
-              <div class="paybtn active" onclick="setPay(this,'especes')">💵 Espèces</div>
-              <div class="paybtn" onclick="setPay(this,'wave')">🌊 Wave</div>
-              <div class="paybtn" onclick="setPay(this,'orange')">🟠 Orange</div>
-              <div class="paybtn" onclick="setPay(this,'mobile')">📱 Mobile</div>
-              <div class="paybtn" onclick="setPay(this,'carte')">💳 Carte</div>
+              <div class="paybtn active" onclick="setPay(this,'especes')"><img src="data:image/jpeg;base64,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" alt="" style="height:16px;width:16px;object-fit:contain;border-radius:3px;background:#fff;vertical-align:middle;margin-right:4px;">Espèces</div>
+              <div class="paybtn" onclick="setPay(this,'wave')"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCABIAEgDASIAAhEBAxEB/8QAGQABAAMBAQAAAAAAAAAAAAAAAAYHCAUE/8QAMxAAAgEDAgUBBQYHAAAAAAAAAQIDAAQFBhEHEhMhMVEUFUFhcRYiMlKRoSQ0QnOBsdH/xAAZAQEBAQEBAQAAAAAAAAAAAAAABgEEBQL/xAAoEQACAQMDAwIHAAAAAAAAAAAAAQIDBBEFIbESQXEGMRNRYYGRwfD/2gAMAwEAAhEDEQA/ANU0pSgFKUoBSlKAUpSgFKUoCK6h1rZYm6a2jie6nQ7OEYKFPpv61x24lwqpZsa6qO5JnAA/aq0y9/DZQ3V9kJ1igjLSSyP4HfzVU8U8tbZe/wABjY73mxV5E87tFcLErkgiMl27ABh3B+fxqhr2dpaUOuostL54/kRdpqeoajdKnSfTFt9s4/Pc1AnE6B1DR45nU+GW4BH67V2tPa0ssxcrbPE9tcP+BXO4b5A+tY+4TzDE6umwUNwZYJLISSBbhZo+uu3MyFewBG/bz61dFi7R3tu6EqyyqQR9RWW9nbXlv8WmsPzk291O+028VCrNSW3ZLb7GgqUFKnyzFKb0oBSlKAzRqTFQZzFXuNuywhuAVLIe6nfcEfQgVU/CbhWuoOLcum9QSNJj8dC11P0nK9aPdeUA+V5i43+Pn61dU6NHPKjjZlcgj0O9Q3BXmS0Jxgu9WNZS3mBubTpXnQZTJGmy7lVJ3blKA7D4b1Q64qcaMa0nh5Sz5In0rVqyuJ2y3WG8fVY/R5teaCxvDXjXptsCHixWWjkCwO5fpOAVZQT3I7qRv6mp5afzUH9xf9iobxBy95xO4i6ZzeJs5rfTGN7w3Fxsjzd+ZnCb7gEhVH03+NTSxRpL63RBuzSqAB9RW6JVjO3qdLTSb4Pn1VScbyllbtLnYlvGbVOQ0Nk9O6hF3KuB/ibS+tgN0Z2hZoG8eeddv81W2ltc62kusVpvJ3t1PnsfNPlshyABp7RbVJooj28M8nJ279q0bnMLjc/j2sc1Y299aFlcwzoHUsDuDsfSkOCxcGblzENhbJlJYRA90sYEjRjbZSfTsP0qdLgzTFqrUKYPQ+oV4iTXl7qDLW8V7iUEQSNGk+8iKBzIF/C3ruKk8eq9SNmU4e+9bk6hTUTK9326pxYXrh99ttypCb1aycO9HpkXv001iVvHmW4MwtlDdRTzBgfgd+/b412BgcUM+c2Mfbe9zD7ObzpjqmPzy83nagMv2PEfXF1LFqNLi/WeTKm19glurSOx5A/L7P0mYSiTb+rzv+tK0h9iNMfaP3/7hxvvnm5/a/Z16nN+bf8AN8/NKA8+oNE2OWumuY5XtZ3O7lAGVj67etcc8NIWUhskxB87wD/tWFSupXtdRUOrZeHyedPSbSU3UcN374bXDK8ThlAihUyLKoGwC24AH712tPaLssRcrcvK9zcJ+BnGwX5getSmlHe1nFw6tn4XBsNKtITVRQ3Xtlt8sClKVynoClKUApSlAKUpQClKUApSlAKUpQClKUB//9k=" alt="" style="height:16px;width:16px;object-fit:contain;border-radius:3px;background:#fff;vertical-align:middle;margin-right:4px;">Wave</div>
+              <div class="paybtn" onclick="setPay(this,'orange')"><img src="data:image/jpeg;base64,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" alt="" style="height:16px;width:16px;object-fit:contain;border-radius:3px;background:#fff;vertical-align:middle;margin-right:4px;">Orange</div>
+              <div class="paybtn" onclick="setPay(this,'mobile')"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCABYAFgDASIAAhEBAxEB/8QAHAABAAICAwEAAAAAAAAAAAAAAAUHAQMCBAYI/8QALBAAAQMDAwIGAgIDAAAAAAAAAQACAwQFEQYSMSFSBxMiQVGRFHEIYSMyQv/EABYBAQEBAAAAAAAAAAAAAAAAAAACAf/EACARAQACAgEEAwAAAAAAAAAAAAABAgMRURITMWGBoeH/2gAMAwEAAhEDEQA/APqlERAREQEREBERAREQEREBERAREQEREBERAREQEREHEbnAEOAz/SYf3j6WqqlfBQyyxjL2RFzR8kBVj55sVHb9UyV96vjpP8k88Fc2ODcTgReUfbJ4HwprNr5owUjdp+Pvn0uO1Wlr5L6163M/nMrTw7vH0m1/ePpVRqut1FX6xvtDZ3ajdVQWujlt7KGeJlPT1DzP1nDyAWksZno7o09Mrs1viZqCnvMtto7dQ3Fx/LpYDE2ZrXVUEBkLTIQGnLmPYWtB2nHqOCFSFnbX94+kDi4YGAQcErz2idWjWlJWXSljYLX54jopQTunaI2F7j7DEhezp2FehZy79oG1/ePpMP7x9Knf5HeMt78JKKxmyW+kqJLjLKJJalri1jWBvpG0j1Hdz7Y4KgPD/wARrtqbwDqLka0tr6W409EBQTPdVtjdUwtIe+RxJle17vVkA7hx7B9A4ef+x9Jtf3j6VXw37U+nBNEGVnlXCrZFa6a85qqzDYXOmIbCSXN3Nbje8YG4k42tPYsHirX32uslALXTQ1F5ipK6BplcdtI+F7p3np1LHxlnwfMjzygsjLm4yQRnHCJJ/qP2EQZaPQAfjCgo9CabiuQuLLTTtqQ/zAeu0P7g3O0H+8KeRZMRPlFsdba6o3pojoKWKsmrWU8TamdjGSzBo3yNZnaCfcDc7HxkqJqNF2Y11Rd6G3UFHepQ4suLaZjpY5HMLd/Xk4PX591OotWjdN2Ck0vY6Oz0W4wUrNoc7G55JJc44AGS4knAxkqQaCCenJXJEEJqzRWntdW5lu1HaoLlSxytmZHLkbXjggggjkjnqDgrVYfD/S2mLIbHabJR01tdMKh1OG7mukDg4PJdkkgtaQSem0Y4C9AiCPvOn7TqGCOnu1upa6KKQSsZPGHhruMjPBwSP0SF0Lbo2htl9ZdIdjI6aj/AoaSOFjIqOElrnhuBk7ixnPQBoAHKn0QYeNwAHyEWUQEREBERAREQEREBERAREQEREBERAREQEREBERAREQf/2Q==" alt="" style="height:16px;width:16px;object-fit:contain;border-radius:3px;background:#fff;vertical-align:middle;margin-right:4px;">Mobile</div>
+              <div class="paybtn" onclick="setPay(this,'carte')"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCABYAFgDASIAAhEBAxEB/8QAGwABAAIDAQEAAAAAAAAAAAAAAAQFAQYIBwL/xAAwEAABAwMCAgcIAwAAAAAAAAABAAIDBAURBhIhMQcTQVFScZEUFSIyQmGBoQgWwf/EABkBAQADAQEAAAAAAAAAAAAAAAABAwUCBP/EACcRAAIBAwMDAwUAAAAAAAAAAAABAgMEEQUSMSFBcROR8GGBocHR/9oADAMBAAIRAxEAPwDqlERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQHyN7hncBnswmH+Meiw6NssJjdna5uDgkH1C8I1dqO/6N1TqXSduuVynnvsNILI2ad8ppnyPLJNrnEkBvxHn2DuXrtLSVzJwi8Ndfyk/bOfCZXUqbFlnvGH+MeiYf4x6Lw3Gr7l/cKPT9+rZZbbLRWmmE9bsfOYmbqksc7g2V5+rmqy79INNHoa1Wuz6hvNoqLvXzCpq7rWmWahZDwe0SDjtLw1oxzy5euOkzm0oyzx9srdl9+M+zK3cJdWvnB0Ltf4x6IHE5HDIOFqfRLfptS9HdjuNTM6apdTiOd7nZc6RhLHEntJLc/lbW353ef+LNrUnSqSpy5Ta9i6MtyTRna/xj0US53ahs1P7RcrjS0UOcdZUPaxue7JKmrmz+ScN0Gq6OaoEnu00obTO+gPyd47t3L8YXlr1fThuwbWh6XHUruNtKe1PLz47L6nQUV9tk0UUsV2opI5hmN7ZWkP8AI54qeA4jIeMeS5s0OG+6muiAFM5jdvcXfV++a980eyqj0/Stqg8PwdofzDM/D+ljaZrMru4nQcMY7/0u1nR42DxGe7rj5+y3O5oJLgcfZFl/yO8ii3zBDRhoB7lXVWm7PXXilvVTbqaa40bSyCpezL4gc5APZzPqrJF1GTjwyGk+TXK/o50lc6V9LV2ChmhkqX1jmlmMzP4OkyDncccSpNDorTdsqIaijslBBLBB7LE5kIHVxZ3bR3DPH7q6Rd+vUa27njyRsjzghWiyW6wUppLXRw0dOZHSmOJuG7nHLjj7lSw0hzj3lfSKttyeWdJYCp77Yqm8ENZc3U8O0B0Jp4pWOOc5IeDx7FcIoJTx1RrTNK3GOJkY1DMerI2Zo4PgGeQG3gr2300tJSMhnqpKqRud0rwAXZJPIcO3H4UhFCSXAbb5MPGWkDtCLKKSAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiID//Z" alt="" style="height:16px;width:16px;object-fit:contain;border-radius:3px;background:#fff;vertical-align:middle;margin-right:4px;">Carte</div>
               <div class="paybtn" onclick="setPay(this,'credit')">📝 Crédit</div>
               <div class="paybtn" onclick="setPay(this,'acompte')">💼 Acompte</div>
             </div>
@@ -734,6 +735,14 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <table><thead><tr><th>Date</th><th>Heure</th><th>Utilisateur</th><th>Rôle</th><th>Action</th><th>Détails</th></tr></thead>
       <tbody id="tb-aud"></tbody></table>
     </div></div>
+  </div>
+  <div class="sec" id="sec-diagnostic">
+    <div class="card" style="padding:15px;margin-bottom:11px;text-align:center;" id="diag-resume"></div>
+    <div id="diag-liste"></div>
+    <div style="display:flex;gap:7px;margin-top:11px;flex-wrap:wrap;">
+      <button class="btn btn-gold" style="flex:1;min-width:130px;" onclick="renderDiagnostic();toast('Diagnostic actualisé','ok')">🔄 Actualiser</button>
+      <button class="btn btn-green" style="flex:1;min-width:130px;" onclick="exportFullBackup();setTimeout(renderDiagnostic,600)">💾 Sauvegarder maintenant</button>
+    </div>
   </div>
   <div class="sec" id="sec-connexions">
     <div style="display:flex;gap:6px;margin-bottom:11px;flex-wrap:wrap;">
@@ -2053,6 +2062,21 @@ const today=()=>new Date().toISOString().slice(0,10);
 const getBName=b=>DB.settings[b]?.nom||b;
 const isAdmin=()=>['admin','superviseur'].includes(session.user?.role);
 const hasPerm=p=>session.user?.perms?.includes(p)||false;
+// ══ LOGOS DES MODES DE PAIEMENT ══
+const PAY_LOGOS={
+  especes:'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCABIAEgDASIAAhEBAxEB/8QAHAAAAgMBAQEBAAAAAAAAAAAAAAYFBwgBBAMC/8QAQxAAAQMDAQMHCQQGCwAAAAAAAQIDBAAFEQYSITFBUWFxkZTSBxMUFhciMlahQlWBwRUjM3KC00RSYmSEpLGywsPR/8QAGQEBAQEBAQEAAAAAAAAAAAAAAAMCBAEF/8QAJBEAAwABAwMFAQEAAAAAAAAAAAECAxEhMQQSFBMyQVJhIlH/2gAMAwEAAhEDEQA/ANU0UiHyt6JGc3rh/dH/AAVz2u6H+/B3V/wUA+UUh+13Q/33/lH/AAV32uaI2dr9NHZ5/RH8f7KAe6KQfbBoX79HdX/BX7b8rWinf2d4Wv8AdhSD/wAKaAe6KSk+VHSKgSm5vEDlECR/LoHlS0geFyfPVAkH/roB1opIPlU0eDg3R4HmMGR/LooDMF/jRos11JV5tt4BaS4oJH1NQRk2th3L01jAHBHvH6A1P322Rr4y0iSlSS2raStHHB4j/TsrxxtK2dkjbaU4f7a//Kg+qxrjcsulyUt9iI9YLRHWS16Q9uxgIwD2mvRpy8ou1yYt4gPCI4/7wccyAOU7hw6zTNEt1sjkBiGwFcmGwSe2nC26cnvISpbIhsHgp/3MjoTxPZWF1Lt6ROpTxNPdRWuprHck3gtWK1RlxsZS5sAgb+dRx9KldMWjW0SU26i4RIyAcqaJBQroKUD86tiHp23loNKnKElw4bUrCd444SeI+tRGoGJOnor8laXJkdkZKooyf4h9nrO6tXWaeUZWLFxqSxtybk205JccZmJSB55hxScc438R1022VPobCGxJcc2ftKO89lU/aNbKlp2o8MIGcZecJPYKcYV+dKUnz7QPMhI3dtUnHke7JVeJbIsViPDLynywhTqzlSyMkn8aKiNN3hu5Rk5U0iTk5ZSvKiB9oDjiimg5KGtEB663BuFHW0H1/CHFhOcc3Oegb6sSz+TtlOyu4PuO8pQ3+rH5k/SqRvEJx8JdYdcZebIUhxBKSkjgQeQ1YHk/8sqGW1W3XKgxIaT+ruAQSh4DkcAG5XSBg9B483TRir3cnbnvIvbwPj9tctzxbgBiEwASdhnDmByhe9Ss7+qvLbjPt9wWY6WpanQMqLgKyM52hnkpitd6jajt6JVrXFfhqUUpkBwLGRxwBwPXiuyrFFfIS467JVna80MJQDz4G7tzX01lUT2pHBdzy+SBnzYTpDbzCm3M583tb8g8ydw39IFfcy5IdRtOKYQkBQCsBeB0DeB+H41LGzSo6FBlxDEUj3mmiRgY/rHgOrApOVcYLTrsGwebW7lTi5SllTfSUhWds5PxHd11l1otaei/xbsi7y5f5lHoe03p25XFK1Mi2yVguqQypKA+M/GUEnYAPKOOeFTMK06bhIAT6NIdH2SVvnsG76UsQrg3bVH9P2SdI9/PpjMf0lLpJwCTnaSreBggdG6nxVldehCbDZcjNbAWYz6dhaB0jkPRXI8jp6KdDpjGpW9akvbLzGhN7MC3FJPQhlA6gBntFFQEVwADf2UV6qZpwihFlKviBOOevgqGw8rJZSo/u5rYPqZpf5bsvcWvDR6maX+W7L3Frw1DxH9jo8xfUx/bba7bpDr1tmTLeXSC4Iz6mwvByMgcadNO6vvVmUEF9M+MT7yHhhfXtDcT1jPTWjPUzS/y3Ze4teGu+p2mflyzdxa8NUnDkh7URvLjvmDPuo9UTL8Cw7tR4A/o4X8fSs8vVw66hXYqZCmlIU6y80ctusKKVJ5Nx/I7q076oaa+XrP3Jrw131R038v2fuTfhryunqq7nW5qc8zPap2M9R0yX4TsO4THpkZwYU29s7JHSEgZ/GpW1NqipShE6eplIwlp2W4tA/hJIq7zpDTR46es/cmvDXPU7TPy7Zu4teGtLA/mjPrr4kq+M8SlIznHKBiirSGkdNjhp+zj/BN+GitrF+mfV/CboooqpEKKKKAKKKKAKKKKAKKKKA//2Q==',
+  wave:'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCABIAEgDASIAAhEBAxEB/8QAGQABAAMBAQAAAAAAAAAAAAAAAAYHCAUE/8QAMxAAAgEDAgUBBQYHAAAAAAAAAQIDAAQFBhEHEhMhMVEUFUFhcRYiMlKRoSQ0QnOBsdH/xAAZAQEBAQEBAQAAAAAAAAAAAAAABgEEBQL/xAAoEQACAQMDAwIHAAAAAAAAAAAAAQIDBBEFIbESQXEGMRNRYYGRwfD/2gAMAwEAAhEDEQA/ANU0pSgFKUoBSlKAUpSgFKUoCK6h1rZYm6a2jie6nQ7OEYKFPpv61x24lwqpZsa6qO5JnAA/aq0y9/DZQ3V9kJ1igjLSSyP4HfzVU8U8tbZe/wABjY73mxV5E87tFcLErkgiMl27ABh3B+fxqhr2dpaUOuostL54/kRdpqeoajdKnSfTFt9s4/Pc1AnE6B1DR45nU+GW4BH67V2tPa0ssxcrbPE9tcP+BXO4b5A+tY+4TzDE6umwUNwZYJLISSBbhZo+uu3MyFewBG/bz61dFi7R3tu6EqyyqQR9RWW9nbXlv8WmsPzk291O+028VCrNSW3ZLb7GgqUFKnyzFKb0oBSlKAzRqTFQZzFXuNuywhuAVLIe6nfcEfQgVU/CbhWuoOLcum9QSNJj8dC11P0nK9aPdeUA+V5i43+Pn61dU6NHPKjjZlcgj0O9Q3BXmS0Jxgu9WNZS3mBubTpXnQZTJGmy7lVJ3blKA7D4b1Q64qcaMa0nh5Sz5In0rVqyuJ2y3WG8fVY/R5teaCxvDXjXptsCHixWWjkCwO5fpOAVZQT3I7qRv6mp5afzUH9xf9iobxBy95xO4i6ZzeJs5rfTGN7w3Fxsjzd+ZnCb7gEhVH03+NTSxRpL63RBuzSqAB9RW6JVjO3qdLTSb4Pn1VScbyllbtLnYlvGbVOQ0Nk9O6hF3KuB/ibS+tgN0Z2hZoG8eeddv81W2ltc62kusVpvJ3t1PnsfNPlshyABp7RbVJooj28M8nJ279q0bnMLjc/j2sc1Y299aFlcwzoHUsDuDsfSkOCxcGblzENhbJlJYRA90sYEjRjbZSfTsP0qdLgzTFqrUKYPQ+oV4iTXl7qDLW8V7iUEQSNGk+8iKBzIF/C3ruKk8eq9SNmU4e+9bk6hTUTK9326pxYXrh99ttypCb1aycO9HpkXv001iVvHmW4MwtlDdRTzBgfgd+/b412BgcUM+c2Mfbe9zD7ObzpjqmPzy83nagMv2PEfXF1LFqNLi/WeTKm19glurSOx5A/L7P0mYSiTb+rzv+tK0h9iNMfaP3/7hxvvnm5/a/Z16nN+bf8AN8/NKA8+oNE2OWumuY5XtZ3O7lAGVj67etcc8NIWUhskxB87wD/tWFSupXtdRUOrZeHyedPSbSU3UcN374bXDK8ThlAihUyLKoGwC24AH712tPaLssRcrcvK9zcJ+BnGwX5getSmlHe1nFw6tn4XBsNKtITVRQ3Xtlt8sClKVynoClKUApSlAKUpQClKUApSlAKUpQClKUB//9k=',
+  orange:'data:image/jpeg;base64,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',
+  carte:'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCABYAFgDASIAAhEBAxEB/8QAGwABAAIDAQEAAAAAAAAAAAAAAAQFAQYIBwL/xAAwEAABAwMCAgcIAwAAAAAAAAABAAIDBAURBhIhMQcTQVFScZEUFSIyQmGBoQgWwf/EABkBAQADAQEAAAAAAAAAAAAAAAABAwUCBP/EACcRAAIBAwMDAwUAAAAAAAAAAAABAgMEEQUSMSFBcROR8GGBocHR/9oADAMBAAIRAxEAPwDqlERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQHyN7hncBnswmH+Meiw6NssJjdna5uDgkH1C8I1dqO/6N1TqXSduuVynnvsNILI2ad8ppnyPLJNrnEkBvxHn2DuXrtLSVzJwi8Ndfyk/bOfCZXUqbFlnvGH+MeiYf4x6Lw3Gr7l/cKPT9+rZZbbLRWmmE9bsfOYmbqksc7g2V5+rmqy79INNHoa1Wuz6hvNoqLvXzCpq7rWmWahZDwe0SDjtLw1oxzy5euOkzm0oyzx9srdl9+M+zK3cJdWvnB0Ltf4x6IHE5HDIOFqfRLfptS9HdjuNTM6apdTiOd7nZc6RhLHEntJLc/lbW353ef+LNrUnSqSpy5Ta9i6MtyTRna/xj0US53ahs1P7RcrjS0UOcdZUPaxue7JKmrmz+ScN0Gq6OaoEnu00obTO+gPyd47t3L8YXlr1fThuwbWh6XHUruNtKe1PLz47L6nQUV9tk0UUsV2opI5hmN7ZWkP8AI54qeA4jIeMeS5s0OG+6muiAFM5jdvcXfV++a980eyqj0/Stqg8PwdofzDM/D+ljaZrMru4nQcMY7/0u1nR42DxGe7rj5+y3O5oJLgcfZFl/yO8ii3zBDRhoB7lXVWm7PXXilvVTbqaa40bSyCpezL4gc5APZzPqrJF1GTjwyGk+TXK/o50lc6V9LV2ChmhkqX1jmlmMzP4OkyDncccSpNDorTdsqIaijslBBLBB7LE5kIHVxZ3bR3DPH7q6Rd+vUa27njyRsjzghWiyW6wUppLXRw0dOZHSmOJuG7nHLjj7lSw0hzj3lfSKttyeWdJYCp77Yqm8ENZc3U8O0B0Jp4pWOOc5IeDx7FcIoJTx1RrTNK3GOJkY1DMerI2Zo4PgGeQG3gr2300tJSMhnqpKqRud0rwAXZJPIcO3H4UhFCSXAbb5MPGWkDtCLKKSAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiID//Z',
+  mobile:'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCABYAFgDASIAAhEBAxEB/8QAHAABAAICAwEAAAAAAAAAAAAAAAUHAQMCBAYI/8QALBAAAQMDAwIGAgIDAAAAAAAAAQACAwQFEQYSMSFSBxMiQVGRFHEIYSMyQv/EABYBAQEBAAAAAAAAAAAAAAAAAAACAf/EACARAQACAgEEAwAAAAAAAAAAAAABAgMRURITMWGBoeH/2gAMAwEAAhEDEQA/APqlERAREQEREBERAREQEREBERAREQEREBERAREQEREHEbnAEOAz/SYf3j6WqqlfBQyyxjL2RFzR8kBVj55sVHb9UyV96vjpP8k88Fc2ODcTgReUfbJ4HwprNr5owUjdp+Pvn0uO1Wlr5L6163M/nMrTw7vH0m1/ePpVRqut1FX6xvtDZ3ajdVQWujlt7KGeJlPT1DzP1nDyAWksZno7o09Mrs1viZqCnvMtto7dQ3Fx/LpYDE2ZrXVUEBkLTIQGnLmPYWtB2nHqOCFSFnbX94+kDi4YGAQcErz2idWjWlJWXSljYLX54jopQTunaI2F7j7DEhezp2FehZy79oG1/ePpMP7x9Knf5HeMt78JKKxmyW+kqJLjLKJJalri1jWBvpG0j1Hdz7Y4KgPD/wARrtqbwDqLka0tr6W409EBQTPdVtjdUwtIe+RxJle17vVkA7hx7B9A4ef+x9Jtf3j6VXw37U+nBNEGVnlXCrZFa6a85qqzDYXOmIbCSXN3Nbje8YG4k42tPYsHirX32uslALXTQ1F5ipK6BplcdtI+F7p3np1LHxlnwfMjzygsjLm4yQRnHCJJ/qP2EQZaPQAfjCgo9CabiuQuLLTTtqQ/zAeu0P7g3O0H+8KeRZMRPlFsdba6o3pojoKWKsmrWU8TamdjGSzBo3yNZnaCfcDc7HxkqJqNF2Y11Rd6G3UFHepQ4suLaZjpY5HMLd/Xk4PX591OotWjdN2Ck0vY6Oz0W4wUrNoc7G55JJc44AGS4knAxkqQaCCenJXJEEJqzRWntdW5lu1HaoLlSxytmZHLkbXjggggjkjnqDgrVYfD/S2mLIbHabJR01tdMKh1OG7mukDg4PJdkkgtaQSem0Y4C9AiCPvOn7TqGCOnu1upa6KKQSsZPGHhruMjPBwSP0SF0Lbo2htl9ZdIdjI6aj/AoaSOFjIqOElrnhuBk7ixnPQBoAHKn0QYeNwAHyEWUQEREBERAREQEREBERAREQEREBERAREQEREBERAREQf/2Q==',
+};
+// Rendu du mode de paiement: logo si disponible, sinon emoji
+function payIcon(mode,h){
+  h=h||18;
+  const l=PAY_LOGOS[mode];
+  if(l)return '<img src="'+l+'" alt="'+mode+'" style="height:'+h+'px;width:'+h+'px;object-fit:contain;border-radius:3px;vertical-align:middle;display:inline-block;background:#fff;">';
+  return '<span style="font-size:'+h+'px;">'+(IC[mode]||'💰')+'</span>';
+}
 const IC={especes:'💵',wave:'🌊',orange:'🟠',mobile:'📱',carte:'💳',credit:'📝',acompte:'💼'};
 
 // ══ THEME ══
@@ -2522,8 +2546,8 @@ function updCSig(){document.getElementById('csig-label').textContent=session.cai
 function changeBoutique(b){session.boutique=b;updCSig();renderGrid();}
 
 // ══ NAV ══
-const TITLES={accueil:'<span>Accueil</span>',caisse:'Caisse / <span>POS</span>','ventes-jour':'Ventes du <span>Jour</span>',factures:'Historique <span>Factures</span>',devis:'<span>Devis</span>',retours:'<span>Retours</span>',depenses:'<span>Dépenses</span>',produits:'Gestion <span>Produits</span>',fournisseurs:'<span>Fournisseurs</span>',clients:'Gestion <span>Clients</span>',dashboard:'Tableau de <span>Bord</span>',benefice:'Bénéfice <span>Journalier</span>',inventaire:'Inventaire & <span>Analyses</span>','ia-centre':'Centre <span>IA</span>',agenda:'<span>Agenda</span> & Rappels',creances:'<span>Créances</span> & Relances','heures-fortes':'🔥 Heures <span>Fortes</span>','produits-lents':'🐢 Produits <span>Lents</span>',chat:'💬 Chat <span>Personnel</span>',comparaison:'📊 Comparaison <span>Boutiques</span>',previsions:'🤖 IA <span>Prévisions</span>',users:'Utilisateurs & <span>Rôles</span>','caisses-config':'Config <span>Caisses</span>',salaires:'<span>Salaires</span>',rapports:'<span>Rapports</span>',parametres:'<span>Paramètres</span>',mouvements:'🔄 Mouvements de <span>Stock</span>',tresorerie:'🏦 <span>Trésorerie</span>',connexions:'🔑 Journal des <span>Connexions</span>',audit:'📋 Journal d\'<span>Audit</span>'};
-const RENDERS={accueil:renderAccueil,caisse:renderGrid,'ventes-jour':renderVentesJour,factures:renderFactures,devis:renderDevis,retours:renderRetours,depenses:renderDepenses,produits:renderProduits,fournisseurs:renderFourn,clients:renderClients,dashboard:renderDash,benefice:renderBenefice,inventaire:renderInventaire,'ia-centre':renderIACentre,agenda:renderAgenda,creances:renderCreances,'heures-fortes':renderHeuresFortes,'produits-lents':renderProduitsLents,chat:renderChat,comparaison:renderComparaison,previsions:()=>{},users:renderUsers,'caisses-config':renderCaissesConfig,salaires:renderSalaires,rapports:renderRapports,parametres:loadSettings,mouvements:renderMouvements,tresorerie:renderTresorerie,connexions:renderConnexions,audit:renderAudit};
+const TITLES={accueil:'<span>Accueil</span>',caisse:'Caisse / <span>POS</span>','ventes-jour':'Ventes du <span>Jour</span>',factures:'Historique <span>Factures</span>',devis:'<span>Devis</span>',retours:'<span>Retours</span>',depenses:'<span>Dépenses</span>',produits:'Gestion <span>Produits</span>',fournisseurs:'<span>Fournisseurs</span>',clients:'Gestion <span>Clients</span>',dashboard:'Tableau de <span>Bord</span>',benefice:'Bénéfice <span>Journalier</span>',inventaire:'Inventaire & <span>Analyses</span>','ia-centre':'Centre <span>IA</span>',agenda:'<span>Agenda</span> & Rappels',creances:'<span>Créances</span> & Relances','heures-fortes':'🔥 Heures <span>Fortes</span>','produits-lents':'🐢 Produits <span>Lents</span>',chat:'💬 Chat <span>Personnel</span>',comparaison:'📊 Comparaison <span>Boutiques</span>',previsions:'🤖 IA <span>Prévisions</span>',users:'Utilisateurs & <span>Rôles</span>','caisses-config':'Config <span>Caisses</span>',salaires:'<span>Salaires</span>',rapports:'<span>Rapports</span>',parametres:'<span>Paramètres</span>',mouvements:'🔄 Mouvements de <span>Stock</span>',tresorerie:'🏦 <span>Trésorerie</span>',connexions:'🔑 Journal des <span>Connexions</span>',audit:'📋 Journal d\'<span>Audit</span>',diagnostic:'🩺 <span>Diagnostic</span>'};
+const RENDERS={accueil:renderAccueil,caisse:renderGrid,'ventes-jour':renderVentesJour,factures:renderFactures,devis:renderDevis,retours:renderRetours,depenses:renderDepenses,produits:renderProduits,fournisseurs:renderFourn,clients:renderClients,dashboard:renderDash,benefice:renderBenefice,inventaire:renderInventaire,'ia-centre':renderIACentre,agenda:renderAgenda,creances:renderCreances,'heures-fortes':renderHeuresFortes,'produits-lents':renderProduitsLents,chat:renderChat,comparaison:renderComparaison,previsions:()=>{},users:renderUsers,'caisses-config':renderCaissesConfig,salaires:renderSalaires,rapports:renderRapports,parametres:loadSettings,mouvements:renderMouvements,tresorerie:renderTresorerie,connexions:renderConnexions,audit:renderAudit,diagnostic:renderDiagnostic};
 
 function nav(page){
   // Sécurité: pages strictement admin, bloquées même via appel direct (console, etc.)
@@ -2729,7 +2753,7 @@ function renderVentesJour(){
   const allV=DB.factures.filter(f=>f.date.startsWith(day));const allD=DB.depenses.filter(d=>d.date.startsWith(day));
   const gCA=allV.reduce((s,f)=>s+f.total,0);const gBen=allV.reduce((s,f)=>s+f.items.reduce((ss,i)=>ss+(i.prix-(i.achat||0))*i.qty,0),0);const gDep=allD.reduce((s,d)=>s+d.montant,0);
   const payG={};allV.forEach(f=>payG[f.mode]=(payG[f.mode]||0)+f.total);
-  const payHTML=Object.entries(payG).map(([m,v])=>`<div class="mini-kpi"><div class="mk-label">${IC[m]||'💰'} ${m}</div><div class="mk-val mk-g" style="font-size:12px;">${fmt(v)}</div></div>`).join('');
+  const payHTML=Object.entries(payG).map(([m,v])=>`<div class="mini-kpi"><div class="mk-label">${payIcon(m,14)} ${m}</div><div class="mk-val mk-g" style="font-size:12px;">${fmt(v)}</div></div>`).join('');
   const bHTML=['B1','B2'].map(b=>{
     const bV=allV.filter(f=>f.boutique===b);const bCA=bV.reduce((s,f)=>s+f.total,0);
     const knownCaisseIds=DB.caisses.map(c=>c.id);const bVautres=bV.filter(f=>!knownCaisseIds.includes(f.caisse));
@@ -2802,7 +2826,7 @@ function renderFactures(){
     <td><span class="badge bcy">${f.caisse}</span></td>
     <td>${escapeHtml(f.client)}</td><td>${f.items.length}</td>
     <td class="mono" style="color:var(--green);font-weight:700;">${fmt(f.total)}</td>
-    <td>${IC[f.mode]||''} ${f.mode}</td>
+    <td>${payIcon(f.mode,16)} ${f.mode}</td>
     <td style="font-size:10px;color:var(--text2);">${f.vendeur||'—'}</td>
     <td style="font-size:10px;white-space:nowrap;">${new Date(f.date).toLocaleDateString('fr-FR')}<br><span style="color:var(--text2);">${new Date(f.date).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span></td>
     <td style="display:flex;gap:3px;flex-wrap:wrap;">
@@ -3341,6 +3365,128 @@ function genererDescriptionLocale(){
   } else {
     toast('✨ Description générée (saisissez le prix d\'achat pour un prix conseillé)','ok');
   }
+}
+
+// ══════════════════════════════════════════════════════════
+// ÉCRAN DE DIAGNOSTIC — état de santé de l'application
+// Objectif: voir les problèmes AVANT qu'ils ne bloquent une caisse.
+// ══════════════════════════════════════════════════════════
+function _dureeDepuis(ts){
+  if(!ts)return null;
+  const s=Math.floor((Date.now()-ts)/1000);
+  if(s<60)return 'à l\'instant';
+  if(s<3600)return 'il y a '+Math.floor(s/60)+' min';
+  if(s<86400)return 'il y a '+Math.floor(s/3600)+' h';
+  return 'il y a '+Math.floor(s/86400)+' jour(s)';
+}
+
+function collecterDiagnostic(){
+  const d=[];
+
+  // 1. Connexion / synchronisation
+  d.push(fbConnected
+    ? {n:'Synchronisation',e:'ok',v:'Connecté au cloud',m:'Vos données sont partagées entre les appareils.'}
+    : {n:'Synchronisation',e:'warn',v:'Hors ligne',m:'L\'app fonctionne, mais rien n\'est partagé pour l\'instant. Vérifiez internet.'});
+
+  // 2. Ventes en attente d'envoi
+  const enAttente=(DB.factures||[]).filter(f=>f&&f._offline===true);
+  if(enAttente.length){
+    const plusVieille=Math.min(...enAttente.map(f=>new Date(f.date).getTime()));
+    const jours=Math.floor((Date.now()-plusVieille)/86400000);
+    d.push({n:'Ventes en attente',e:jours>=1?'err':'warn',
+      v:enAttente.length+' vente(s) non envoyée(s)',
+      m:jours>=1?('La plus ancienne date de '+jours+' jour(s). Connectez cet appareil à internet rapidement.')
+                :'Elles partiront dès le retour de la connexion.'});
+  } else {
+    d.push({n:'Ventes en attente',e:'ok',v:'Aucune',m:'Toutes vos ventes sont enregistrées sur le cloud.'});
+  }
+
+  // 3. Mouvements de stock en attente
+  const stockAtt=(LS('pendingStockOps')||[]).length;
+  d.push(stockAtt
+    ? {n:'Stock en attente',e:'warn',v:stockAtt+' mouvement(s)',m:'Ils seront envoyés au retour de la connexion.'}
+    : {n:'Stock en attente',e:'ok',v:'Aucun',m:'Le stock est à jour sur tous les appareils.'});
+
+  // 4. Dernière sauvegarde
+  const lb=LS('lastBackup');
+  if(!lb){
+    d.push({n:'Sauvegarde',e:'err',v:'Jamais effectuée',
+      m:'En cas de problème, vous perdriez tout. Faites-en une maintenant : Export → Sauvegarde complète.'});
+  } else {
+    const jours=Math.floor((Date.now()-lb)/86400000);
+    d.push({n:'Sauvegarde',e:jours>7?'err':jours>3?'warn':'ok',
+      v:_dureeDepuis(lb),
+      m:jours>7?'Plus d\'une semaine. Faites-en une aujourd\'hui.':jours>3?'Pensez à en refaire une.':'À jour.'});
+  }
+
+  // 5. Comptes en mot de passe d'usine
+  const usine=['0000','1111','2222','3333','4444'];
+  const risque=(DB.users||[]).filter(u=>usine.includes(u.pwd));
+  d.push(risque.length
+    ? {n:'Sécurité des comptes',e:'err',v:risque.length+' compte(s) en code d\'usine',
+       m:'À changer : '+risque.map(u=>u.id).join(', ')+'. Ces appareils ne peuvent pas publier les comptes (protection).'}
+    : {n:'Sécurité des comptes',e:'ok',v:'Tous personnalisés',m:'Aucun code d\'usine actif.'});
+
+  // 6. Affectation des boutiques
+  const malAffectes=(DB.users||[]).filter(u=>u.role!=='admin'&&!u.boutique);
+  d.push(malAffectes.length
+    ? {n:'Affectation boutique',e:'warn',v:malAffectes.length+' compte(s) sans boutique',
+       m:'Ces comptes risquent d\'être bloqués : '+malAffectes.map(u=>u.id).join(', ')}
+    : {n:'Affectation boutique',e:'ok',v:'Toutes définies',m:'Chaque employé est rattaché à sa boutique.'});
+
+  // 7. Prix incohérents
+  const cp=controlePrixLocal();
+  d.push(cp.pertes.length
+    ? {n:'Prix de vente',e:'err',v:cp.pertes.length+' produit(s) à perte',
+       m:'Vous perdez de l\'argent à chaque vente : '+cp.pertes.slice(0,3).map(x=>x.nom).join(', ')+(cp.pertes.length>3?'…':'')}
+    : (cp.faibles.length
+      ? {n:'Prix de vente',e:'warn',v:cp.faibles.length+' marge(s) faible(s)',m:'Marge sous 15 % sur ces produits.'}
+      : {n:'Prix de vente',e:'ok',v:'Cohérents',m:'Marge médiane : '+cp.margeMediane+' %.'}));
+
+  // 8. Produits sans prix d'achat (bénéfices faussés)
+  const sansAchat=(DB.produits||[]).filter(p=>!(Number(p.achat)>0));
+  d.push(sansAchat.length
+    ? {n:'Prix d\'achat',e:'warn',v:sansAchat.length+' produit(s) sans prix d\'achat',
+       m:'Vos bénéfices sont sous-estimés tant qu\'ils ne sont pas renseignés.'}
+    : {n:'Prix d\'achat',e:'ok',v:'Tous renseignés',m:'Les calculs de bénéfice sont fiables.'});
+
+  // 9. Ruptures de stock
+  const rupt=(DB.produits||[]).filter(p=>((p.s1||0)+(p.s2||0))<=0).length;
+  const total=(DB.produits||[]).length;
+  d.push(rupt>total*0.3
+    ? {n:'Stock',e:'warn',v:rupt+' rupture(s) sur '+total,
+       m:'Beaucoup de fiches à zéro. Inventaire à mettre à jour ?'}
+    : {n:'Stock',e:'ok',v:rupt+' rupture(s) sur '+total,m:'Situation normale.'});
+
+  return d;
+}
+
+function renderDiagnostic(){
+  const el=document.getElementById('diag-liste');
+  if(!el)return;
+  const d=collecterDiagnostic();
+  const nbErr=d.filter(x=>x.e==='err').length, nbWarn=d.filter(x=>x.e==='warn').length;
+
+  const res=document.getElementById('diag-resume');
+  if(res){
+    const etat=nbErr?{c:'var(--red)',t:'🔴 '+nbErr+' point(s) à corriger'}
+              :nbWarn?{c:'var(--gold)',t:'🟠 '+nbWarn+' point(s) à surveiller'}
+              :{c:'var(--green)',t:'🟢 Tout va bien'};
+    res.innerHTML='<div style="font-size:18px;font-weight:900;color:'+etat.c+';">'+etat.t+'</div>'
+      +'<div style="font-size:10px;color:var(--text2);margin-top:3px;">Vérifié '+new Date().toLocaleTimeString('fr-FR')
+      +' · Boutique : '+escapeHtml(DB.settings[session.boutique]?.nom||session.boutique||'—')+'</div>';
+  }
+
+  const couleur={ok:'#10b981',warn:'#f59e0b',err:'#f43f5e'};
+  const icone={ok:'✅',warn:'⚠️',err:'🔴'};
+  el.innerHTML=d.map(x=>
+    '<div style="background:rgba(148,163,184,.06);border:1px solid rgba(148,163,184,.12);'
+    +'border-left:3px solid '+couleur[x.e]+';border-radius:9px;padding:11px 13px;margin-bottom:8px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">'
+    +'<span style="font-size:11px;font-weight:800;">'+icone[x.e]+' '+escapeHtml(x.n)+'</span>'
+    +'<span style="font-size:11px;font-weight:800;color:'+couleur[x.e]+';">'+escapeHtml(x.v)+'</span></div>'
+    +'<div style="font-size:10px;color:var(--text2);margin-top:4px;line-height:1.5;">'+escapeHtml(x.m)+'</div>'
+    +'</div>').join('');
 }
 
 // ══ AFFICHAGE DES ANALYSES LOCALES ══
@@ -4406,7 +4552,7 @@ function renderBenefice(){
   const ventes=DB.factures.filter(f=>f.date.startsWith(day));const depJour=DB.depenses.filter(d=>d.date.startsWith(day));
   const totalV=ventes.reduce((s,f)=>s+f.total,0);const totalD=depJour.reduce((s,d)=>s+d.montant,0);const cout=ventes.reduce((s,f)=>s+f.items.reduce((ss,i)=>ss+(i.achat||0)*i.qty,0),0);const ben=totalV-cout-totalD;
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};set('bj-ventes',fmt(totalV));set('bj-nb-v',ventes.length+' transactions');set('bj-dep',fmt(totalD));set('bj-cout',fmt(cout));set('bj-ben',fmt(ben));
-  document.getElementById('bj-ventes-list').innerHTML=ventes.length?ventes.map(f=>`<tr><td class="mono" style="color:var(--gold);font-size:11px;">${f.id}</td><td>${escapeHtml(f.client)}</td><td class="mono" style="color:var(--green);font-weight:700">${fmt(f.total)}</td><td>${IC[f.mode]||''} ${f.mode}</td><td style="font-size:10px;">${new Date(f.date).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</td></tr>`).join(''):`<tr><td colspan="5" class="empty">Aucune vente</td></tr>`;
+  document.getElementById('bj-ventes-list').innerHTML=ventes.length?ventes.map(f=>`<tr><td class="mono" style="color:var(--gold);font-size:11px;">${f.id}</td><td>${escapeHtml(f.client)}</td><td class="mono" style="color:var(--green);font-weight:700">${fmt(f.total)}</td><td>${payIcon(f.mode,16)} ${f.mode}</td><td style="font-size:10px;">${new Date(f.date).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</td></tr>`).join(''):`<tr><td colspan="5" class="empty">Aucune vente</td></tr>`;
   document.getElementById('bj-dep-list').innerHTML=depJour.length?depJour.map(d=>`<tr><td>${d.lib}</td><td class="mono" style="color:var(--red)">${fmt(d.montant)}</td></tr>`).join(''):`<tr><td colspan="2" class="empty">Aucune dépense</td></tr>`;
 }
 
@@ -4562,7 +4708,7 @@ function cloturerCaisse(caisseId){
       <div style="display:flex;justify-content:space-between;padding:6px;background:var(--surf2);border-radius:6px;">
         <span>💰 CA Total</span><span style="color:var(--green);font-weight:900;">${fmt(ca)}</span>
       </div>
-      ${Object.entries(byMode).map(([m,v])=>`<div style="display:flex;justify-content:space-between;padding:4px 6px;font-size:11px;color:var(--text2);"><span>${IC[m]||'💰'} ${m}</span><span>${fmt(v)}</span></div>`).join('')}
+      ${Object.entries(byMode).map(([m,v])=>`<div style="display:flex;justify-content:space-between;padding:4px 6px;font-size:11px;color:var(--text2);"><span>${payIcon(m,14)} ${m}</span><span>${fmt(v)}</span></div>`).join('')}
       <div style="display:flex;justify-content:space-between;padding:6px;background:var(--surf2);border-radius:6px;">
         <span>🏦 Fond caisse initial</span><span>${fmt(fond)}</span>
       </div>
@@ -4972,8 +5118,9 @@ async function askIA(){
   await callIA(`${buildContext()}\nQuestion: ${q}`,r=>{result.innerHTML=`<div class="ia-panel"><div class="ia-title">🤖 Réponse</div><div class="ia-msg">${r.replace(/\n/g,'<br>')}</div></div>`;},e=>{result.innerHTML=`<div class="empty">❌ ${e}</div>`;});}
 
 // ══ EXPORT / IMPORT ══
-function exportJSON(){const _st={...DB.settings};delete _st.apiKey;const data=JSON.stringify({produits:DB.produits,clients:DB.clients,fournisseurs:DB.fournisseurs,factures:DB.factures,devis:DB.devis,retours:DB.retours,salaires:DB.salaires,depenses:DB.depenses,caisses:DB.caisses,settings:_st,exported:new Date().toISOString()},null,2);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=`MonNegoce_${today()}.json`;a.click();toast('Export téléchargé ✅','ok');}
+function exportJSON(){SS('lastBackup',Date.now());const _st={...DB.settings};delete _st.apiKey;const data=JSON.stringify({produits:DB.produits,clients:DB.clients,fournisseurs:DB.fournisseurs,factures:DB.factures,devis:DB.devis,retours:DB.retours,salaires:DB.salaires,depenses:DB.depenses,caisses:DB.caisses,settings:_st,exported:new Date().toISOString()},null,2);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=`MonNegoce_${today()}.json`;a.click();toast('Export téléchargé ✅','ok');}
 function exportFullBackup(){
+  SS('lastBackup',Date.now());
   // Exclure les mots de passe hachés de la sauvegarde visible, mais garder le reste
   const backup={
     exportDate:new Date().toISOString(),
@@ -5086,7 +5233,7 @@ function renderAccueil(){
           <div style="font-size:9px;color:var(--text3);">Fond: ${fmt(fond)}</div>
         </div>
       </div>
-      ${Object.entries(maCaisseByMode).map(([m,v])=>`<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0;color:var(--text2);"><span>${IC[m]||'💰'} ${m}</span><span class="mono" style="color:var(--gold);">${fmt(v)}</span></div>`).join('')}
+      ${Object.entries(maCaisseByMode).map(([m,v])=>`<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0;color:var(--text2);"><span>${payIcon(m,14)} ${m}</span><span class="mono" style="color:var(--gold);">${fmt(v)}</span></div>`).join('')}
     </div>`:'' ;
     const alertesEl=document.getElementById('accueil-alertes');
     if(alertesEl)alertesEl.insertAdjacentHTML('beforebegin',mesStatsHTML+(caisseStatsHTML||''));
@@ -5126,6 +5273,13 @@ function renderAccueil(){
   // Produits vendus à perte (prix de vente < prix d'achat)
   const prixPerte=DB.produits.filter(p=>(Number(p.achat)||0)>0&&Number(p.prix)<Number(p.achat)).length;
   if(prixPerte>0)alertes.push({icon:'🚨',text:`${prixPerte} produit(s) vendu(s) À PERTE — prix à corriger`,type:'red',nav:'produits'});
+  // Alerte de santé: remonter les problèmes critiques sans attendre une consultation
+  try{
+    const diag=collecterDiagnostic().filter(x=>x.e==='err');
+    if(diag.length)alertes.push({icon:'🩺',
+      text:`${diag.length} problème(s) détecté(s) : ${diag.map(x=>x.n).join(', ')}`,
+      type:'red',nav:'diagnostic'});
+  }catch(e){}
   if(totalCreances>0)alertes.push({icon:'💳',text:`${creances.length} client(s) avec créance — ${fmt(totalCreances)}`,type:'red',nav:'creances'});
   // Événements agenda aujourd'hui
   const eventsToday=AGENDA_EVENTS.filter(e=>e.date===todayStr);
