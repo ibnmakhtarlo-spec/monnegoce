@@ -1437,6 +1437,35 @@ canvas.chart-canvas{display:block;width:100%!important;}
   </div>
 </div>
 
+<!-- MODIFIER FACTURE (admin) -->
+<div class="overlay" id="modal-edit-fact">
+  <div class="modal">
+    <div class="mtitle"><span>✏️ Modifier Facture</span><span class="mclose" onclick="closeModal('modal-edit-fact')">✕</span></div>
+    <div style="background:rgba(240,165,0,.1);border:1px solid rgba(240,165,0,.3);border-radius:8px;padding:9px;margin-bottom:11px;font-size:11px;color:var(--text2);">
+      ⚠️ Le stock sera automatiquement ajusté selon les nouvelles quantités.
+    </div>
+    <div id="ef-info" style="font-size:11px;color:var(--text2);margin-bottom:9px;"></div>
+    <div class="fg"><label>Client</label><input id="ef-client"></div>
+    <div class="fg"><label>Mode de paiement</label>
+      <select id="ef-mode">
+        <option value="especes">Espèces</option><option value="wave">Wave</option>
+        <option value="orange">Orange Money</option><option value="mobile">Mobile</option>
+        <option value="carte">Carte</option><option value="credit">Crédit</option>
+      </select>
+    </div>
+    <div class="fg"><label>Articles (un par ligne : Nom;Quantité;Prix unitaire)</label>
+      <textarea id="ef-lignes" style="min-height:110px;width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:8px;color:var(--text);font-family:var(--font);font-size:11px;outline:none;resize:vertical;"></textarea>
+    </div>
+    <div id="ef-total" style="text-align:right;font-size:15px;font-weight:900;margin-bottom:9px;"></div>
+    <div class="fg"><label>Code Administrateur requis *</label><input type="password" id="ef-pwd" placeholder="Entrez votre code admin"></div>
+    <input type="hidden" id="ef-id">
+    <div class="mfooter">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-fact')">Annuler</button>
+      <button class="btn btn-gold" onclick="confirmEditFact()">💾 Enregistrer les modifications</button>
+    </div>
+  </div>
+</div>
+
 <!-- FACTURE DETAIL -->
 <div class="overlay" id="modal-fdet">
   <div class="modal xl">
@@ -2833,7 +2862,7 @@ function renderFactures(){
       <button class="btn btn-ghost btn-xs" onclick="openFactDetail('${f.id}')">👁</button>
       <button class="btn btn-blue btn-xs" onclick="(function(){const f=DB.factures.find(x=>x.id==='${f.id}');if(f){currentFact=JSON.parse(JSON.stringify(f));genererFacturePDF();}})()">📄</button>
       <button class="wabtn" style="padding:2px 5px;font-size:10px;" onclick="waShareId('${f.id}')">📲</button>
-      ${canDel?`<button class="btn btn-red btn-xs" onclick="openDelFact('${f.id}')">🗑</button>`:''}
+      ${canDel?`<button class="btn btn-gold btn-xs" onclick="openEditFact('${f.id}')">✏️</button><button class="btn btn-red btn-xs" onclick="openDelFact('${f.id}')">🗑</button>`:''}
     </td>
   </tr>`).join(''):`<tr><td colspan="10" class="empty"><div class="ei">🧾</div>Aucune facture</td></tr>`;
 }
@@ -2861,6 +2890,98 @@ async function confirmDelFact(){
   logAction&&logAction('Suppression facture',id+' (validé par '+admin.nom+')');
   toast(`Facture supprimée (validé par ${admin.nom}) ✅`,'ok');
 }
+
+// ══ MODIFICATION DE FACTURE (admin) ══
+function openEditFact(id){
+  const f=DB.factures.find(x=>x.id===id);if(!f)return;
+  document.getElementById('ef-id').value=id;
+  document.getElementById('ef-pwd').value='';
+  document.getElementById('ef-client').value=f.client||'';
+  document.getElementById('ef-mode').value=f.mode||'especes';
+  document.getElementById('ef-info').textContent=`Facture ${f.id} — ${new Date(f.date).toLocaleString('fr-FR')} — ${getBName(f.boutique)}`;
+  document.getElementById('ef-lignes').value=(f.items||[])
+    .map(i=>`${i.nom};${i.qty};${i.prix}`).join('\n');
+  _majTotalEditFact();
+  openModal('modal-edit-fact');
+}
+
+function _parseLignesEditFact(){
+  const txt=document.getElementById('ef-lignes').value.trim();
+  if(!txt)return [];
+  return txt.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
+    const [nom,qty,prix]=l.split(';').map(x=>(x||'').trim());
+    return {nom:nom||'?',qty:Math.max(0,parseFloat(qty)||0),prix:Math.max(0,parseFloat(prix)||0)};
+  }).filter(l=>l.qty>0);
+}
+
+function _majTotalEditFact(){
+  const lignes=_parseLignesEditFact();
+  const total=lignes.reduce((s,l)=>s+l.qty*l.prix,0);
+  const el=document.getElementById('ef-total');
+  if(el)el.textContent='TOTAL : '+fmt(total);
+}
+// Recalculer le total en direct pendant la saisie
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='ef-lignes')_majTotalEditFact();});
+
+async function confirmEditFact(){
+  const id=document.getElementById('ef-id').value;
+  const pwd=document.getElementById('ef-pwd').value;
+  const f=DB.factures.find(x=>x.id===id);
+  if(!f){toast('Facture introuvable','err');return;}
+
+  let admin=null;
+  for(const u of DB.users){
+    if(u.role==='admin'&&u.actif!==false&&await checkPwd(pwd,u.pwd)){admin=u;break;}
+  }
+  if(!admin){soundErr();toast('Code administrateur incorrect','err');return;}
+
+  const nouvellesLignes=_parseLignesEditFact();
+  if(!nouvellesLignes.length){soundErr();toast('Ajoutez au moins un article','err');return;}
+
+  // Faire correspondre chaque ligne à un produit du catalogue pour récupérer
+  // le prix d'achat (nécessaire pour un calcul de bénéfice correct) et ajuster le stock.
+  const anciensItems=f.items||[];
+  const champStock=f.boutique==='B1'?'s1':'s2';
+
+  // 1. Restituer le stock des anciennes quantités
+  anciensItems.forEach(old=>{
+    const p=DB.produits.find(x=>x.id===old.id)||DB.produits.find(x=>_norm(x.nom)===_norm(old.nom));
+    if(p)applyStockDelta(p.id,champStock,Number(old.qty)||0);
+  });
+
+  // 2. Construire les nouveaux items et déduire le nouveau stock
+  const nouveauxItems=nouvellesLignes.map(l=>{
+    const p=DB.produits.find(x=>_norm(x.nom)===_norm(l.nom));
+    if(p){
+      applyStockDelta(p.id,champStock,-l.qty);
+      return {id:p.id,nom:p.nom,prix:l.prix,achat:Number(p.achat)||0,qty:l.qty,unite:p.unite||'pièce'};
+    }
+    // Produit non trouvé dans le catalogue: on garde la ligne telle quelle (pas d'ajustement de stock possible)
+    return {id:null,nom:l.nom,prix:l.prix,achat:0,qty:l.qty,unite:'pièce'};
+  });
+
+  const nouveauTotal=nouveauxItems.reduce((s,i)=>s+i.qty*i.prix,0);
+  const avant={client:f.client,mode:f.mode,total:f.total,items:anciensItems};
+
+  f.items=nouveauxItems;
+  f.client=document.getElementById('ef-client').value.trim()||'Anonyme';
+  f.mode=document.getElementById('ef-mode').value;
+  f.sousTotal=nouveauTotal;
+  f.total=nouveauTotal*(1-(Number(f.remise)||0)/100);
+  f._modifiePar=admin.nom;
+  f._modifieLe=Date.now();
+  // Transférer l'autorité de synchronisation à l'admin qui modifie, sinon la
+  // correction ne serait jamais renvoyée vers Firebase (filtre par auteur).
+  f._author=admin.id;
+
+  save();
+  logAction&&logAction('Modification facture',
+    id+' par '+admin.nom+' — total '+fmt(avant.total)+' → '+fmt(f.total));
+  closeModal('modal-edit-fact');
+  renderFactures();
+  toast(`✅ Facture ${id} modifiée — nouveau total ${fmt(f.total)}`,'ok');
+}
+
 
 // ══ FACTURE DETAIL / PDF ══
 function switchTab(tab){
@@ -3438,16 +3559,23 @@ function collecterDiagnostic(){
   const cp=controlePrixLocal();
   d.push(cp.pertes.length
     ? {n:'Prix de vente',e:'err',v:cp.pertes.length+' produit(s) à perte',
-       m:'Vous perdez de l\'argent à chaque vente : '+cp.pertes.slice(0,3).map(x=>x.nom).join(', ')+(cp.pertes.length>3?'…':'')}
+       m:'Vous perdez de l\'argent à chaque vente sur ces produits.',
+       liste:cp.pertes.map(x=>({id:x.id,nom:x.nom,achat:x.achat,vente:x.vente,conseille:x.conseille}))}
     : (cp.faibles.length
-      ? {n:'Prix de vente',e:'warn',v:cp.faibles.length+' marge(s) faible(s)',m:'Marge sous 15 % sur ces produits.'}
+      ? {n:'Prix de vente',e:'warn',v:cp.faibles.length+' marge(s) faible(s)',m:'Marge sous 15 % sur ces produits.',
+         liste:cp.faibles.map(x=>({id:x.id,nom:x.nom,achat:x.achat,vente:x.vente,conseille:x.conseille}))}
       : {n:'Prix de vente',e:'ok',v:'Cohérents',m:'Marge médiane : '+cp.margeMediane+' %.'}));
 
   // 8. Produits sans prix d'achat (bénéfices faussés)
-  const sansAchat=(DB.produits||[]).filter(p=>!(Number(p.achat)>0));
+  // Prix d'achat manquants ou aberrants (0, vide, ou négatif comme "-100")
+  const sansAchat=(DB.produits||[]).filter(p=>{
+    const a=Number(p.achat);
+    return !(a>0) || a<0;   // 0, vide/NaN, ou négatif
+  });
   d.push(sansAchat.length
-    ? {n:'Prix d\'achat',e:'warn',v:sansAchat.length+' produit(s) sans prix d\'achat',
-       m:'Vos bénéfices sont sous-estimés tant qu\'ils ne sont pas renseignés.'}
+    ? {n:'Prix d\'achat',e:'warn',v:sansAchat.length+' produit(s) à corriger',
+       m:'Vos bénéfices sont faussés tant que ces prix ne sont pas renseignés correctement.',
+       liste:sansAchat.map(p=>({id:p.id,nom:p.nom,achat:Number(p.achat)||0}))}
     : {n:'Prix d\'achat',e:'ok',v:'Tous renseignés',m:'Les calculs de bénéfice sont fiables.'});
 
   // 9. Ruptures de stock
@@ -3479,14 +3607,31 @@ function renderDiagnostic(){
 
   const couleur={ok:'#10b981',warn:'#f59e0b',err:'#f43f5e'};
   const icone={ok:'✅',warn:'⚠️',err:'🔴'};
-  el.innerHTML=d.map(x=>
-    '<div style="background:rgba(148,163,184,.06);border:1px solid rgba(148,163,184,.12);'
+  el.innerHTML=d.map(x=>{
+    let listeHTML='';
+    if(x.liste&&x.liste.length){
+      listeHTML='<div style="margin-top:8px;display:flex;flex-direction:column;gap:5px;">'
+        +x.liste.map(p=>{
+          const detail = p.vente!==undefined
+            ? `achat ${fmt(p.achat)} · vente ${fmt(p.vente)}`+(p.conseille?` · conseillé ${fmt(p.conseille)}`:'')
+            : `prix d'achat actuel : ${fmt(p.achat)}`;
+          return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;'
+            +'background:rgba(148,163,184,.08);border-radius:7px;padding:6px 9px;">'
+            +'<div style="font-size:10px;"><b>'+escapeHtml(p.nom)+'</b><br><span style="color:var(--text2);">'+detail+'</span></div>'
+            +'<button class="btn btn-sm btn-gold" style="flex-shrink:0;" onclick="editProd(\''+p.id+'\')">✏️ Corriger</button>'
+            +'</div>';
+        }).join('')
+        +'</div>';
+    }
+    return '<div style="background:rgba(148,163,184,.06);border:1px solid rgba(148,163,184,.12);'
     +'border-left:3px solid '+couleur[x.e]+';border-radius:9px;padding:11px 13px;margin-bottom:8px;">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">'
     +'<span style="font-size:11px;font-weight:800;">'+icone[x.e]+' '+escapeHtml(x.n)+'</span>'
     +'<span style="font-size:11px;font-weight:800;color:'+couleur[x.e]+';">'+escapeHtml(x.v)+'</span></div>'
     +'<div style="font-size:10px;color:var(--text2);margin-top:4px;line-height:1.5;">'+escapeHtml(x.m)+'</div>'
-    +'</div>').join('');
+    +listeHTML
+    +'</div>';
+  }).join('');
 }
 
 // ══ AFFICHAGE DES ANALYSES LOCALES ══
