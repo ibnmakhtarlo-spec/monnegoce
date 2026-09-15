@@ -547,7 +547,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="ni admin-nav" onclick="nav('produits-lents')"><span class="ic">🐢</span> Produits Lents</div>
   <div class="ni" onclick="nav('chat')"><span class="ic">💬</span> Chat Personnel</div>
   <div class="ni admin-nav" onclick="nav('users')"><span class="ic">🔐</span> Utilisateurs & Rôles</div>
-  <div class="ni admin-nav" onclick="openTransfertStock()"><span class="ic">🔄</span> Transfert Stock</div>
+  <div class="ni" onclick="openTransfertStock()"><span class="ic">🔄</span> Transfert Stock</div>
   <div class="ni admin-nav" onclick="recalculerStockCloud()"><span class="ic">♻️</span> Recalculer le Stock</div>
   <div class="ni admin-nav" onclick="nav('diagnostic')"><span class="ic">🩺</span> Diagnostic</div>
   <div class="ni admin-nav" onclick="nav('caisses-config')"><span class="ic">💰</span> Config Caisses</div>
@@ -1271,6 +1271,10 @@ canvas.chart-canvas{display:block;width:100%!important;}
         <div class="qa-icon">📊</div><div class="qa-label">Rapport</div><div class="qa-sub">Journalier</div>
       </button>
     </div>
+    <div class="card" style="padding:13px;margin-bottom:11px;">
+      <h3 style="font-size:13px;font-weight:800;margin-bottom:9px;">🔔 Changements produits</h3>
+      <div id="accueil-changements" style="max-height:200px;overflow-y:auto;"></div>
+    </div>
     <div class="card" style="padding:13px;">
       <h3 style="font-size:13px;font-weight:800;margin-bottom:9px;">🕐 Activité récente</h3>
       <div id="accueil-activite" style="max-height:230px;overflow-y:auto;"></div>
@@ -1437,6 +1441,27 @@ canvas.chart-canvas{display:block;width:100%!important;}
   </div>
 </div>
 
+<!-- PARTAGER FACTURE (client) -->
+<div class="overlay" id="modal-share-fact">
+  <div class="modal">
+    <div class="mtitle"><span>📤 Envoyer au client</span><span class="mclose" onclick="closeModal('modal-share-fact')">✕</span></div>
+    <div id="share-fact-info" style="font-size:11px;color:var(--text2);margin-bottom:11px;"></div>
+    <input type="hidden" id="share-fact-id">
+
+    <div style="background:var(--surf2);border-radius:9px;padding:11px;">
+      <div style="font-size:10px;color:var(--text2);margin-bottom:9px;line-height:1.5;">
+        Ouvre le menu de partage de votre téléphone (WhatsApp, Mail, SMS...) avec le PDF déjà attaché.
+        Le fichier part directement de cet appareil : rien n'est stocké en ligne.
+      </div>
+      <button class="btn btn-gold" style="width:100%;" onclick="partagerFichierPDF(document.getElementById('share-fact-id').value)">📤 Partager le PDF</button>
+    </div>
+
+    <div class="mfooter">
+      <button class="btn btn-ghost" onclick="closeModal('modal-share-fact')">Fermer</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODIFIER FACTURE (admin) -->
 <div class="overlay" id="modal-edit-fact">
   <div class="modal">
@@ -1483,6 +1508,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
     <div class="mfooter">
       <button class="btn btn-ghost" onclick="closeModal('modal-fdet')">Fermer</button>
       <button class="btn btn-blue btn-sm" onclick="genererFacturePDF()">⬇️ PDF</button>
+      <button class="btn btn-green btn-sm" onclick="ouvrirPartageFacture(currentFact&&currentFact.id)">📤 Envoyer au client</button>
       <button class="wabtn" onclick="waShare()">📲 WhatsApp</button>
       <button class="btn btn-gold" onclick="printFact()">🖨 Imprimer</button>
     </div>
@@ -2012,6 +2038,7 @@ const ALL_PERMS=[
   {id:'depenses',label:'💸 Dépenses'},
   {id:'produits',label:'📦 Voir Produits'},
   {id:'produits_edit',label:'✏️ Modifier Produits'},
+  {id:'transfert',label:'🔄 Transfert de Stock'},
   {id:'fournisseurs',label:'🚚 Fournisseurs'},
   {id:'clients',label:'👥 Clients'},
   {id:'prix_achat',label:'💰 Voir Prix Achat'},
@@ -2025,9 +2052,9 @@ const ALL_PERMS=[
 
 const ROLE_PERMS={
   admin:ALL_PERMS.map(p=>p.id),
-  superviseur:['caisse','factures','devis','retours','depenses','produits','produits_edit','fournisseurs','clients','dashboard','ventes_jour','inventaire','rapports','ia','admin_menus'],
-  vendeur:['caisse','factures','devis','retours','produits','produits_edit','clients','ia'],
-  caissier:['caisse','factures','produits','produits_edit','ia'],
+  superviseur:['caisse','factures','devis','retours','depenses','produits','produits_edit','fournisseurs','clients','dashboard','ventes_jour','inventaire','rapports','ia','transfert','admin_menus'],
+  vendeur:['caisse','factures','devis','retours','produits','produits_edit','clients','ia','transfert'],
+  caissier:['caisse','factures','produits','produits_edit','ia','transfert'],
 };
 
 let DB={
@@ -2468,7 +2495,7 @@ function startApp(){
 // des produits. Sans ça, les comptes déjà enregistrés (VEN01, CAS01...) gardent leurs
 // anciennes permissions et ne verraient pas le bouton "Nouveau produit".
 function migrerPermsProduits(){
-  if(LS('migr_prodPerms_v2'))return;
+  if(LS('migr_prodPerms_v3'))return;
   // SÉCURITÉ: ne jamais lancer cette migration sur des données par défaut non
   // synchronisées. Sinon un poste réinitialisé (mise à jour système, cache vidé)
   // republierait les comptes d'usine sur Firebase et écraserait les vrais
@@ -2483,7 +2510,7 @@ function migrerPermsProduits(){
   (DB.users||[]).forEach(u=>{
     if(!u.perms)u.perms=[];
     let ajout=false;
-    ['produits','produits_edit','ia'].forEach(pm=>{
+    ['produits','produits_edit','ia','transfert'].forEach(pm=>{
       if(!u.perms.includes(pm)){u.perms.push(pm);ajout=true;modif++;}
     });
     // Ne dater que les fiches réellement modifiées (avant: toutes l'étaient)
@@ -2494,17 +2521,26 @@ function migrerPermsProduits(){
     try{if(typeof pushUsersToFirebase==='function')pushUsersToFirebase();}catch(e){}
     console.log('Permissions produits accordées à '+modif+' entrée(s)');
   }
-  SS('migr_prodPerms_v2',1);
+  SS('migr_prodPerms_v3',1);
   // Mettre à jour la session en cours pour que le bouton apparaisse sans reconnexion
   if(session.user){
-    ['produits','produits_edit','ia'].forEach(pm=>{
+    ['produits','produits_edit','ia','transfert'].forEach(pm=>{
       if(!session.user.perms)session.user.perms=[];
       if(!session.user.perms.includes(pm))session.user.perms.push(pm);
     });
   }
 }
 
+// Filet de securite: restaurer un logo de boutique absent, quelle qu'en soit la cause
+function assurerLogosBoutiques(){
+  let modif=false;
+  if(DB.settings?.B1&&!DB.settings.B1.logo){DB.settings.B1.logo=LOGO_B1;modif=true;}
+  if(DB.settings?.B2&&!DB.settings.B2.logo){DB.settings.B2.logo=LOGO_B2;modif=true;}
+  if(modif){save();console.log('Logo(s) de boutique restaure(s)');}
+}
+
 function applyNavPerms(){
+  try{assurerLogosBoutiques();}catch(e){}
   migrerPermsProduits();
   if(session.user?.role==='admin')return; // Admin voit tout
 
@@ -2519,6 +2555,11 @@ function applyNavPerms(){
   // Masquer menus selon perms
   document.querySelectorAll('.ni').forEach(el=>{
     const onclick=el.getAttribute('onclick')||'';
+    // Le Transfert de Stock n'utilise pas nav(): on le gère par sa permission dédiée
+    if(onclick.includes('openTransfertStock')){
+      el.style.display=perms.includes('transfert')?'flex':'none';
+      return;
+    }
     const m=onclick.match(/nav\('([^']+)'\)/);
     if(!m)return;
     const page=m[1];
@@ -2861,6 +2902,7 @@ function renderFactures(){
     <td style="display:flex;gap:3px;flex-wrap:wrap;">
       <button class="btn btn-ghost btn-xs" onclick="openFactDetail('${f.id}')">👁</button>
       <button class="btn btn-blue btn-xs" onclick="(function(){const f=DB.factures.find(x=>x.id==='${f.id}');if(f){currentFact=JSON.parse(JSON.stringify(f));genererFacturePDF();}})()">📄</button>
+      <button class="btn btn-green btn-xs" onclick="ouvrirPartageFacture('${f.id}')">📤</button>
       <button class="wabtn" style="padding:2px 5px;font-size:10px;" onclick="waShareId('${f.id}')">📲</button>
       ${canDel?`<button class="btn btn-gold btn-xs" onclick="openEditFact('${f.id}')">✏️</button><button class="btn btn-red btn-xs" onclick="openDelFact('${f.id}')">🗑</button>`:''}
     </td>
@@ -2998,6 +3040,47 @@ async function renderPDFPreview(f){
   try{const bytes=await buildPDFBytes(f);const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));c.innerHTML=`<iframe src="${url}#toolbar=0&navpanes=0" style="width:100%;height:100%;border:none;border-radius:8px;"></iframe>`;}
   catch(e){c.innerHTML=`<div class="empty"><div class="ei">📄</div><p>Aperçu indisponible</p><button class="btn btn-gold btn-sm" style="margin-top:7px" onclick="genererFacturePDF()">⬇️ PDF</button></div>`;}
 }
+// ══ MONTANT EN LETTRES (français) ══
+function montantEnLettres(n){
+  n=Math.round(Math.abs(Number(n)||0));
+  if(n===0)return 'zéro franc CFA';
+  const U=['','un','deux','trois','quatre','cinq','six','sept','huit','neuf','dix',
+           'onze','douze','treize','quatorze','quinze','seize','dix-sept','dix-huit','dix-neuf'];
+  const D=['','','vingt','trente','quarante','cinquante','soixante','soixante','quatre-vingt','quatre-vingt'];
+  function centaines(x){
+    if(x===0)return '';
+    if(x<20)return U[x];
+    if(x<100){
+      const d=Math.floor(x/10),u=x%10;
+      if(d===7||d===9){
+        const base=D[d];const reste=U[10+u];
+        return base+(u===1&&d===7?'-et-':'-')+reste;
+      }
+      if(u===0)return D[d]+((d===8)?'s':'');
+      if(u===1&&d!==8)return D[d]+'-et-un';
+      return D[d]+'-'+U[u];
+    }
+    const cc=Math.floor(x/100),r=x%100;
+    let s=(cc>1?U[cc]+' ':'')+'cent'+((cc>1&&r===0)?'s':'');
+    if(r)s+=' '+centaines(r);
+    return s;
+  }
+  let mots='';
+  const milliards=Math.floor(n/1e9), millions=Math.floor((n%1e9)/1e6),
+        milliers=Math.floor((n%1e6)/1e3), reste=n%1e3;
+  if(milliards)mots+=(milliards===1?'un milliard':centaines(milliards)+' milliards')+' ';
+  if(millions)mots+=(millions===1?'un million':centaines(millions)+' millions')+' ';
+  if(milliers)mots+=(milliers===1?'mille':centaines(milliers)+' mille')+' ';
+  if(reste)mots+=centaines(reste);
+  mots=mots.trim().replace(/\s+/g,' ');
+  // Règles d'accord: « cent » et « vingt » restent invariables devant mille/million/milliard
+  mots=mots.replace(/cents (mille|millions?|milliards?)/g,'cent $1')
+           .replace(/vingts (mille|millions?|milliards?)/g,'vingt $1');
+  // « un million DE francs » quand rien ne suit l'ordre de grandeur
+  if(/(millions?|milliards?)$/.test(mots))return mots+' de francs CFA';
+  return mots+' franc'+(n>1?'s':'')+' CFA';
+}
+
 // Dessine le logo dans un PDF: image si data URI, sinon emoji texte.
 function pdfLogo(doc,logo,x,y,maxH,goldColor){
   if(isImgLogo(logo)){
@@ -3024,7 +3107,8 @@ async function buildPDFBytes(f){
   doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.setTextColor(...gold);doc.text('FACTURE INFO',14,62);
   doc.setFont('helvetica','normal');doc.setTextColor(60,60,70);
   doc.text('N° :',14,69);doc.setFont('helvetica','bold');doc.text(f.id,34,69);doc.setFont('helvetica','normal');
-  doc.text('Date :',14,75);doc.text(new Date(f.date).toLocaleDateString('fr-FR'),34,75);
+  const _d=new Date(f.date);
+  doc.text('Date :',14,75);doc.text(_d.toLocaleDateString('fr-FR')+' à '+_d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),34,75);
   doc.text('Vendeur :',14,81);doc.text(f.vendeur||'—',34,81);
   doc.text('Paiement :',14,87);doc.setFont('helvetica','bold');doc.setTextColor(...gold);doc.text(f.mode.toUpperCase(),34,87);
   doc.setFont('helvetica','bold');doc.setTextColor(...gold);doc.text('CLIENT',116,62);
@@ -3045,6 +3129,13 @@ async function buildPDFBytes(f){
   if(f.remise>0){doc.setTextColor(...gray);doc.text(`Remise (-${f.remise}%) :`,114,y+14);doc.setTextColor(...red);doc.text('-'+_fmtBase(f.sousTotal*f.remise/100)+' FCFA',197,y+14,{align:'right'});y+=7;}
   const tY=y+(f.remise>0?14:12);doc.setFillColor(...gold);doc.roundedRect(110,tY,90,12,2,2,'F');doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(...dark);
   doc.text('TOTAL :',114,tY+8);doc.text(_fmtBase(f.total)+' FCFA',197,tY+8,{align:'right'});
+  // Montant en toutes lettres (valeur légale sur une facture)
+  const lettres=montantEnLettres(f.total);
+  doc.setFontSize(7.5);doc.setFont('helvetica','italic');doc.setTextColor(60,60,70);
+  doc.text('Arrêtée la présente facture à la somme de :',14,tY+6);
+  doc.setFont('helvetica','bold');doc.setFontSize(8);
+  const lignesLettres=doc.splitTextToSize(lettres.charAt(0).toUpperCase()+lettres.slice(1),92);
+  lignesLettres.forEach((ln,i)=>doc.text(ln,14,tY+11.5+i*4));
   const fY=H-25;doc.setDrawColor(...gold);doc.setLineWidth(0.5);doc.line(10,fY,W-10,fY);
   doc.setFontSize(7);doc.setFont('helvetica','italic');doc.setTextColor(...gray);
   doc.text('Merci pour votre confiance !',W/2,fY+6,{align:'center'});
@@ -3148,6 +3239,37 @@ async function genererFacturePDF(){
   a.click();
   toast('📄 PDF téléchargé ✅','ok');
 }
+
+// ══ PARTAGE DE FACTURE AU CLIENT ══
+// Option 1: partage direct du fichier PDF (WhatsApp, mail, etc. via le menu natif du téléphone)
+async function partagerFichierPDF(id){
+  const f=DB.factures.find(x=>x.id===id)||currentFact;
+  if(!f){toast('Facture introuvable','err');return;}
+  try{
+    const bytes=await buildPDFBytes(JSON.parse(JSON.stringify(f)));
+    const file=new File([bytes],`Facture_${f.id}.pdf`,{type:'application/pdf'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:'Facture '+f.id,text:'Votre facture '+f.id});
+    } else {
+      // Pas de partage natif disponible (PC, ancien navigateur): on télécharge simplement
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+      a.download=`Facture_${f.id}.pdf`;a.click();
+      toast('📄 PDF téléchargé — partagez-le manuellement (le partage direct n\'est pas dispo sur cet appareil)','info');
+    }
+  }catch(e){
+    if(e.name!=='AbortError'){console.error('partagerFichierPDF:',e);toast('❌ Échec du partage: '+e.message,'err');}
+  }
+}
+
+function ouvrirPartageFacture(id){
+  const f=DB.factures.find(x=>x.id===id)||currentFact;
+  if(!f){toast('Facture introuvable','err');return;}
+  document.getElementById('share-fact-id').value=id||f.id;
+  document.getElementById('share-fact-info').textContent=`Facture ${f.id} — ${f.client||'Anonyme'} — ${fmt(f.total)}`;
+  openModal('modal-share-fact');
+}
+
 function openFactDetail(id){
   const fOrig=DB.factures.find(x=>x.id===id);if(!fOrig)return;
   const f=JSON.parse(JSON.stringify(fOrig)); // Copie profonde — protège les items du PDF
@@ -3161,7 +3283,7 @@ function openFactDetail(id){
 }
 function waShare(){if(currentFact)waShareId(currentFact.id);}
 function waShareId(id){const f=DB.factures.find(x=>x.id===id);const s=DB.settings[f.boutique]||{};const txt=encodeURIComponent(`🧾 *FACTURE ${f.id}*\n🏪 ${s.nom||getBName(f.boutique)}\n📅 ${new Date(f.date).toLocaleDateString('fr-FR')}\n👤 ${f.client}\n\n${f.items.map(i=>`• ${i.nom} x${i.qty} = ${fmt(i.prix*i.qty)}`).join('\n')}${f.remise>0?`\n🏷️ -${f.remise}%`:''}\n\n*💰 TOTAL: ${fmt(f.total)}*\n💳 ${f.mode}\n\nMerci 🙏`);window.open(`https://wa.me/?text=${txt}`,'_blank');}
-function printFact(){if(!currentFact)return;const f=currentFact;const s=DB.settings[f.boutique]||{};document.getElementById('print-area').innerHTML=`<div style="max-width:360px;margin:0 auto;font-family:sans-serif;padding:16px;"><div style="text-align:center;margin-bottom:14px;border-bottom:2px solid #000;padding-bottom:11px;"><div style="margin-bottom:6px;">${logoHTML(s.logo,54)}</div><h2>${escapeHtml(s.nom)||'Mon Négoce'}</h2>${s.adr?`<p style="font-size:10px;color:#666;">${escapeHtml(s.adr)}</p>`:''}</div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:9px;"><div><b>Facture:</b> ${f.id}<br><b>Date:</b> ${new Date(f.date).toLocaleString('fr-FR')}</div><div><b>Client:</b> ${escapeHtml(f.client)}<br><b>Mode:</b> ${f.mode}</div></div><table style="width:100%;font-size:11px;border-collapse:collapse;margin-bottom:9px;"><thead><tr style="border-bottom:2px solid #000;"><th style="text-align:left;padding:2px 0">Produit</th><th>Qté</th><th style="text-align:right">Total</th></tr></thead><tbody>${f.items.map(i=>`<tr style="border-bottom:1px solid #eee;"><td style="padding:2px 0">${escapeHtml(i.nom)}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right;font-weight:700">${_fmtBase(i.prix*i.qty)}</td></tr>`).join('')}</tbody></table>${f.remise>0?`<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;"><span>Remise -${f.remise}%</span><span>-${_fmtBase(f.sousTotal*f.remise/100)} FCFA</span></div>`:''}<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:900;border-top:2px solid #000;padding-top:6px;"><span>TOTAL</span><span>${_fmtBase(f.total)} FCFA</span></div><p style="text-align:center;margin-top:12px;font-size:10px;color:#999;">Merci !</p></div>`;window.print();}
+function printFact(){if(!currentFact)return;const f=currentFact;const s=DB.settings[f.boutique]||{};document.getElementById('print-area').innerHTML=`<div style="max-width:360px;margin:0 auto;font-family:sans-serif;padding:16px;"><div style="text-align:center;margin-bottom:14px;border-bottom:2px solid #000;padding-bottom:11px;"><div style="margin-bottom:6px;">${logoHTML(s.logo,54)}</div><h2>${escapeHtml(s.nom)||'Mon Négoce'}</h2>${s.adr?`<p style="font-size:10px;color:#666;">${escapeHtml(s.adr)}</p>`:''}</div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:9px;"><div><b>Facture:</b> ${f.id}<br><b>Date:</b> ${new Date(f.date).toLocaleString('fr-FR')}</div><div><b>Client:</b> ${escapeHtml(f.client)}<br><b>Mode:</b> ${f.mode}</div></div><table style="width:100%;font-size:11px;border-collapse:collapse;margin-bottom:9px;"><thead><tr style="border-bottom:2px solid #000;"><th style="text-align:left;padding:2px 0">Produit</th><th>Qté</th><th style="text-align:right">Total</th></tr></thead><tbody>${f.items.map(i=>`<tr style="border-bottom:1px solid #eee;"><td style="padding:2px 0">${escapeHtml(i.nom)}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right;font-weight:700">${_fmtBase(i.prix*i.qty)}</td></tr>`).join('')}</tbody></table>${f.remise>0?`<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;"><span>Remise -${f.remise}%</span><span>-${_fmtBase(f.sousTotal*f.remise/100)} FCFA</span></div>`:''}<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:900;border-top:2px solid #000;padding-top:6px;"><span>TOTAL</span><span>${_fmtBase(f.total)} FCFA</span></div><div style="font-size:10px;font-style:italic;margin-top:7px;padding-top:6px;border-top:1px dashed #999;">Arrêtée la présente facture à la somme de :<br><b style="font-style:normal;">${escapeHtml((m=>m.charAt(0).toUpperCase()+m.slice(1))(montantEnLettres(f.total)))}</b></div><p style="text-align:center;margin-top:12px;font-size:10px;color:#999;">Merci !</p></div>`;window.print();}
 
 // ══ NOUVELLE FACTURE ══
 function openNouvelleFacture(){
@@ -4296,7 +4418,17 @@ function saveProd(){
   const _prodTs=Date.now();
   const p={id:_pid,_updated:_prodTs,nom,ref:document.getElementById('mp-ref').value,cat:document.getElementById('mp-cat').value||'Accessoire High-Tech',fourn:document.getElementById('mp-fourn').value||'',prix,achat:parseFloat(document.getElementById('mp-achat').value)||0,s1:parseInt(document.getElementById('mp-s1').value)||0,s2:parseInt(document.getElementById('mp-s2').value)||0,alerte:parseInt(document.getElementById('mp-al').value)||5,unite:document.getElementById('mp-un').value,desc:document.getElementById('mp-desc').value,photo:document.getElementById('mp-photo-data').value||''};
   let _qteChangee=false;
-  if(eid){const old=DB.produits.find(x=>x.id===eid);if(old&&(old.s1!==p.s1||old.s2!==p.s2)){_qteChangee=true;if(old.s1!==p.s1)logMouvement(p.id,p.nom,'ajustement',p.s1-old.s1,'B1','Modification manuelle stock');if(old.s2!==p.s2)logMouvement(p.id,p.nom,'ajustement',p.s2-old.s2,'B2','Modification manuelle stock');}const i=DB.produits.findIndex(x=>x.id===eid);DB.produits[i]=p;logAction('Modif produit',p.nom);}else{DB.produits.push(p);logAction('Ajout produit',p.nom);if(p.s1>0)logMouvement(p.id,p.nom,'creation',p.s1,'B1','Stock initial');if(p.s2>0)logMouvement(p.id,p.nom,'creation',p.s2,'B2','Stock initial');}
+  if(eid){const old=DB.produits.find(x=>x.id===eid);
+    // Tracer les changements de PRIX (non suivis jusqu'ici)
+    if(old){
+      if(Number(old.prix)!==Number(p.prix))
+        logMouvement(p.id,p.nom,'prix_vente',0,session.boutique,'Prix de vente : '+fmt(old.prix)+' → '+fmt(p.prix));
+      if(Number(old.achat)!==Number(p.achat))
+        logMouvement(p.id,p.nom,'prix_achat',0,session.boutique,'Prix d\'achat : '+fmt(old.achat||0)+' → '+fmt(p.achat||0));
+      if(old.nom!==p.nom)
+        logMouvement(p.id,p.nom,'renommage',0,session.boutique,'Renommé : "'+old.nom+'" → "'+p.nom+'"');
+    }
+    if(old&&(old.s1!==p.s1||old.s2!==p.s2)){_qteChangee=true;if(old.s1!==p.s1)logMouvement(p.id,p.nom,'ajustement',p.s1-old.s1,'B1','Modification manuelle stock');if(old.s2!==p.s2)logMouvement(p.id,p.nom,'ajustement',p.s2-old.s2,'B2','Modification manuelle stock');}const i=DB.produits.findIndex(x=>x.id===eid);DB.produits[i]=p;logAction('Modif produit',p.nom);}else{DB.produits.push(p);logAction('Ajout produit',p.nom);if(p.s1>0)logMouvement(p.id,p.nom,'creation',p.s1,'B1','Stock initial');if(p.s2>0)logMouvement(p.id,p.nom,'creation',p.s2,'B2','Stock initial');}
   // Publier le stock de ce produit vers Firebase (sinon les autres appareils ne le voient jamais)
   setStockQty(p.id,p.s1,p.s2);
   // Forcer push immédiat pour que les autres appareils voient le nouveau produit
@@ -4318,8 +4450,8 @@ function renderCategories(){
     return`<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--surf2);border-radius:8px;margin-bottom:5px;">
       <span style="flex:1;font-size:12px;font-weight:700;">${c}</span>
       <span class="badge bcy">${count} produit(s)</span>
-      <button class="btn btn-ghost btn-xs" onclick="renommerCategorie('${c.replace(/'/g,"\\'")}')">✏️</button>
-      <button class="btn btn-red btn-xs" onclick="supprimerCategorie('${c.replace(/'/g,"\\'")}')">🗑️</button>
+      <button class="btn btn-ghost btn-xs" onclick="renommerCategorie('${c.replace(/'/g,"\'")}')">✏️</button>
+      <button class="btn btn-red btn-xs" onclick="supprimerCategorie('${c.replace(/'/g,"\'")}')">🗑️</button>
     </div>`;
   }).join(''):'<div class="empty" style="padding:14px;">Aucune catégorie</div>';
   // Mettre à jour le datalist du formulaire produit
@@ -5158,7 +5290,24 @@ function resetLogo(b){
   const pv=document.getElementById(`set-b${n}-logo-prev`);if(pv)pv.innerHTML=logoHTML(def,40);
   toast('Logo par défaut restauré — pensez à enregistrer','ok');
 }
-function saveSettings(b){const n=b==='B1'?1:2;const s=DB.settings[b];const get=id=>document.getElementById(id)?.value||'';s.nom=get(`set-b${n}-nom`);s.adr=get(`set-b${n}-adr`);s.tel=get(`set-b${n}-tel`);s.ninea=get(`set-b${n}-ninea`);s.rc=get(`set-b${n}-rc`);s.logo=get(`set-b${n}-logo`);save();buildBoutiqueSelects();toast(`Boutique ${n} mise à jour ✅`,'ok');}
+function saveSettings(b){
+  const n=b==='B1'?1:2;const s=DB.settings[b];
+  const get=id=>document.getElementById(id)?.value||'';
+  // N'écraser un champ QUE s'il a été réellement saisi. Sinon, ouvrir les paramètres
+  // sans les remplir (ou enregistrer depuis un écran où ils sont absents) effaçait
+  // le nom, l'adresse, le téléphone et le logo de la boutique.
+  const maj=(cle,val)=>{if(val!=='')s[cle]=val;};
+  maj('nom',get(`set-b${n}-nom`));
+  maj('adr',get(`set-b${n}-adr`));
+  maj('tel',get(`set-b${n}-tel`));
+  maj('ninea',get(`set-b${n}-ninea`));
+  maj('rc',get(`set-b${n}-rc`));
+  maj('logo',get(`set-b${n}-logo`));
+  if(!s.logo)s.logo=(b==='B1'?LOGO_B1:LOGO_B2);
+  if(!s.nom)s.nom=(b==='B1'?'Rahma Telecom':'Rayane Telecom');
+  save();buildBoutiqueSelects();
+  toast(`Boutique ${n} mise à jour ✅`,'ok');
+}
 function saveSettingsGen(){DB.settings.appNom=document.getElementById('set-app-nom')?.value||'Mon Négoce';DB.settings.apiKey=document.getElementById('set-api-key')?.value||'';save();const sb=document.getElementById('sb-brand');if(sb)sb.textContent=DB.settings.appNom;toast('Paramètres enregistrés ✅','ok');}
 
 // ══ CENTRE IA ══
@@ -5309,8 +5458,41 @@ function importJSON(input){const file=input.files[0];if(!file)return;const reade
 function importCSVProduits(input){const file=input.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{const lines=e.target.result.split('\n').filter(Boolean);const header=lines[0].split(',');let added=0;lines.slice(1).forEach(line=>{const cols=line.split(',');const obj={};header.forEach((h,i)=>obj[h.trim().toLowerCase()]=cols[i]?.trim()||'');if(obj.nom){DB.produits.push({id:'P'+String(DB.nextIds.p++).padStart(3,'0'),nom:obj.nom,ref:obj.ref||'',cat:obj.cat||obj.categorie||'Accessoire High-Tech',fourn:'',prix:parseFloat(obj.prix||obj.prix_vente||0)||0,achat:parseFloat(obj.achat||obj.prix_achat||0)||0,s1:parseInt(obj.s1||obj.stock_b1||0)||0,s2:parseInt(obj.s2||obj.stock_b2||0)||0,alerte:parseInt(obj.alerte||1)||1,unite:obj.unite||'pièce',desc:obj.desc||obj.description||'',photo:''});added++;}});save();renderProduits();refreshAllSelects();toast(`${added} produits importés ✅`,'ok');};reader.readAsText(file);input.value='';}
 
 // ══ ACCUEIL ══
+// Journal des changements produits: créations, stock, prix
+function renderChangementsProduits(){
+  const el=document.getElementById('accueil-changements');
+  if(!el)return;
+  const TYPES={
+    creation:{ic:'📦',lib:'Nouveau produit',c:'var(--green)'},
+    ajustement:{ic:'📊',lib:'Stock modifié',c:'var(--gold)'},
+    transfert:{ic:'🔄',lib:'Transfert',c:'var(--cyan)'},
+    prix_vente:{ic:'💰',lib:'Prix de vente',c:'var(--orange)'},
+    prix_achat:{ic:'🏷️',lib:'Prix d\'achat',c:'var(--purple)'},
+    renommage:{ic:'✏️',lib:'Renommé',c:'var(--text2)'},
+    reception:{ic:'📥',lib:'Réception',c:'var(--green)'}
+  };
+  const mvts=(DB.mouvements||[]).filter(m=>m&&TYPES[m.type]).slice(0,15);
+  if(!mvts.length){
+    el.innerHTML='<div style="font-size:11px;color:var(--text2);text-align:center;padding:10px;">Aucun changement récent</div>';
+    return;
+  }
+  el.innerHTML=mvts.map(m=>{
+    const t=TYPES[m.type];
+    const quand=_dureeDepuis(new Date(m.date).getTime())||'';
+    const detail=m.details||((m.qte>0?'+':'')+m.qte+' unité(s)');
+    return '<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border);">'
+      +'<span style="font-size:14px;flex-shrink:0;">'+t.ic+'</span>'
+      +'<div style="flex:1;min-width:0;">'
+      +'<div style="font-size:11px;font-weight:700;">'+escapeHtml(m.produitNom||'?')+'</div>'
+      +'<div style="font-size:10px;color:'+t.c+';">'+escapeHtml(detail)+'</div>'
+      +'<div style="font-size:9px;color:var(--text2);">'+escapeHtml(m.user||'?')+' · '+quand+'</div>'
+      +'</div></div>';
+  }).join('');
+}
+
 function renderAccueil(){
   try{renderPerf();}catch(e){console.error('renderPerf:',e);}
+  try{renderChangementsProduits();}catch(e){console.error('renderChangements:',e);}
   const now=new Date();
   const h=now.getHours();
   const greeting=h<12?'Bonjour':h<18?'Bon après-midi':'Bonsoir';
@@ -6240,8 +6422,14 @@ async function pullFromFirebase(){
         const savedFactures=DB.factures;
         const savedClients=DB.clients;
         const savedApiKey=DB.settings?.apiKey||'';
+        // Conserver les logos: un appareil qui aurait poussé des paramètres sans logo
+        // les effacerait chez tout le monde.
+        const savedLogoB1=DB.settings?.B1?.logo||'';
+        const savedLogoB2=DB.settings?.B2?.logo||'';
         Object.assign(DB,cleanCloud);
         if(DB.settings)DB.settings.apiKey=savedApiKey; // clé API = locale uniquement
+        if(DB.settings?.B1&&!DB.settings.B1.logo)DB.settings.B1.logo=savedLogoB1||LOGO_B1;
+        if(DB.settings?.B2&&!DB.settings.B2.logo)DB.settings.B2.logo=savedLogoB2||LOGO_B2;
         DB.factures=savedFactures;
         DB.clients=savedClients;
         DB._syncTime=cloudTime;
@@ -6382,10 +6570,14 @@ function startRealtimeSync(){
       const currentFactures=DB.factures;
       const currentClients=DB.clients;
       const currentApiKey=DB.settings?.apiKey||'';
+      const currentLogoB1=DB.settings?.B1?.logo||'';
+      const currentLogoB2=DB.settings?.B2?.logo||'';
       delete cleanCloud.factures;
       delete cleanCloud.clients;
       Object.assign(DB,cleanCloud);
       if(DB.settings)DB.settings.apiKey=currentApiKey; // clé API = locale uniquement
+      if(DB.settings?.B1&&!DB.settings.B1.logo)DB.settings.B1.logo=currentLogoB1||LOGO_B1;
+      if(DB.settings?.B2&&!DB.settings.B2.logo)DB.settings.B2.logo=currentLogoB2||LOGO_B2;
       // Restaurer users avec fusion intelligente
       const merged2=currentUsers.map(lu=>{
         const cu=cleanCloud.users?.find(u=>u.id===lu.id);
@@ -6473,23 +6665,34 @@ function startRealtimeSync(){
     if(!liste.length)return;
     const localIds=new Set(DB.produits.map(p=>p.id));
     let nouveaux=0,modifies=0;
+    const nomsNouveaux=[],changementsPrix=[];
     liste.forEach(cp=>{
       if(!cp||!cp.id)return;
       if(!localIds.has(cp.id)){
         // Nouveau produit créé sur un autre appareil: on l'ajoute.
         // Le stock viendra de stock_qty (0 en attendant).
         DB.produits.push({...cp,s1:0,s2:0});
-        nouveaux++;
+        nouveaux++;nomsNouveaux.push(cp.nom);
       } else {
         // Produit connu: on met à jour la fiche (nom, prix, réf, photo...) sans toucher au stock
         const lp=DB.produits.find(x=>x.id===cp.id);
         if(!lp)return;
         const {s1,s2,...fiche}=cp;
+        // Repérer les changements de prix pour en informer l'utilisateur
+        if(fiche.prix!==undefined&&Number(lp.prix)!==Number(fiche.prix))
+          changementsPrix.push(lp.nom+' : vente '+fmt(lp.prix)+' → '+fmt(fiche.prix));
+        if(fiche.achat!==undefined&&Number(lp.achat)!==Number(fiche.achat))
+          changementsPrix.push(lp.nom+' : achat '+fmt(lp.achat||0)+' → '+fmt(fiche.achat||0));
         let change=false;
         Object.keys(fiche).forEach(k=>{if(JSON.stringify(lp[k])!==JSON.stringify(fiche[k])){lp[k]=fiche[k];change=true;}});
         if(change)modifies++;
       }
     });
+    // Signaler les changements de prix, qui affectent directement les ventes
+    if(changementsPrix.length){
+      changementsPrix.slice(0,3).forEach(txt=>toast('💰 '+txt,'warn'));
+      if(changementsPrix.length>3)toast('💰 +'+(changementsPrix.length-3)+' autre(s) changement(s) de prix','warn');
+    }
     if(nouveaux||modifies){
       fbLoading=true;
       if(window._origSave)window._origSave();else save();
@@ -6497,7 +6700,7 @@ function startRealtimeSync(){
       try{if(typeof renderGrid==='function')renderGrid();}catch(e){}
       try{if(typeof renderProduits==='function')renderProduits();}catch(e){}
       if(nouveaux){
-        toast('📦 '+nouveaux+' nouveau(x) produit(s) reçu(s)','ok');
+        toast('📦 Nouveau produit : '+nomsNouveaux.slice(0,2).join(', ')+(nouveaux>2?' +'+(nouveaux-2):''),'ok');
         // Aller chercher tout de suite le stock des nouveaux produits, sinon ils
         // resteraient affichés à 0 jusqu'au prochain mouvement de stock.
         fbDB.ref('negoce/stock_qty').once('value').then(s=>{
