@@ -2349,11 +2349,51 @@ async function logConnexion(user,statut){
   save();
   if(fbConnected)pushToFirebase();
 }
-function logAction(action,details=''){
-  if(!session.user)return;
+// ══ TRAÇABILITÉ DES RECHERCHES ══
+// Chaque frappe ne doit PAS créer une ligne de journal, sinon il devient illisible.
+// On attend 2 s de pause, on ignore les termes trop courts, et on ne répète pas
+// deux fois la même recherche à la suite.
+const _ZONES_RECHERCHE={
+  'pos-srch':'Caisse (produits)','pos-cl-srch':'Caisse (clients)','nf-cl-srch':'Note (clients)',
+  'srch-p':'Produits','srch-cl':'Clients','srch-f':'Factures','srch-dv':'Devis',
+  'srch-rt':'Retours','srch-dep':'Dépenses','srch-fn':'Fournisseurs','srch-mv':'Mouvements',
+  'srch-sal':'Salaires','srch-aud':'Journal d\'audit','srch-cx':'Connexions'
+};
+let _timerRecherche=null,_derniereRecherche='';
+function tracerRecherche(zone,terme){
+  terme=(terme||'').trim();
+  if(terme.length<3)return;                       // trop court: bruit
+  const cle=zone+'|'+terme.toLowerCase();
+  if(cle===_derniereRecherche)return;             // déjà enregistrée
+  clearTimeout(_timerRecherche);
+  _timerRecherche=setTimeout(()=>{
+    _derniereRecherche=cle;
+    logAction('Recherche',(_ZONES_RECHERCHE[zone]||zone)+' : « '+terme+' »');
+  },2000);
+}
+function installerTracageRecherches(){
+  Object.keys(_ZONES_RECHERCHE).forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el||el.dataset.tracked)return;
+    el.dataset.tracked='1';
+    el.addEventListener('input',()=>tracerRecherche(id,el.value));
+  });
+}
+
+function logAction(action,details='',acteur=null){
+  // acteur: permet de tracer AVANT connexion (échecs de login), où session.user est vide.
+  if(!session.user&&!acteur)return;
   if(!DB.logs)DB.logs=[];
-  DB.logs.unshift({date:new Date().toISOString(),user:session.user.nom,userId:session.user.id,role:session.user.role,action,details});
-  if(DB.logs.length>500)DB.logs=DB.logs.slice(0,500); // Garder 500 dernières actions
+  const u=session.user;
+  DB.logs.unshift({
+    date:new Date().toISOString(),
+    user:acteur?acteur.nom:u.nom,
+    userId:acteur?acteur.id:u.id,
+    role:acteur?(acteur.role||'inconnu'):u.role,
+    boutique:session.boutique||'',caisse:session.caisse||'',
+    action,details
+  });
+  if(DB.logs.length>800)DB.logs=DB.logs.slice(0,800); // Garder 800 dernières actions
 }
 
 let _loginAttempts={};
@@ -2408,10 +2448,15 @@ async function doLogin(){
     soundErr();
     if(!_loginAttempts[id])_loginAttempts[id]={count:0,lockUntil:0};
     _loginAttempts[id].count++;
+    // Tracer chaque tentative échouée (session.user est vide ici: on passe un acteur)
+    logAction('Échec connexion',
+      'Identifiant "'+id+'" — '+(userFound?(userFound.actif===false?'compte désactivé':'code incorrect'):'identifiant inconnu')
+      +' — tentative n°'+_loginAttempts[id].count,
+      {nom:userFound?userFound.nom:id,id:id,role:userFound?userFound.role:'inconnu'});
     if(_loginAttempts[id].count>=5){
       _loginAttempts[id].lockUntil=Date.now()+5*60*1000;
       _loginAttempts[id].count=0;
-      logAction&&logAction('Sécurité','Verrouillage compte '+id+' après 5 échecs');
+      logAction&&logAction('Sécurité','🔒 Verrouillage du compte '+id+' après 5 échecs',{nom:id,id:id,role:'inconnu'});
       toast('🔒 5 échecs — Compte verrouillé 5 minutes','err');
       return;
     }
@@ -2429,6 +2474,7 @@ async function doLogin(){
   session.caisse=u.caisse||document.getElementById('l-caisse').value||'C1';
   // Forcer une caisse valide si toujours vide
   if(!session.caisse)session.caisse=DB.caisses.find(c=>c.boutique===session.boutique)?.id||'C1';
+  session._debutSession=Date.now();
   logAction('Connexion','Login depuis '+session.boutique+'/'+session.caisse);
   soundLogin();playBismillah();setTimeout(startApp,400);
 }
@@ -2605,6 +2651,10 @@ function applyNavPerms(){
 }
 
 function logout(){
+  // Tracer la déconnexion avec la durée de la session
+  const _duree=session._debutSession?Math.round((Date.now()-session._debutSession)/60000):null;
+  logAction('Déconnexion','Depuis '+(session.boutique||'?')+'/'+(session.caisse||'?')
+    +(_duree!==null?' — session de '+_duree+' min':''));
   soundLogout();playAlhamdoulillah();clearInterval(autoSaveTimer);save();
   const cb=document.getElementById('chat-bubble');if(cb)cb.style.display='none';
   const cp=document.getElementById('chat-popup');if(cp)cp.style.display='none';
@@ -2648,6 +2698,18 @@ function nav(page){
   if(RENDERS[page])RENDERS[page]();
   // Ajouter les boutons micro aux champs de texte de la page
   try{installerBoutonsDictee();}catch(e){}
+  try{installerTracageRecherches();}catch(e){}
+  // Tracer l'accès aux écrans sensibles (marges, bénéfices, salaires, données personnelles)
+  try{
+    const SENSIBLES={
+      rapports:'Rapports financiers',benefices:'Bénéfices',salaires:'Salaires',
+      tresorerie:'Trésorerie',creances:'Créances',comparaison:'Comparaison boutiques',
+      previsions:'Prévisions',users:'Utilisateurs & rôles',audit:'Journal d\'audit',
+      connexions:'Historique des connexions',parametres:'Paramètres',
+      'produits-lents':'Produits lents',inventaire:'Inventaire'
+    };
+    if(SENSIBLES[page])logAction('Consultation',SENSIBLES[page]);
+  }catch(e){}
 }
 
 // ══ CLIENT SEARCH (POS) ══
@@ -6257,8 +6319,28 @@ function pushToFirebase(){
         return c;});
       // La clé API reste STRICTEMENT locale à l'appareil — jamais envoyée sur Firebase
       const settingsSansCle={...DB.settings};delete settingsSansCle.apiKey;
+      // FUSION du catalogue au lieu d'un remplacement: un appareil dont la liste
+      // est en retard effaçait du cloud les produits créés ailleurs.
+      let produitsFusionnes=produitsSansStock;
+      try{
+        const snapProd=await fbDB.ref('negoce/shared/data/produits').once('value');
+        const cloudProd=snapProd.val();
+        const listeCloud=Array.isArray(cloudProd)?cloudProd:(cloudProd?Object.values(cloudProd):[]);
+        if(listeCloud.length){
+          const parId={};
+          // D'abord le cloud, puis le local: le plus récemment modifié l'emporte
+          listeCloud.forEach(p=>{if(p&&p.id)parId[p.id]=p;});
+          produitsSansStock.forEach(p=>{
+            const cp=parId[p.id];
+            if(!cp){parId[p.id]=p;return;}
+            const tCloud=Number(cp._updated)||0, tLocal=Number(p._updated)||0;
+            parId[p.id]=(tLocal>=tCloud)?p:cp;
+          });
+          produitsFusionnes=Object.values(parId);
+        }
+      }catch(e){console.error('Fusion catalogue:',e);}
       await fbDB.ref('negoce/shared/data').set({
-        produits: produitsSansStock,
+        produits: produitsFusionnes,
         fournisseurs: DB.fournisseurs,
         settings: settingsSansCle,
         caisses: DB.caisses,
@@ -6303,7 +6385,7 @@ function pushToFirebase(){
       // Inclure aussi les factures créées hors-ligne qui n'ont pas encore d'auteur
       const myFactures=DB.factures.filter(f=>
         f&&f.id&&!f.id.startsWith('OLD_')&&!estFactureSupprimee(f.id)&&
-        (f._author===userId||f.userId===userId||f._offline===true)
+        (f._author===userId||f.userId===userId||f._offline===true||f._modifiePar)
       );
       // Une fois envoyées, elles ne sont plus "hors-ligne"
       myFactures.forEach(f=>{if(f._offline){f._author=f._author||userId;delete f._offline;}});
@@ -6311,7 +6393,11 @@ function pushToFirebase(){
 
       // 5. Pousser dans all_factures — JAMAIS si admin, et seulement si on a des factures à pousser
       const myRole=session.user?.role||'vendeur';
-      const canPushFact=(myRole==='vendeur'||myRole==='caissier'||myRole==='superviseur');
+      // L'admin ne pousse pas les ventes courantes (elles appartiennent aux caisses),
+      // MAIS il doit pouvoir publier les factures qu'il a lui-même modifiées,
+      // sinon sa correction reste locale et la caisse la réécrase avec l'originale.
+      const canPushFact=(myRole==='vendeur'||myRole==='caissier'||myRole==='superviseur')
+                        ||(myRole==='admin'&&myFactures.some(f=>f._modifiePar));
       if(canPushFact&&myFactures.length>0){
         // Lire d'abord pour fusionner sans jamais effacer les factures des autres
         let mergedAll=[];
@@ -6323,8 +6409,13 @@ function pushToFirebase(){
         // Ajouter/mettre à jour seulement MES factures
         myFactures.forEach(f=>{
           const idx=mergedAll.findIndex(x=>x.id===f.id);
-          if(idx>=0)mergedAll[idx]=f;
-          else mergedAll.push(f);
+          if(idx>=0){
+            // Ne pas écraser une correction plus récente faite par quelqu'un d'autre
+            const dejaLa=mergedAll[idx];
+            const tCloud=Number(dejaLa._modifieLe)||0, tLocal=Number(f._modifieLe)||0;
+            if(tCloud>tLocal)return;   // la version du cloud est plus récente: on la garde
+            mergedAll[idx]=f;
+          } else mergedAll.push(f);
         });
         mergedAll=mergedAll.filter(f=>f&&f.id&&!f.id.startsWith('OLD_'));
         mergedAll.sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -6752,9 +6843,20 @@ function startRealtimeSync(){
     const localIds=new Set(localFacts.map(f=>f.id));
     // Ajouter les factures cloud absentes localement
     const cloudOnly=cloudFacts.filter(f=>!localIds.has(f.id));
-    if(cloudOnly.length===0)return; // Rien de nouveau depuis le cloud
-    // Fusionner: local + nouvelles du cloud uniquement
-    const merged=[...localFacts,...cloudOnly];
+    // Récupérer aussi les CORRECTIONS de factures déjà connues (modifiées par l'admin),
+    // sinon la caisse garderait indéfiniment son ancienne version.
+    let corrigees=0;
+    const localFactsMaj=localFacts.map(lf=>{
+      const cf=cloudFacts.find(x=>x.id===lf.id);
+      if(!cf)return lf;
+      const tCloud=Number(cf._modifieLe)||0, tLocal=Number(lf._modifieLe)||0;
+      if(tCloud>tLocal){corrigees++;return cf;}
+      return lf;
+    });
+    if(cloudOnly.length===0&&corrigees===0)return; // Rien de nouveau depuis le cloud
+    if(corrigees)toast('✏️ '+corrigees+' facture(s) corrigée(s) par l\'administrateur','info');
+    // Fusionner: local (à jour) + nouvelles du cloud
+    const merged=[...localFactsMaj,...cloudOnly];
     merged.sort((a,b)=>new Date(b.date)-new Date(a.date));
     fbLoading=true;
     // Toujours garder la vente la plus récente en tête (tri décroissant par heure)
