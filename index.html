@@ -39,7 +39,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex
 /* LOGIN */
 #login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;}
 .lbox{background:var(--surf);border:1px solid var(--border2);border-radius:20px;padding:32px;width:380px;max-width:96vw;}
-.llogo{text-align:center;margin-bottom:20px;}
+.llogo{text-align:center;margin-bottom:15px;}
 .llogo .brand{font-size:24px;font-weight:900;color:var(--gold);}
 .llogo .lsub{font-size:10px;color:var(--text2);letter-spacing:3px;text-transform:uppercase;}
 .lfg{margin-bottom:11px;}
@@ -379,12 +379,12 @@ canvas.chart-canvas{display:block;width:100%!important;}
 .qa-label{font-size:11.5px;font-weight:800;color:#fff;}
 .qa-sub{font-size:9px;color:rgba(255,255,255,.8);font-weight:600;}
 /* Palette sobre et professionnelle: surfaces ardoise + accent coloré discret */
-.qa-btn{background:linear-gradient(160deg,#1e293b,#172032);border:1px solid rgba(148,163,184,.16);position:relative;overflow:hidden;}
+.qa-btn{background:var(--surf);border:1px solid var(--border2);position:relative;overflow:hidden;}
 .qa-btn::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--qa-accent,#64748b);opacity:.9;}
 .qa-btn:hover{border-color:var(--qa-accent,#64748b);}
 .qa-icon{background:color-mix(in srgb,var(--qa-accent,#64748b) 18%,transparent)!important;color:var(--qa-accent,#64748b);}
-.qa-label{color:#e2e8f0!important;letter-spacing:.2px;}
-.qa-sub{color:#94a3b8!important;}
+.qa-label{color:var(--text)!important;letter-spacing:.2px;}
+.qa-sub{color:var(--text2)!important;}
 .qa-blue{--qa-accent:#3b82f6;}
 .qa-green{--qa-accent:#10b981;}
 .qa-purple{--qa-accent:#8b5cf6;}
@@ -393,23 +393,23 @@ canvas.chart-canvas{display:block;width:100%!important;}
 .accueil-hero{background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid var(--border2);border-radius:16px;padding:20px;margin-bottom:14px;display:flex;align-items:center;gap:16px;box-shadow:0 4px 14px rgba(0,0,0,.2);}
 .accueil-hero .ah-icon{width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#ff8c00);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;box-shadow:0 4px 12px rgba(240,165,0,.35);}
 .accueil-hero .ah-text h2{font-size:17px;font-weight:900;margin-bottom:3px;color:#fff;}
-.accueil-hero .ah-text p{font-size:11px;color:#94a3b8;}
+.accueil-hero .ah-text p{font-size:11px;color:var(--text2);}
 .accueil-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:13px;}
 /* ══ Bloc Performance ══ */
 .perf-card{border:1px solid rgba(148,163,184,.14);}
 .perf-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
 .perf-tabs{display:flex;gap:4px;background:rgba(148,163,184,.09);padding:3px;border-radius:9px;}
-.perf-tab{border:none;background:transparent;color:#94a3b8;font-family:var(--font);font-size:10.5px;font-weight:700;
+.perf-tab{border:none;background:transparent;color:var(--text2);font-family:var(--font);font-size:10.5px;font-weight:700;
   padding:6px 11px;border-radius:7px;cursor:pointer;transition:all .18s;white-space:nowrap;}
-.perf-tab:hover{color:#e2e8f0;}
-.perf-tab.active{background:rgba(148,163,184,.18);color:#f1f5f9;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.perf-tab:hover{color:var(--text);}
+.perf-tab.active{background:var(--surf2);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.15);}
 .perf-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
 @media (max-width:900px){.perf-grid{grid-template-columns:repeat(2,1fr);}}
 .perf-item{background:rgba(148,163,184,.06);border:1px solid rgba(148,163,184,.12);border-radius:11px;padding:12px 13px;position:relative;overflow:hidden;}
 .perf-item::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--pf,#64748b);}
-.perf-lab{font-size:9.5px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;}
-.perf-val{font-size:17px;font-weight:900;color:#f1f5f9;line-height:1.15;letter-spacing:-.3px;}
-.perf-sub{font-size:9.5px;color:#94a3b8;margin-top:3px;font-weight:600;}
+.perf-lab{font-size:10px;color:var(--text2);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;}
+.perf-val{font-size:17px;font-weight:900;color:var(--text);line-height:1.15;letter-spacing:-.3px;}
+.perf-sub{font-size:9.5px;color:var(--text2);margin-top:3px;font-weight:600;}
 .perf-up{color:#10b981;}.perf-down{color:#f43f5e;}
 @media (max-width:900px){.accueil-grid{grid-template-columns:repeat(2,1fr);}}
 .accueil-card{border-radius:14px;padding:15px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.15);}
@@ -475,25 +475,26 @@ canvas.chart-canvas{display:block;width:100%!important;}
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="lbox">
-    <div style="display:flex;justify-content:flex-end;gap:5px;margin-bottom:8px;flex-wrap:wrap;">
-      <button class="theme-btn" onclick="setTheme('dark')" title="Sombre">🌙</button>
-      <button class="theme-btn" onclick="setTheme('dark-green')" title="Jungle">🌿</button>
-      <button class="theme-btn" onclick="setTheme('dark-purple')" title="Violet">🔮</button>
-      <button class="theme-btn" onclick="setTheme('light')" title="Clair">☀️</button>
-      <button class="theme-btn" onclick="setTheme('light-warm')" title="Crème">🌅</button>
-      <button class="theme-btn" onclick="setTheme('light-green')" title="Nature">🍃</button>
-    </div>
     <div class="llogo">
-      <div class="brand" id="login-brand">🏪 Mon Négoce</div>
-      <div class="lsub">Enterprise Multi-Boutiques</div>
+      <div id="login-logo-box" style="background:#fff;border-radius:9px;padding:9px 12px;display:inline-block;margin-bottom:9px;min-height:34px;"></div>
+      <div class="lsub">Entreprise Multi-Boutiques</div>
     </div>
-    <div class="lfg"><label>Boutique</label><select id="l-boutique"></select></div>
+    <div class="lfg"><label>Boutique</label><select id="l-boutique" onchange="majLogoLogin()"></select></div>
     <div class="lfg"><label>Caisse</label><select id="l-caisse"></select></div>
-    <div class="lfg"><label>Identifiant</label><input id="l-id" placeholder="ADM01, VEN01..." onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <div class="lfg"><label>Code Secret</label><input type="password" id="l-pwd" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div style="display:flex;gap:9px;">
+      <div class="lfg" style="flex:1;"><label>Identifiant</label><input id="l-id" placeholder="ADM01" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="lfg" style="flex:1;"><label>Code Secret</label>
+        <div style="position:relative;">
+          <input type="password" id="l-pwd" placeholder="••••••" style="padding-right:32px;" onkeydown="if(event.key==='Enter')doLogin()">
+          <span onclick="toggleVoirCode()" id="l-pwd-eye" title="Afficher le code"
+            style="position:absolute;right:9px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:14px;opacity:.6;">👁️</span>
+        </div>
+      </div>
+    </div>
     <button class="lbtn" onclick="doLogin()">🔓 Se connecter</button>
-    <div style="text-align:center;margin-top:9px;">
-      <span style="font-size:10px;color:var(--text3);cursor:pointer;" onclick="showResetPanel()">🔑 Mot de passe oublié ?</span>
+    <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);margin-top:11px;padding-top:8px;">
+      <span id="login-etat" style="font-size:10px;color:var(--text3);">⏳ Connexion...</span>
+      <span style="font-size:10px;color:var(--text3);">v<span id="login-version">2.4</span></span>
     </div>
     <div id="reset-panel" style="display:none;margin-top:9px;background:rgba(240,165,0,.08);border:1px solid rgba(240,165,0,.3);border-radius:8px;padding:10px;">
       <div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:7px;">🔑 Réinitialisation d'urgence</div>
@@ -2207,12 +2208,42 @@ function buildCaisseSelect(sel,val=''){
   const el=document.getElementById(sel);if(!el)return;
   el.innerHTML=(sel==='mu-caisse'?'<option value="">Libre (toutes)</option>':'')+DB.caisses.map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${c.nom} (${c.boutique==='all'?'Toutes':getBName(c.boutique)})</option>`).join('');
 }
+// Écran de connexion: afficher le logo de la boutique sélectionnée
+const APP_VERSION='2.4';
+function majLogoLogin(){
+  const box=document.getElementById('login-logo-box');
+  if(!box)return;
+  const b=document.getElementById('l-boutique')?.value||'B1';
+  const s=DB.settings[b]||{};
+  box.innerHTML=isImgLogo(s.logo)
+    ? '<img src="'+s.logo+'" alt="" style="max-height:44px;max-width:210px;object-fit:contain;display:block;">'
+    : '<div style="font-size:19px;font-weight:900;color:var(--gold);padding:2px 4px;">'
+      +escapeHtml(s.nom||DB.settings.appNom||'Mon Négoce')+'</div>';
+}
+function toggleVoirCode(){
+  const inp=document.getElementById('l-pwd'),oeil=document.getElementById('l-pwd-eye');
+  if(!inp)return;
+  const visible=inp.type==='text';
+  inp.type=visible?'password':'text';
+  if(oeil){oeil.textContent=visible?'👁️':'🙈';oeil.title=visible?'Afficher le code':'Masquer le code';}
+}
+// État de connexion affiché avant de se connecter
+function majEtatLogin(){
+  const el=document.getElementById('login-etat');
+  if(!el)return;
+  const v=document.getElementById('login-version');if(v)v.textContent=APP_VERSION;
+  if(fbConnected){el.innerHTML='☁️ Synchronisé';el.style.color='var(--green)';}
+  else if(navigator.onLine){el.innerHTML='⏳ Connexion...';el.style.color='var(--text3)';}
+  else {el.innerHTML='📴 Hors ligne';el.style.color='var(--red)';}
+}
+setInterval(()=>{try{if(document.getElementById('login-screen')?.offsetParent!==null)majEtatLogin();}catch(e){}},3000);
+
 function buildBoutiqueSelects(){
   const s=DB.settings;
   const opts=`<option value="B1">${logoEmoji(s.B1.logo,'🏪')} ${s.B1.nom}</option><option value="B2">${logoEmoji(s.B2.logo,'🏬')} ${s.B2.nom}</option>`;
   ['l-boutique','sb-boutique'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=opts;});
-  const lb=document.getElementById('login-brand');if(lb)lb.textContent=s.appNom||'Mon Négoce';
   buildCaisseSelect('l-caisse','C1');
+  majLogoLogin();
 }
 
 function showResetPanel(){
@@ -5227,7 +5258,7 @@ function renderPerf(){
   const evol=(a,b)=>{
     if(!b)return a>0?'<span class="perf-up">▲ nouveau</span>':'';
     const pc=Math.round(((a-b)/Math.abs(b))*100);
-    if(pc===0)return '<span style="color:#94a3b8;">= stable</span>';
+    if(pc===0)return '<span style="color:var(--text2);">= stable</span>';
     return pc>0?`<span class="perf-up">▲ ${pc}%</span>`:`<span class="perf-down">▼ ${Math.abs(pc)}%</span>`;
   };
 
@@ -5981,9 +6012,14 @@ function renderAccueil(){
 
   // KPIs
   const todayStr=today();
-  const ventesAujourdhui=DB.factures.filter(f=>f.date.startsWith(todayStr));
+  // Compter la boutique COURANTE, comme le bloc Performance. Auparavant les deux
+  // boutiques etaient additionnees ici, d'ou des chiffres incoherents entre les cartes.
+  const toutesVentesJour=DB.factures.filter(f=>f.date.startsWith(todayStr));
+  const ventesAujourdhui=toutesVentesJour.filter(f=>f.boutique===session.boutique);
   const caJour=ventesAujourdhui.reduce((s,f)=>s+f.total,0);
   const nbVentes=ventesAujourdhui.length;
+  const caJourTotal=toutesVentesJour.reduce((s,f)=>s+f.total,0);
+  const estAdminAccueil=session.user?.role==='admin'||session.user?.role==='superviseur';
 
   // Stats personnelles pour vendeur/caissier/superviseur (sans bénéfices)
   const myRole=session.user?.role||'vendeur';
@@ -6052,11 +6088,18 @@ function renderAccueil(){
 
   // Mois
   const moisStr=todayStr.slice(0,7);
-  const caMois=DB.factures.filter(f=>f.date.startsWith(moisStr)).reduce((s,f)=>s+f.total,0);
+  const factMois=DB.factures.filter(f=>f.date.startsWith(moisStr));
+  const caMois=factMois.filter(f=>f.boutique===session.boutique).reduce((s,f)=>s+f.total,0);
+  const caMoisTotal=factMois.reduce((s,f)=>s+f.total,0);
 
   const kpis=[
-    {icon:'💰',title:'CA Aujourd\'hui',val:fmt(caJour),sub:`${nbVentes} vente(s)`,color:'var(--green)',nav:'ventes-jour'},
-    {icon:'📅',title:'CA Ce Mois',val:fmt(caMois),sub:moisStr,color:'var(--gold)',nav:'rapports'},
+    {icon:'💰',title:'CA Aujourd\'hui',val:fmt(caJour),
+      sub:`${nbVentes} vente(s) · ${DB.settings[session.boutique]?.nom||session.boutique}`
+        +(estAdminAccueil&&caJourTotal!==caJour?` · 2 boutiques : ${fmt(caJourTotal)}`:''),
+      color:'var(--green)',nav:'ventes-jour'},
+    {icon:'📅',title:'CA Ce Mois',val:fmt(caMois),
+      sub:moisStr+(estAdminAccueil&&caMoisTotal!==caMois?` · 2 boutiques : ${fmt(caMoisTotal)}`:''),
+      color:'var(--gold)',nav:'rapports'},
     {icon:'📦',title:'Ruptures Stock',val:stockCrit,sub:`${stockFaible} en alerte`,color:stockCrit>0?'var(--red)':'var(--green)',nav:'inventaire',badge:stockCrit>0?stockCrit:null},
     {icon:'💳',title:'Créances',val:fmt(totalCreances),sub:`${creances.length} client(s)`,color:'var(--red)',nav:'creances'},
     {icon:'💬',title:'Messages',val:nbMessages||'0',sub:'non lus',color:'var(--purple)',nav:'chat',badge:nbMessages>0?nbMessages:null},
@@ -6598,6 +6641,7 @@ function initFirebase(){
         const wasConnected=fbConnected;
         fbConnected=snap.val()===true;
         updateSyncUI(fbConnected?'connected':'offline');
+        try{majEtatLogin();}catch(e){}
         if(fbConnected){
           if(fbFirstConnect){
             fbFirstConnect=false;
