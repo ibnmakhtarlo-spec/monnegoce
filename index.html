@@ -958,7 +958,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <div class="kpi g"><div class="klabel">Ventes</div><div class="kval" id="bj-ventes">0</div><div class="ksub" id="bj-nb-v">0 transactions</div></div>
       <div class="kpi rd"><div class="klabel">Dépenses</div><div class="kval" id="bj-dep">0</div></div>
       <div class="kpi bl"><div class="klabel">Coût marchandises</div><div class="kval" id="bj-cout">0</div></div>
-      <div class="kpi gr"><div class="klabel">Bénéfice net</div><div class="kval" id="bj-ben">0</div></div>
+      <div class="kpi gr admin-stat"><div class="klabel">Bénéfice net</div><div class="kval" id="bj-ben">0</div></div>
     </div>
     <div class="row">
       <div class="col card" style="padding:13px;"><h3 style="font-size:12px;font-weight:800;margin-bottom:9px;">🧾 Ventes</h3>
@@ -973,8 +973,8 @@ canvas.chart-canvas{display:block;width:100%!important;}
     <div class="kgrid" style="grid-template-columns:repeat(5,1fr);margin-bottom:13px;">
       <div class="kpi g"><div class="klabel">Valeur stock (vente)</div><div class="kval" id="inv-val-v">0</div></div>
       <div class="kpi bl"><div class="klabel">Valeur stock (achat)</div><div class="kval" id="inv-val-a">0</div></div>
-      <div class="kpi gr"><div class="klabel">Bénéfice potentiel</div><div class="kval" id="inv-ben-pot">0</div></div>
-      <div class="kpi pu"><div class="klabel">Bénéfice réalisé</div><div class="kval" id="inv-ben-real">0</div></div>
+      <div class="kpi gr admin-stat"><div class="klabel">Bénéfice potentiel</div><div class="kval" id="inv-ben-pot">0</div></div>
+      <div class="kpi pu admin-stat"><div class="klabel">Bénéfice réalisé</div><div class="kval" id="inv-ben-real">0</div></div>
       <div class="kpi rd"><div class="klabel">Ruptures</div><div class="kval" id="inv-rupture">0</div></div>
     </div>
     <div class="global-summary">
@@ -982,8 +982,8 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px;">
         <div class="mini-kpi"><div class="mk-label">CA Total</div><div class="mk-val mk-g" id="inv-ca">0</div></div>
         <div class="mini-kpi"><div class="mk-label">Coût vendus</div><div class="mk-val mk-rd" id="inv-cout">0</div></div>
-        <div class="mini-kpi"><div class="mk-label">Bénéfice brut</div><div class="mk-val mk-gr" id="inv-brut">0</div></div>
-        <div class="mini-kpi"><div class="mk-label">Marge moy.</div><div class="mk-val mk-bl" id="inv-marge">0%</div></div>
+        <div class="mini-kpi admin-stat"><div class="mk-label">Bénéfice brut</div><div class="mk-val mk-gr" id="inv-brut">0</div></div>
+        <div class="mini-kpi admin-stat"><div class="mk-label">Marge moy.</div><div class="mk-val mk-bl" id="inv-marge">0%</div></div>
       </div>
     </div>
     <div class="card" style="margin-bottom:13px;">
@@ -1289,7 +1289,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
     <!-- Performance : CA & bénéfices par période -->
     <div class="card perf-card" style="padding:14px;margin-bottom:12px;">
       <div class="perf-head">
-        <h3 style="font-size:13px;font-weight:800;">📊 Performance</h3>
+        <h3 style="font-size:13px;font-weight:800;">📊 Performance <span id="perf-portee" style="font-size:10px;font-weight:600;color:var(--text2);"></span></h3>
         <div class="perf-tabs" id="perf-tabs">
           <button class="perf-tab active" data-per="jour" onclick="setPeriodePerf('jour')">Aujourd'hui</button>
           <button class="perf-tab" data-per="semaine" onclick="setPeriodePerf('semaine')">7 jours</button>
@@ -1302,6 +1302,11 @@ canvas.chart-canvas{display:block;width:100%!important;}
         <div class="fg" style="margin:0;"><label style="font-size:10px;">Au</label><input type="date" id="perf-d2" onchange="renderPerf()"></div>
       </div>
       <div class="perf-grid" id="perf-grid"></div>
+    </div>
+    <!-- Classement des boutiques (trophée au meilleur CA) -->
+    <div class="card" id="carte-trophee" style="padding:14px;margin-bottom:12px;display:none;">
+      <h3 style="font-size:13px;font-weight:800;margin-bottom:10px;">🏆 Meilleure boutique <span id="trophee-periode" style="font-size:10px;font-weight:600;color:var(--text2);"></span></h3>
+      <div id="trophee-classement"></div>
     </div>
     <!-- Ligne 2 : Graphique courbe semaine + Donut répartition CA -->
     <div class="row" style="margin-bottom:11px;">
@@ -1636,23 +1641,35 @@ canvas.chart-canvas{display:block;width:100%!important;}
 <div class="overlay" id="modal-transfert">
   <div class="modal">
     <div class="mtitle"><span>🔄 Transfert de Stock</span><span class="mclose" onclick="closeModal('modal-transfert')">✕</span></div>
+
+    <div class="fg">
+      <label>Produit — tapez pour chercher</label>
+      <input id="tr-search" placeholder="🔍 Nom, référence ou code-barres..." autocomplete="off"
+        oninput="chercherProduitTransfert()" onkeydown="if(event.key==='Enter'){event.preventDefault();premierResultatTransfert();}"
+        style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:9px 11px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;">
+      <div id="tr-resultats" style="max-height:190px;overflow-y:auto;margin-top:6px;"></div>
+    </div>
+
+    <div id="tr-choisi" style="display:none;background:var(--surf2);border:1px solid var(--gold);border-radius:8px;padding:9px 11px;margin-bottom:9px;"></div>
+    <input type="hidden" id="tr-prod">
+
     <div class="fgrid">
       <div class="fg">
-        <label>Produit</label>
-        <select id="tr-prod" style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;color:var(--text);font-family:var(--font);font-size:12px;outline:none;"></select>
-      </div>
-      <div class="fg">
         <label>Quantité à transférer</label>
-        <input type="number" id="tr-qte" min="1" placeholder="0" style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;color:var(--text);font-family:var(--font);font-size:12px;outline:none;">
+        <input type="number" id="tr-qte" min="1" placeholder="0" inputmode="numeric"
+          onkeydown="if(event.key==='Enter')transfertStock()"
+          style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:9px 11px;color:var(--text);font-family:var(--font);font-size:14px;outline:none;">
+        <div id="tr-raccourcis" style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;"></div>
       </div>
       <div class="fg">
         <label>Sens du transfert</label>
-        <select id="tr-sens" style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;color:var(--text);font-family:var(--font);font-size:12px;outline:none;">
-          <option value="B1toB2">Boutique 1 → Boutique 2</option>
-          <option value="B2toB1">Boutique 2 → Boutique 1</option>
+        <select id="tr-sens" onchange="majChoixTransfert()" style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:9px 11px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;">
+          <option value="B1toB2">Rahma → Rayane</option>
+          <option value="B2toB1">Rayane → Rahma</option>
         </select>
       </div>
     </div>
+
     <button class="btn btn-gold" style="width:100%;margin-top:10px;" onclick="transfertStock()">🔄 Effectuer le transfert</button>
   </div>
 </div>
@@ -5288,10 +5305,93 @@ function renderProduits(){
 function editProd(id){const p=DB.produits.find(x=>x.id===id);document.getElementById('mp-t').textContent='✏️ Modifier';document.getElementById('mp-id').value=p.id;document.getElementById('mp-nom').value=p.nom;document.getElementById('mp-ref').value=p.ref||'';document.getElementById('mp-cat').value=p.cat||'';document.getElementById('mp-prix').value=p.prix;document.getElementById('mp-achat').value=p.achat||0;document.getElementById('mp-s1').value=p.s1||0;document.getElementById('mp-s2').value=p.s2||0;document.getElementById('mp-al').value=p.alerte||1;document.getElementById('mp-un').value=p.unite||'pièce';document.getElementById('mp-desc').value=p.desc||'';if(p.photo){document.getElementById('mp-photo-data').value=p.photo;document.getElementById('mp-photo-preview').innerHTML=`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover;">`;document.getElementById('mp-photo-clear').style.display='inline-flex';}else clearProdPhoto();refreshFournSel('mp-fourn',p.fourn);mpShowTab('manuel');openModal('modal-prod');}
 function openTransfertStock(){
   openModal('modal-transfert');
-  setTimeout(()=>{
-    const s=document.getElementById('tr-prod');
-    if(s)s.innerHTML=DB.produits.map(p=>'<option value="'+escapeHtml(p.id)+'">'+escapeHtml(p.nom)+' (B1:'+(p.s1||0)+' B2:'+(p.s2||0)+')</option>').join('');
-  },50);
+  const s=document.getElementById('tr-search');
+  if(s)s.value='';
+  document.getElementById('tr-prod').value='';
+  document.getElementById('tr-qte').value='';
+  const ch=document.getElementById('tr-choisi');if(ch)ch.style.display='none';
+  const rc=document.getElementById('tr-raccourcis');if(rc)rc.innerHTML='';
+  chercherProduitTransfert();
+  setTimeout(()=>{if(s)s.focus();},120);
+}
+
+// Recherche instantanée: nom, référence ou code-barres
+function chercherProduitTransfert(){
+  const q=_norm(document.getElementById('tr-search')?.value||'');
+  const zone=document.getElementById('tr-resultats');
+  if(!zone)return;
+  let liste=DB.produits||[];
+  if(q){
+    const mots=q.split(' ').filter(Boolean);
+    liste=liste.filter(p=>{
+      const cible=_norm((p.nom||'')+' '+(p.ref||'')+' '+(p.codeBarre||''));
+      return mots.every(m=>cible.includes(m));
+    });
+  } else {
+    // Sans recherche: proposer les produits récemment bougés, les plus utiles
+    const recents=(DB.mouvements||[]).slice(0,40).map(m=>m.produitId);
+    const vus=new Set();
+    liste=recents.map(id=>(DB.produits||[]).find(p=>p.id===id))
+      .filter(p=>p&&!vus.has(p.id)&&vus.add(p.id));
+    if(!liste.length)liste=(DB.produits||[]).slice(0,12);
+  }
+  liste=liste.slice(0,25);
+  if(!liste.length){
+    zone.innerHTML='<div style="font-size:11px;color:var(--text2);text-align:center;padding:10px;">Aucun produit trouvé</div>';
+    return;
+  }
+  zone.innerHTML=(q?'':'<div style="font-size:9px;color:var(--text2);margin-bottom:5px;">Produits récemment déplacés</div>')
+    +liste.map(p=>{
+      const t=(p.s1||0)+(p.s2||0);
+      return '<div onclick="choisirProduitTransfert(\''+p.id+'\')" '
+        +'style="cursor:pointer;background:var(--surf2);border:1px solid var(--border);border-radius:7px;'
+        +'padding:7px 10px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+        +'<div style="min-width:0;"><div style="font-size:12px;font-weight:700;">'+escapeHtml(p.nom)+'</div>'
+        +'<div style="font-size:9.5px;color:var(--text2);">B1 : '+(p.s1||0)+' · B2 : '+(p.s2||0)
+        +(p.ref?' · réf '+escapeHtml(p.ref):'')+'</div></div>'
+        +'<span style="font-size:11px;font-weight:800;color:'+(t>0?'var(--green)':'var(--red)')+';flex-shrink:0;">'+t+'</span>'
+        +'</div>';
+    }).join('');
+}
+
+function premierResultatTransfert(){
+  const prem=document.querySelector('#tr-resultats div[onclick]');
+  if(prem)prem.click();
+}
+
+function choisirProduitTransfert(id){
+  const p=(DB.produits||[]).find(x=>x.id===id);
+  if(!p)return;
+  document.getElementById('tr-prod').value=id;
+  document.getElementById('tr-search').value='';
+  chercherProduitTransfert();
+  majChoixTransfert();
+  setTimeout(()=>document.getElementById('tr-qte')?.focus(),80);
+}
+
+// Rappel du produit choisi + boutons de quantité rapide
+function majChoixTransfert(){
+  const id=document.getElementById('tr-prod')?.value;
+  const box=document.getElementById('tr-choisi');
+  const rc=document.getElementById('tr-raccourcis');
+  const p=(DB.produits||[]).find(x=>x.id===id);
+  if(!p||!box){if(box)box.style.display='none';if(rc)rc.innerHTML='';return;}
+  const sens=document.getElementById('tr-sens')?.value||'B1toB2';
+  const source=sens==='B1toB2'?'s1':'s2';
+  const dispo=p[source]||0;
+  const nomSrc=sens==='B1toB2'?(DB.settings.B1?.nom||'B1'):(DB.settings.B2?.nom||'B2');
+  box.style.display='';
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+    +'<div><div style="font-size:12.5px;font-weight:800;">'+escapeHtml(p.nom)+'</div>'
+    +'<div style="font-size:10px;color:var(--text2);">Disponible sur '+escapeHtml(nomSrc)+' : <b style="color:'
+    +(dispo>0?'var(--green)':'var(--red)')+';">'+dispo+'</b></div></div>'
+    +'<button class="btn btn-sm" onclick="document.getElementById(\'tr-prod\').value=\'\';majChoixTransfert();">✕</button></div>';
+  // Raccourcis de quantité, adaptés au stock disponible
+  if(rc){
+    const props=[1,5,10,Math.floor(dispo/2),dispo].filter((v,i,a)=>v>0&&a.indexOf(v)===i&&v<=dispo);
+    rc.innerHTML=props.map(v=>'<button class="btn btn-sm" onclick="document.getElementById(\'tr-qte\').value='+v+'">'
+      +(v===dispo?'Tout ('+v+')':v)+'</button>').join('');
+  }
 }
 // Force la republication du stock LOCAL de tous les produits vers Firebase.
 // À utiliser depuis l'appareil qui a les bons chiffres, si un écart apparaît entre appareils.
@@ -5388,19 +5488,103 @@ function _bornesPerf(){
 // Calcule CA, bénéfice et dépenses sur un intervalle
 function _calculPerf(debut,fin){
   const boutique=session.boutique;
+  // L'administrateur suit l'activité GLOBALE des deux boutiques, comme sur les cartes.
+  const global=(session.user?.role==='admin');
   const dansPeriode=d=>{const x=new Date(d);return x>=debut&&x<fin;};
-  const facts=(DB.factures||[]).filter(f=>f&&f.date&&f.boutique===boutique&&dansPeriode(f.date));
+  const facts=(DB.factures||[]).filter(f=>f&&f.date&&(global||f.boutique===boutique)&&dansPeriode(f.date));
   const ca=facts.reduce((s,f)=>s+(Number(f.total)||0),0);
   const brut=facts.reduce((s,f)=>s+((f.items||[]).reduce(
     (ss,i)=>ss+((Number(i.prix)||0)-(Number(i.achat)||0))*(Number(i.qty)||0),0)),0);
-  const dep=(DB.depenses||[]).filter(d=>d&&d.date&&d.boutique===boutique&&dansPeriode(d.date))
+  const dep=(DB.depenses||[]).filter(d=>d&&d.date&&(global||d.boutique===boutique)&&dansPeriode(d.date))
     .reduce((s,d)=>s+(Number(d.montant)||0),0);
   return {ca,brut,dep,net:brut-dep,nb:facts.length};
+}
+
+// ══ TROPHÉE: classement des boutiques par chiffre d'affaires ══
+function _caBoutique(code,debut,fin){
+  const dans=d=>{const x=new Date(d);return x>=debut&&x<fin;};
+  const facts=(DB.factures||[]).filter(f=>f&&f.date&&f.boutique===code&&dans(f.date));
+  const ca=facts.reduce((s,f)=>s+(Number(f.total)||0),0);
+  const benef=facts.reduce((s,f)=>s+((f.items||[]).reduce(
+    (ss,i)=>ss+((Number(i.prix)||0)-(Number(i.achat)||0))*(Number(i.qty)||0),0)),0);
+  return {code,nom:DB.settings[code]?.nom||code,logo:DB.settings[code]?.logo,
+          ca,benef,nb:facts.length,panier:facts.length?Math.round(ca/facts.length):0};
+}
+
+// Message adapté selon que l'utilisateur est en tête ou non
+function _messageEncouragement(rangs,ecart,maBoutique){
+  const style='<div style="font-size:10.5px;text-align:center;margin-top:3px;';
+  if(ecart<=0)
+    return style+'color:var(--text2);">🤝 Égalité parfaite — les deux boutiques au coude à coude !</div>';
+  const chef=rangs[0],second=rangs[1];
+  const jeSuisEnTete=chef.code===maBoutique;
+  const jeSuisSecond=second.code===maBoutique;
+  if(jeSuisEnTete)
+    return style+'color:var(--gold);font-weight:700;">🏆 Bravo ! '+escapeHtml(chef.nom)
+      +' est en tête avec '+fmt(ecart)+' d\'avance 🎉</div>';
+  if(jeSuisSecond)
+    return style+'color:var(--cyan);font-weight:700;">💪 Courage ! Plus que '
+      +fmt(ecart)+' pour dépasser '+escapeHtml(chef.nom)+'</div>';
+  return style+'color:var(--text2);">🏆 <b>'+escapeHtml(chef.nom)+'</b> devance de <b style="color:var(--gold);">'
+    +fmt(ecart)+'</b></div>';
+}
+
+function renderTrophee(){
+  const carte=document.getElementById('carte-trophee');
+  const zone=document.getElementById('trophee-classement');
+  if(!carte||!zone)return;
+  // Visible par tous: l'émulation entre les deux boutiques motive les équipes.
+  carte.style.display='';
+  const maBoutique=session.boutique;
+
+  const {debut,fin,label}=_bornesPerf();
+  const per=document.getElementById('trophee-periode');
+  if(per)per.textContent='— '+label.toLowerCase();
+
+  const rangs=[_caBoutique('B1',debut,fin),_caBoutique('B2',debut,fin)]
+    .sort((a,b)=>b.ca-a.ca);
+  const total=rangs.reduce((s,b)=>s+b.ca,0);
+
+  if(!total){
+    zone.innerHTML='<div style="font-size:11px;color:var(--text2);text-align:center;padding:12px;">Aucune vente sur cette période</div>';
+    return;
+  }
+  const ecart=rangs[0].ca-rangs[1].ca;
+
+  zone.innerHTML=rangs.map((b,i)=>{
+    const gagnant=i===0&&ecart>0;
+    const pct=total?Math.round(b.ca/total*100):0;
+    const mienne=b.code===maBoutique;
+    return '<div style="background:'+(gagnant?'rgba(240,165,0,.10)':'rgba(148,163,184,.06)')+';'
+      +'border:1px solid '+(gagnant?'rgba(240,165,0,.35)':(mienne?'var(--cyan)':'var(--border)'))+';'
+      +'border-radius:11px;padding:11px 12px;margin-bottom:8px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:9px;flex-wrap:wrap;">'
+      +'<div style="display:flex;align-items:center;gap:9px;min-width:0;">'
+      +'<span style="font-size:19px;flex-shrink:0;">'+(gagnant?'🏆':(i===0?'🤝':'🥈'))+'</span>'
+      +'<div style="min-width:0;">'
+      +'<div style="font-size:12.5px;font-weight:800;">'+escapeHtml(b.nom)
+      +(mienne?' <span style="font-size:9px;font-weight:700;color:var(--cyan);">VOUS</span>':'')+'</div>'
+      +'<div style="font-size:10px;color:var(--text2);">'+b.nb+' vente(s) · panier '+fmt(b.panier)+'</div>'
+      +'</div></div>'
+      +'<div style="text-align:right;flex-shrink:0;">'
+      +'<div style="font-size:16px;font-weight:900;color:'+(gagnant?'var(--gold)':'var(--text)')+';">'+fmt(b.ca)+'</div>'
+      +'<div style="font-size:9.5px;color:var(--text2);">'+pct+' % du total</div>'
+      +'</div></div>'
+      // Barre de proportion
+      +'<div style="height:5px;background:rgba(148,163,184,.14);border-radius:3px;margin-top:8px;overflow:hidden;">'
+      +'<div style="height:100%;width:'+pct+'%;background:'+(gagnant?'var(--gold)':'var(--text3)')+';border-radius:3px;"></div>'
+      +'</div></div>';
+  }).join('')
+  + _messageEncouragement(rangs,ecart,maBoutique);
 }
 
 function renderPerf(){
   const grid=document.getElementById('perf-grid');
   if(!grid)return;
+  const pp=document.getElementById('perf-portee');
+  if(pp)pp.textContent=(session.user?.role==='admin')
+    ? '— 2 boutiques'
+    : '— '+(DB.settings[session.boutique]?.nom||session.boutique||'');
   const {debut,fin,label,jours}=_bornesPerf();
   const p=_calculPerf(debut,fin);
 
@@ -5414,7 +5598,8 @@ function renderPerf(){
     return pc>0?`<span class="perf-up">▲ ${pc}%</span>`:`<span class="perf-down">▼ ${Math.abs(pc)}%</span>`;
   };
 
-  const estAdmin=session.user?.role==='admin'||hasPerm('rapports');
+  // Les bénéfices et marges sont STRICTEMENT réservés à l'administrateur.
+  const estAdmin=session.user?.role==='admin';
   const moyJour=Math.round(p.ca/jours);
 
   let html=`
@@ -5455,6 +5640,7 @@ function renderPerf(){
     </div>`;
   }
   grid.innerHTML=html;
+  try{renderTrophee();}catch(e){console.error('renderTrophee:',e);}
 }
 
 function renderDash(){
@@ -5762,7 +5948,7 @@ function renderRapports(){
   // Rapport par vendeur
   const vendeursRap={};filtered.forEach(f=>{const v=f.vendeur||f.userId||'Inconnu';if(!vendeursRap[v])vendeursRap[v]={nom:v,nb:0,ca:0,ben:0};vendeursRap[v].nb++;vendeursRap[v].ca+=f.total;vendeursRap[v].ben+=f.items.reduce((s,i)=>s+(i.prix-(i.achat||0))*i.qty,0);});
   const rapVendEl=document.getElementById('r-vendeurs');
-  if(rapVendEl){const canSeeBen2=session.user?.role==='admin'||(session.user?.role==='superviseur'&&(session.user?.perms||[]).includes('benefices'));
+  if(rapVendEl){const canSeeBen2=session.user?.role==='admin'; // bénéfices: administrateur uniquement
   rapVendEl.innerHTML=Object.values(vendeursRap).sort((a,b)=>b.ca-a.ca).length?Object.values(vendeursRap).sort((a,b)=>b.ca-a.ca).map(v=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:var(--surf2);border-radius:6px;margin-bottom:4px;font-size:11px;"><span style="color:var(--cyan);font-weight:700;">👤 ${v.nom}</span><span style="color:var(--text2)">${v.nb} vente(s)</span><span class="mono" style="color:var(--gold);font-weight:900;">${fmt(v.ca)}</span>${canSeeBen2?`<span class="mono" style="color:var(--green);font-size:10px;">+${fmt(v.ben)}</span>`:''}</div>`).join(''):`<div class="empty">Pas de données</div>`;}
 
   // Chart barres rapports
@@ -6245,12 +6431,19 @@ function renderAccueil(){
   const caMoisTotal=factMois.reduce((s,f)=>s+f.total,0);
 
   const kpis=[
-    {icon:'💰',title:'CA Aujourd\'hui',val:fmt(caJour),
-      sub:`${nbVentes} vente(s) · ${DB.settings[session.boutique]?.nom||session.boutique}`
-        +(estAdminAccueil&&caJourTotal!==caJour?` · 2 boutiques : ${fmt(caJourTotal)}`:''),
+    // L'administrateur voit le CHIFFRE GLOBAL des deux boutiques; les employés
+    // voient uniquement celui de leur boutique.
+    {icon:'💰',title:estAdminAccueil?'CA Aujourd\'hui — Global':'CA Aujourd\'hui',
+      val:fmt(estAdminAccueil?caJourTotal:caJour),
+      sub:estAdminAccueil
+        ? `${toutesVentesJour.length} vente(s) · Rahma ${fmt(caJour)} · Rayane ${fmt(caJourTotal-caJour)}`
+        : `${nbVentes} vente(s) · ${DB.settings[session.boutique]?.nom||session.boutique}`,
       color:'var(--green)',nav:'ventes-jour',cls:'kc-rose'},
-    {icon:'📅',title:'CA Ce Mois',val:fmt(caMois),
-      sub:moisStr+(estAdminAccueil&&caMoisTotal!==caMois?` · 2 boutiques : ${fmt(caMoisTotal)}`:''),
+    {icon:'📅',title:estAdminAccueil?'CA Ce Mois — Global':'CA Ce Mois',
+      val:fmt(estAdminAccueil?caMoisTotal:caMois),
+      sub:estAdminAccueil
+        ? `Rahma ${fmt(caMois)} · Rayane ${fmt(caMoisTotal-caMois)}`
+        : moisStr,
       color:'var(--gold)',nav:'rapports',cls:'kc-bleu'},
     {icon:'📦',title:'Ruptures Stock',val:stockCrit,sub:`${stockFaible} en alerte`,color:stockCrit>0?'var(--red)':'var(--green)',nav:'inventaire',badge:stockCrit>0?stockCrit:null,cls:'kc-mauve'},
     {icon:'💳',title:'Créances',val:fmt(totalCreances),sub:`${creances.length} client(s)`,color:'var(--red)',nav:'creances',cls:'kc-orange'},
