@@ -814,6 +814,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
     <div style="display:flex;gap:7px;margin-top:11px;flex-wrap:wrap;">
       <button class="btn btn-gold" style="flex:1;min-width:130px;" onclick="renderDiagnostic();toast('Diagnostic actualisé','ok')">🔄 Actualiser</button>
       <button class="btn btn-green" style="flex:1;min-width:130px;" onclick="exportFullBackup();setTimeout(renderDiagnostic,600)">💾 Sauvegarder maintenant</button>
+      <button class="btn btn-blue" style="flex:1;min-width:130px;" onclick="fusionnerDoublonsProduits()">🔀 Fusionner les doublons</button>
     </div>
   </div>
   <div class="sec" id="sec-connexions">
@@ -4323,6 +4324,16 @@ function collecterDiagnostic(){
        liste:sansAchat.map(p=>({id:p.id,nom:p.nom,achat:Number(p.achat)||0,stock:(p.s1||0)+(p.s2||0),s1:p.s1||0,s2:p.s2||0}))}
     : {n:'Prix d\'achat',e:'ok',v:'Tous renseignés',m:'Les calculs de bénéfice sont fiables.'});
 
+  // Doublons de produits
+  const grp=trouverDoublonsProduits();
+  d.push(grp.length
+    ? {n:'Doublons produits',e:'warn',v:grp.length+' produit(s) en double',
+       m:'Le même article existe en plusieurs fiches : stocks et statistiques faussés.',
+       liste:grp.map(g=>({id:g[0].id,nom:g[0].nom,achat:Number(g[0].achat)||0,
+                          stock:g.reduce((s,p)=>s+(p.s1||0)+(p.s2||0),0),
+                          s1:g.reduce((s,p)=>s+(p.s1||0),0),s2:g.reduce((s,p)=>s+(p.s2||0),0)}))}
+    : {n:'Doublons produits',e:'ok',v:'Aucun',m:'Chaque article n\'a qu\'une seule fiche.'});
+
   // 9. Ruptures de stock
   const rupt=(DB.produits||[]).filter(p=>((p.s1||0)+(p.s2||0))<=0).length;
   const total=(DB.produits||[]).length;
@@ -5015,8 +5026,9 @@ async function analyzeProductText(){
 function saveProd(){
   const nom=document.getElementById('mp-nom').value.trim();const prix=parseFloat(document.getElementById('mp-prix').value);if(!nom||isNaN(prix)){soundErr();toast('Nom et prix obligatoires','err');return;}
   const eid=document.getElementById('mp-id').value;
-  // Bloquer doublons — vérifier si un produit avec ce nom existe déjà
-  const doublon=DB.produits.find(p=>p.nom.toLowerCase()===nom.toLowerCase()&&p.id!==eid);
+  // Bloquer doublons — comparaison insensible aux accents, espaces multiples et casse
+  // (« Câble  gris » et « cable gris » sont considérés comme le même produit)
+  const doublon=DB.produits.find(p=>p&&p.nom&&_norm(p.nom)===_norm(nom)&&p.id!==eid);
   if(doublon){soundDoublon();toast('⚠️ Produit "'+nom+'" existe déjà ('+doublon.id+')','err');return;}
   // Avertir si prix achat = 0
   const achatVal=parseFloat(document.getElementById('mp-achat').value)||0;
@@ -7044,6 +7056,80 @@ function applyStockDelta(productId,field,delta){
     }).catch(e=>{console.error('Stock atomique:',e);/* reste en file, renvoyé plus tard */});
   }
 }
+// ══ DÉDUPLICATION DES PRODUITS ══
+// Deux appareils peuvent créer le même produit chacun de leur côté: ils obtiennent
+// des identifiants différents, et la fusion du catalogue les conserve tous les deux.
+// Ici on repère les doublons par nom normalisé et on les réunit en un seul.
+function trouverDoublonsProduits(liste){
+  const parNom={};
+  (liste||DB.produits||[]).forEach(p=>{
+    if(!p||!p.nom)return;
+    const cle=_norm(p.nom);
+    if(!cle)return;
+    (parNom[cle]=parNom[cle]||[]).push(p);
+  });
+  return Object.values(parNom).filter(g=>g.length>1);
+}
+
+// Fusionne un groupe de doublons en un seul produit:
+// on garde le plus ancien identifiant (référencé par les factures) et on
+// additionne les stocks, car chaque fiche a suivi ses propres mouvements.
+function _fusionnerGroupe(groupe){
+  const tri=[...groupe].sort((a,b)=>(Number(a._updated)||0)-(Number(b._updated)||0));
+  const garde=tri[0];
+  const autres=tri.slice(1);
+  autres.forEach(d=>{
+    garde.s1=(Number(garde.s1)||0)+(Number(d.s1)||0);
+    garde.s2=(Number(garde.s2)||0)+(Number(d.s2)||0);
+    // Compléter les champs vides depuis le doublon
+    ['ref','cat','fourn','desc','photo','unite'].forEach(k=>{
+      if(!garde[k]&&d[k])garde[k]=d[k];
+    });
+    if(!(Number(garde.achat)>0)&&Number(d.achat)>0)garde.achat=d.achat;
+    if(!(Number(garde.prix)>0)&&Number(d.prix)>0)garde.prix=d.prix;
+  });
+  garde._updated=Date.now();
+  return {garde,supprimes:autres.map(d=>d.id)};
+}
+
+function fusionnerDoublonsProduits(silencieux){
+  const groupes=trouverDoublonsProduits();
+  if(!groupes.length){
+    if(!silencieux)toast('✅ Aucun doublon détecté','ok');
+    return 0;
+  }
+  if(!silencieux){
+    const apercu=groupes.slice(0,6).map(g=>'• '+g[0].nom+' ('+g.length+' fiches)').join('\n');
+    if(!confirm('🔀 '+groupes.length+' produit(s) en double détecté(s) :\n\n'+apercu
+      +(groupes.length>6?'\n…':'')
+      +'\n\nLes fiches seront réunies et les stocks additionnés.\nContinuer ?'))return 0;
+  }
+  const aSupprimer=new Set();
+  let n=0;
+  groupes.forEach(g=>{
+    const {garde,supprimes}=_fusionnerGroupe(g);
+    supprimes.forEach(id=>aSupprimer.add(id));
+    n++;
+    logMouvement&&logMouvement(garde.id,garde.nom,'ajustement',0,session.boutique,
+      'Fusion de '+(supprimes.length+1)+' fiches en double');
+  });
+  DB.produits=DB.produits.filter(p=>!aSupprimer.has(p.id));
+  // Nettoyer les entrées de stock orphelines sur Firebase
+  if(fbConnected&&fbDB){
+    aSupprimer.forEach(id=>{
+      fbDB.ref('negoce/stock_qty/'+id).remove().catch(()=>{});
+    });
+  }
+  save();
+  logAction&&logAction('Fusion doublons',n+' produit(s) réuni(s), '+aSupprimer.size+' fiche(s) supprimée(s));');
+  if(!silencieux){
+    toast('🔀 '+n+' doublon(s) fusionné(s) — '+aSupprimer.size+' fiche(s) retirée(s)','ok');
+    try{renderProduits();}catch(e){}
+    try{renderDiagnostic();}catch(e){}
+  }
+  return n;
+}
+
 // ══ REGISTRE DES FACTURES SUPPRIMÉES ══
 // La fusion des ventes est additive (pour ne jamais perdre une vente hors-ligne).
 // Conséquence: une suppression doit être diffusée explicitement, sinon les autres
@@ -7576,6 +7662,15 @@ function startRealtimeSync(){
     liste.forEach(cp=>{
       if(!cp||!cp.id)return;
       if(!localIds.has(cp.id)){
+        // Un produit du même nom existe peut-être déjà sous un autre identifiant
+        // (créé simultanément sur deux appareils): on ne crée pas un doublon.
+        const memeNom=DB.produits.find(x=>x&&x.nom&&cp.nom&&_norm(x.nom)===_norm(cp.nom));
+        if(memeNom){
+          // Compléter la fiche locale au lieu d'ajouter une seconde
+          ['ref','cat','fourn','desc','photo','unite'].forEach(k=>{if(!memeNom[k]&&cp[k])memeNom[k]=cp[k];});
+          if(!(Number(memeNom.achat)>0)&&Number(cp.achat)>0)memeNom.achat=cp.achat;
+          return;
+        }
         // Nouveau produit créé sur un autre appareil: on l'ajoute.
         // Le stock viendra de stock_qty (0 en attendant).
         DB.produits.push({...cp,s1:0,s2:0});
