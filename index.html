@@ -3789,7 +3789,8 @@ function genererDescriptionLocale(){
   const champPrix=document.getElementById('mp-prix');
   if(champPrix&&d.prixConseille>0&&!parseFloat(champPrix.value)){
     champPrix.value=d.prixConseille;
-    toast('✨ Description générée · prix conseillé '+fmt(d.prixConseille)+' (marge '+d.margeReference+'%)','ok');
+    toast('✨ Description générée · prix conseillé '+fmt(d.prixConseille)
+      +(peutVoirBenefices()?' (marge '+d.margeReference+'%)':''),'ok');
   } else if(d.prixConseille>0){
     toast('✨ Description générée · prix conseillé : '+fmt(d.prixConseille),'ok');
   } else {
@@ -4394,6 +4395,9 @@ function renderDiagnostic(){
   }).join('');
 }
 
+// Les bénéfices, marges et prix d'achat sont réservés à l'administrateur.
+const peutVoirBenefices=()=>session.user?.role==='admin';
+
 // ══ AFFICHAGE DES ANALYSES LOCALES ══
 function _renduAnalyse(o){
   if(!o)return '';
@@ -4411,7 +4415,9 @@ function analyseVentesGratuite(){
   const a=analyseVentesLocale(30);
   if(!a.nbVentes)return _afficher({titre:'📈 Analyse des ventes',texte:'Aucune vente sur les 30 derniers jours.'});
   const l=[];
-  l.push(`CA 30 j : ${fmt(a.caTotal)} · Bénéfice : ${fmt(a.benefTotal)} · ${a.nbVentes} ventes`);
+  l.push(peutVoirBenefices()
+    ? `CA 30 j : ${fmt(a.caTotal)} · Bénéfice : ${fmt(a.benefTotal)} · ${a.nbVentes} ventes`
+    : `CA 30 j : ${fmt(a.caTotal)} · ${a.nbVentes} ventes`);
   l.push('— TOP VENTES —');
   a.top.slice(0,5).forEach((x,i)=>l.push(`${i+1}. ${x.nom} : ${x.qty} vendus (${fmt(x.ca)})`));
   if(a.categories.length){
@@ -4420,10 +4426,14 @@ function analyseVentesGratuite(){
   }
   if(a.dormants.length){
     l.push('— NE SE VENDENT PAS —');
-    a.dormants.slice(0,5).forEach(p=>l.push(`${p.nom} : ${(p.s1||0)+(p.s2||0)} en stock (${fmt(p.valeur)} bloqués)`));
+    a.dormants.slice(0,5).forEach(p=>l.push(peutVoirBenefices()
+      ? `${p.nom} : ${(p.s1||0)+(p.s2||0)} en stock (${fmt(p.valeur)} bloqués)`
+      : `${p.nom} : ${(p.s1||0)+(p.s2||0)} en stock`));
   }
   _afficher({titre:'📈 Analyse des ventes (30 j)',lignes:l,
-    pied:a.argentDormant>0?`Argent dormant : ${fmt(a.argentDormant)}`:`Marge moyenne : ${a.caTotal>0?Math.round(a.benefTotal/a.caTotal*100):0}%`});
+    pied:peutVoirBenefices()
+      ? (a.argentDormant>0?`Argent dormant : ${fmt(a.argentDormant)}`:`Marge moyenne : ${a.caTotal>0?Math.round(a.benefTotal/a.caTotal*100):0}%`)
+      : `${a.nbVentes} vente(s) sur la période`});
 }
 
 function previsionStockGratuite(){
@@ -4437,10 +4447,15 @@ function previsionStockGratuite(){
   });
   const cout=(urgents.length?urgents:prev.slice(0,10)).reduce((s,x)=>s+x.cout,0);
   _afficher({titre:'🔮 Prévision de stock & réapprovisionnement',lignes:l,
-    pied:`Budget de commande estimé : ${fmt(cout)}`});
+    pied:peutVoirBenefices()
+      ? `Budget de commande estimé : ${fmt(cout)}`
+      : `${l.length} produit(s) à surveiller`});
 }
 
 function controlePrixGratuit(){
+  if(!peutVoirBenefices())
+    return _afficher({titre:'🔒 Contrôle des prix',
+      texte:'Cette analyse présente les prix d\'achat et les marges. Elle est réservée à l\'administrateur.'});
   const cp=controlePrixLocal();
   if(!cp.pertes.length&&!cp.faibles.length)
     return _afficher({titre:'✅ Contrôle des prix',
@@ -4453,6 +4468,9 @@ function controlePrixGratuit(){
 }
 
 function analyseFournisseursGratuite(){
+  if(!peutVoirBenefices())
+    return _afficher({titre:'🔒 Analyse fournisseurs',
+      texte:'Cette analyse présente les marges et la valeur du stock. Elle est réservée à l\'administrateur.'});
   const a=analyseFournisseursLocale();
   if(!a.fournisseurs.length)
     return _afficher({titre:'🚚 Analyse fournisseurs',texte:'Aucun produit n\'est rattaché à un fournisseur. Renseignez le fournisseur dans les fiches produits pour activer cette analyse.'});
@@ -4653,13 +4671,20 @@ function assistantLocal(question){
     const prev=previsionStockLocale(30).filter(x=>x.joursRestants<=14&&x.recommande>0).slice(0,10);
     if(!prev.length)return {titre:'🛒 À commander',texte:'Aucun réapprovisionnement urgent : tous vos produits qui se vendent ont plus de 14 jours de stock.'};
     const cout=prev.reduce((s,x)=>s+x.cout,0);
-    return {titre:'🛒 Produits à commander en priorité',
-      lignes:prev.map(x=>`${x.nom} — reste ${x.joursRestants} j · commander ${x.recommande} (≈ ${fmt(x.cout)})`),
-      pied:`Budget total estimé : ${fmt(cout)}`};
+    return peutVoirBenefices()
+      ? {titre:'🛒 Produits à commander en priorité',
+         lignes:prev.map(x=>`${x.nom} — reste ${x.joursRestants} j · commander ${x.recommande} (≈ ${fmt(x.cout)})`),
+         pied:`Budget total estimé : ${fmt(cout)}`}
+      : {titre:'🛒 Produits à commander en priorité',
+         lignes:prev.map(x=>`${x.nom} — reste ${x.joursRestants} j · commander ${x.recommande}`),
+         pied:`${prev.length} produit(s) à réapprovisionner`};
   }
 
   // Produits qui font perdre de l'argent
   if(/(perd|perte|coute|negatif|mauvais).*(argent|produit)|vente a perte|marge/.test(q)){
+    if(!peutVoirBenefices())
+      return {titre:'🔒 Information réservée',
+        texte:'Les prix d\'achat et les marges sont réservés à l\'administrateur.'};
     const cp=controlePrixLocal();
     if(!cp.pertes.length&&!cp.faibles.length)
       return {titre:'✅ Prix sains',texte:`Aucun produit vendu à perte. Marge médiane : ${cp.margeMediane}%.`};
@@ -4675,25 +4700,35 @@ function assistantLocal(question){
     const a=analyseVentesLocale(30);
     if(!a.categories.length)return {titre:'📂 Catégories',texte:'Aucune vente sur la période.'};
     return {titre:'📂 Meilleures catégories (30 j)',
-      lignes:a.categories.slice(0,6).map((c,i)=>`${i+1}. ${c.cat} — ${fmt(c.ca)} de CA · ${c.qty} articles · ${fmt(c.benef)} de bénéfice`)};
+      lignes:a.categories.slice(0,6).map((c,i)=>peutVoirBenefices()
+        ? `${i+1}. ${c.cat} — ${fmt(c.ca)} de CA · ${c.qty} articles · ${fmt(c.benef)} de bénéfice`
+        : `${i+1}. ${c.cat} — ${fmt(c.ca)} de CA · ${c.qty} articles`)};
   }
 
   // Meilleur produit
   if(/(meilleur|top|plus vendu|best|rentable|marche bien)/.test(q)){
     const a=analyseVentesLocale(30);
     if(!a.top.length)return {titre:'📊 Meilleurs produits',texte:'Aucune vente enregistrée sur les 30 derniers jours.'};
-    return {titre:'🏆 Vos meilleurs produits (30 j)',
-      lignes:a.top.slice(0,5).map((x,i)=>`${i+1}. ${x.nom} — ${x.qty} vendus · ${fmt(x.ca)} de CA · ${fmt(x.benef)} de bénéfice`),
-      pied:`Le plus rentable : ${a.rentables[0]?.nom||'—'} (${fmt(a.rentables[0]?.benef||0)})`};
+    return peutVoirBenefices()
+      ? {titre:'🏆 Vos meilleurs produits (30 j)',
+         lignes:a.top.slice(0,5).map((x,i)=>`${i+1}. ${x.nom} — ${x.qty} vendus · ${fmt(x.ca)} de CA · ${fmt(x.benef)} de bénéfice`),
+         pied:`Le plus rentable : ${a.rentables[0]?.nom||'—'} (${fmt(a.rentables[0]?.benef||0)})`}
+      : {titre:'🏆 Vos meilleurs produits (30 j)',
+         lignes:a.top.slice(0,5).map((x,i)=>`${i+1}. ${x.nom} — ${x.qty} vendus · ${fmt(x.ca)} de CA`),
+         pied:`Le plus vendu : ${a.top[0]?.nom||'—'}`};
   }
 
   // Produits qui ne se vendent pas
   if(/(ne se vend|dormant|invendu|stagne|bouge pas|mort)/.test(q)){
     const a=analyseVentesLocale(30);
     if(!a.dormants.length)return {titre:'✅ Aucun invendu',texte:'Tous vos produits en stock ont été vendus au moins une fois ce mois.'};
-    return {titre:'😴 Produits qui ne se vendent pas (30 j)',
-      lignes:a.dormants.slice(0,10).map(p=>`${p.nom} — ${(p.s1||0)+(p.s2||0)} en stock · ${fmt(p.valeur)} immobilisés`),
-      pied:`Argent dormant total : ${fmt(a.argentDormant)}`};
+    return peutVoirBenefices()
+      ? {titre:'😴 Produits qui ne se vendent pas (30 j)',
+         lignes:a.dormants.slice(0,10).map(p=>`${p.nom} — ${(p.s1||0)+(p.s2||0)} en stock · ${fmt(p.valeur)} immobilisés`),
+         pied:`Argent dormant total : ${fmt(a.argentDormant)}`}
+      : {titre:'😴 Produits qui ne se vendent pas (30 j)',
+         lignes:a.dormants.slice(0,10).map(p=>`${p.nom} — ${(p.s1||0)+(p.s2||0)} en stock`),
+         pied:`${a.dormants.length} produit(s) sans vente`};
   }
 
   // Rupture / prévision
@@ -4708,10 +4743,14 @@ function assistantLocal(question){
   if(/(chiffre|ca\b|benefice|gagne|rapporte|combien)/.test(q)){
     const a=analyseVentesLocale(30);
     return {titre:'💰 Bilan 30 jours',
-      lignes:[`Chiffre d'affaires : ${fmt(a.caTotal)}`,
-              `Bénéfice brut : ${fmt(a.benefTotal)}`,
-              `Nombre de ventes : ${a.nbVentes}`,
-              `Marge moyenne : ${a.caTotal>0?Math.round(a.benefTotal/a.caTotal*100):0}%`]};
+      lignes:peutVoirBenefices()
+        ? [`Chiffre d'affaires : ${fmt(a.caTotal)}`,
+           `Bénéfice brut : ${fmt(a.benefTotal)}`,
+           `Nombre de ventes : ${a.nbVentes}`,
+           `Marge moyenne : ${a.caTotal>0?Math.round(a.benefTotal/a.caTotal*100):0}%`]
+        : [`Chiffre d'affaires : ${fmt(a.caTotal)}`,
+           `Nombre de ventes : ${a.nbVentes}`,
+           `Panier moyen : ${fmt(a.nbVentes?Math.round(a.caTotal/a.nbVentes):0)}`]};
   }
 
   return null;  // question non reconnue: l'IA payante prendra le relais si disponible
@@ -6460,7 +6499,7 @@ function renderAccueil(){
     {icon:'📦',title:'Ruptures Stock',val:stockCrit,sub:`${stockFaible} en alerte`,color:stockCrit>0?'var(--red)':'var(--green)',nav:'inventaire',badge:stockCrit>0?stockCrit:null,cls:'kc-mauve'},
     {icon:'💳',title:'Créances',val:fmt(totalCreances),sub:`${creances.length} client(s)`,color:'var(--red)',nav:'creances',cls:'kc-orange'},
     {icon:'💬',title:'Messages',val:nbMessages||'0',sub:'non lus',color:'var(--purple)',nav:'chat',badge:nbMessages>0?nbMessages:null,cls:'kc-beige'},
-    {icon:'🐢',title:'Produits Lents',val:DB.produits.filter(p=>{const sold=DB.factures.flatMap(f=>f.items).filter(i=>i.prodId===p.id).reduce((s,i)=>s+i.qty,0);return sold===0;}).length,sub:'jamais vendus',color:'var(--orange)',nav:'produits-lents',cls:'kc-gris'},
+    {icon:'🐢',title:'Produits Lents',val:DB.produits.filter(p=>qteVendue(DB.factures,p)===0).length,sub:'jamais vendus',color:'var(--orange)',nav:'produits-lents',cls:'kc-gris'},
   ];
   document.getElementById('accueil-kpis').innerHTML=kpis.map(k=>`
     <div class="accueil-card ${k.cls||''}" onclick="nav('${k.nav}')">
@@ -6815,8 +6854,8 @@ function renderProduitsLents(){
   const recentFacts=DB.factures.filter(f=>f.date.slice(0,10)>=cutoffStr);
 
   const prodStats=DB.produits.map(p=>{
-    const ventesAll=DB.factures.flatMap(f=>f.items).filter(i=>i.prodId===p.id);
-    const ventesRecentes=recentFacts.flatMap(f=>f.items).filter(i=>i.prodId===p.id);
+    const ventesAll=(DB.factures||[]).flatMap(f=>f&&f.items||[]).filter(i=>ligneCorrespond(i,p));
+    const ventesRecentes=(recentFacts||[]).flatMap(f=>f&&f.items||[]).filter(i=>ligneCorrespond(i,p));
     const qtyRecente=ventesRecentes.reduce((s,i)=>s+i.qty,0);
     const qtyTotal=ventesAll.reduce((s,i)=>s+i.qty,0);
     const lastSale=ventesAll.length?ventesAll.map(i=>i.date||'').sort().reverse()[0]:null;
@@ -6871,8 +6910,8 @@ function exportSlowProducts(){
   const cutoffStr=cutoff.toISOString().slice(0,10);
   const recentFacts=DB.factures.filter(f=>f.date.slice(0,10)>=cutoffStr);
   const rows=DB.produits.map(p=>{
-    const qtyR=recentFacts.flatMap(f=>f.items).filter(i=>i.prodId===p.id).reduce((s,i)=>s+i.qty,0);
-    const qtyT=DB.factures.flatMap(f=>f.items).filter(i=>i.prodId===p.id).reduce((s,i)=>s+i.qty,0);
+    const qtyR=qteVendue(recentFacts,p);
+    const qtyT=qteVendue(DB.factures,p);
     return`${p.nom},${p.ref||''},${p.prix},${(p.s1||0)+(p.s2||0)},${qtyR},${qtyT},${qtyR===0&&qtyT===0?'Jamais vendu':qtyR===0?'Lent':'OK'}`;
   }).filter(r=>r.endsWith('Jamais vendu')||r.endsWith('Lent'));
   const csv='Produit,Ref,Prix,Stock,Ventes '+SLOW_PERIOD_DAYS+'j,Total Ventes,Statut\n'+rows.join('\n');
@@ -7056,6 +7095,22 @@ function applyStockDelta(productId,field,delta){
     }).catch(e=>{console.error('Stock atomique:',e);/* reste en file, renvoyé plus tard */});
   }
 }
+// Une ligne de facture correspond-elle à ce produit ?
+// L'identifiant est stocké dans i.id (et non i.prodId, cause d'un ancien bug qui
+// faisait compter TOUS les produits comme jamais vendus). On garde un repli sur
+// le nom pour les factures anciennes où l'identifiant manquait.
+function ligneCorrespond(i,p){
+  if(!i||!p)return false;
+  if(i.id&&p.id)return i.id===p.id;
+  return !!(i.nom&&p.nom&&_norm(i.nom)===_norm(p.nom));
+}
+// Quantité totale vendue d'un produit sur une liste de factures
+function qteVendue(factures,p){
+  return (factures||[]).flatMap(f=>f&&f.items||[])
+    .filter(i=>ligneCorrespond(i,p))
+    .reduce((s,i)=>s+(Number(i.qty)||0),0);
+}
+
 // ══ DÉDUPLICATION DES PRODUITS ══
 // Deux appareils peuvent créer le même produit chacun de leur côté: ils obtiennent
 // des identifiants différents, et la fusion du catalogue les conserve tous les deux.
