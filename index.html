@@ -597,7 +597,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="sec active" id="sec-caisse">
     <div class="pos-layout">
       <div class="pos-left">
-        <div style="display:flex;gap:6px;align-items:center;"><input class="srch" style="flex:1;" placeholder="🔍 Produit, référence..." id="pos-srch" oninput="renderGridDiffere()"><input id="pos-scan" placeholder="📷 Scanner ici" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();scanVersPanier(this.value);}" style="width:140px;background:var(--surf2);border:1px solid var(--cyan);border-radius:7px;padding:8px 10px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;" title="Placez le curseur ici et scannez, ou tapez le code puis Entrée"><button class="btn btn-sm btn-cyan" onclick="openScanner()" title="Scanner avec la caméra">📷</button></div><div id="pos-info" style="margin-top:4px;"></div><div style="display:none;</div>
+        <input class="srch" style="width:100%" placeholder="🔍 Produit, référence, code-barres..." id="pos-srch" oninput="renderGridDiffere()">
         <div class="pos-prods"><div class="pgrid" id="pos-grid"></div></div>
       </div>
       <div class="pos-right">
