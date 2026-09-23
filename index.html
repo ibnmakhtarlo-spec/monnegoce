@@ -597,7 +597,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="sec active" id="sec-caisse">
     <div class="pos-layout">
       <div class="pos-left">
-        <div style="display:flex;gap:6px;align-items:center;"><input class="srch" style="flex:1;" placeholder="🔍 Produit, référence..." id="pos-srch" oninput="renderGrid()"><input id="pos-scan" placeholder="📷 Scanner ici" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();scanVersPanier(this.value);}" style="width:140px;background:var(--surf2);border:1px solid var(--cyan);border-radius:7px;padding:8px 10px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;" title="Placez le curseur ici et scannez, ou tapez le code puis Entrée"><button class="btn btn-sm btn-cyan" onclick="openScanner()" title="Scanner avec la caméra">📷</button></div><div id="pos-info" style="margin-top:4px;"></div><div style="display:none;</div>
+        <div style="display:flex;gap:6px;align-items:center;"><input class="srch" style="flex:1;" placeholder="🔍 Produit, référence..." id="pos-srch" oninput="renderGridDiffere()"><input id="pos-scan" placeholder="📷 Scanner ici" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();scanVersPanier(this.value);}" style="width:140px;background:var(--surf2);border:1px solid var(--cyan);border-radius:7px;padding:8px 10px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;" title="Placez le curseur ici et scannez, ou tapez le code puis Entrée"><button class="btn btn-sm btn-cyan" onclick="openScanner()" title="Scanner avec la caméra">📷</button></div><div id="pos-info" style="margin-top:4px;"></div><div style="display:none;</div>
         <div class="pos-prods"><div class="pgrid" id="pos-grid"></div></div>
       </div>
       <div class="pos-right">
@@ -2228,13 +2228,55 @@ let session={user:null,boutique:'B1',caisse:'C1'};
 let cart=[],currentFact=null,lastFactId=null,nfLignes=[];
 let autoSaveTimer=null;
 
-function save(){
-  ['produits','clients','fournisseurs','users','caisses','factures','devis','retours','salaires','depenses','nextIds','settings'].forEach(k=>SS(k,DB[k]));
+// ══ SAUVEGARDE LOCALE OPTIMISÉE ══
+// Auparavant chaque save() réécrivait les 12 collections entières (des milliers
+// de factures, un millier de produits) à chaque clic. Sur un gros catalogue cela
+// bloquait l'interface. On regroupe maintenant les écritures et on n'écrit que
+// ce qui a réellement changé.
+const CLES_SAUVEGARDE=['produits','clients','fournisseurs','users','caisses','factures',
+  'devis','retours','salaires','depenses','nextIds','settings','commandes','brouillons','logs','mouvements'];
+let _saveTimer=null,_saveEnCours=false;
+const _empreintes={};
+
+function _ecrireMaintenant(){
+  _saveTimer=null;
+  if(_saveEnCours)return;
+  _saveEnCours=true;
+  try{
+    CLES_SAUVEGARDE.forEach(k=>{
+      if(DB[k]===undefined)return;
+      // Empreinte rapide: taille + dernier élément. Évite de re-sérialiser
+      // une collection inchangée, ce qui est le cas le plus fréquent.
+      const v=DB[k];
+      let emp;
+      if(Array.isArray(v)){
+        const der=v.length?v[v.length-1]:null;
+        emp=v.length+'|'+(der&&der.id?der.id:'')+'|'+(der&&(der._updated||der.date)||'');
+      } else emp='o';
+      // Pour les objets et les petites listes, on écrit toujours (coût négligeable)
+      if(Array.isArray(v)&&v.length>50&&_empreintes[k]===emp)return;
+      _empreintes[k]=emp;
+      SS(k,v);
+    });
+  }catch(e){console.error('save:',e);}
+  _saveEnCours=false;
+
   const now=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   const el=document.getElementById('last-save-time');if(el)el.textContent=now;
   const ind=document.getElementById('autosave-ind');const txt=document.getElementById('autosave-txt');
-  if(ind&&txt){ind.className='autosave ok';txt.textContent='Sauvegardé '+now;setTimeout(()=>{if(txt)txt.textContent='Auto-save';if(ind)ind.className='autosave';},3000);}
+  if(ind&&txt){ind.className='autosave ok';txt.textContent='Sauvegardé '+now;
+    setTimeout(()=>{if(txt)txt.textContent='Auto-save';if(ind)ind.className='autosave';},3000);}
 }
+
+function save(){
+  // Regroupe les appels rapprochés: 20 clics d'affilée = une seule écriture
+  if(_saveTimer)clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(_ecrireMaintenant,180);
+}
+// Forcer l'écriture avant de quitter ou de passer en arrière-plan
+function saveImmediat(){if(_saveTimer)clearTimeout(_saveTimer);_ecrireMaintenant();}
+window.addEventListener('beforeunload',saveImmediat);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveImmediat();});
 function startAutoSave(){if(autoSaveTimer)clearInterval(autoSaveTimer);autoSaveTimer=setInterval(save,30000);}
 
 const _fmtBase=n=>{const num=Number(n||0);return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g,' ');};
@@ -2435,14 +2477,12 @@ function logMouvement(produitId,produitNom,type,qte,boutique,details=''){
   if(DB.mouvements.length>1000)DB.mouvements=DB.mouvements.slice(0,1000);
 }
 // ══ PROTECTION XSS — échapper le HTML dans les contenus saisis par l'utilisateur ══
+// Un seul passage au lieu de cinq: appelé des milliers de fois par rendu
+const _ECH={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};
 function escapeHtml(str){
   if(str===null||str===undefined)return '';
-  return String(str)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;')
-    .replace(/'/g,'&#039;');
+  const s=String(str);
+  return /[&<>"']/.test(s)?s.replace(/[&<>"']/g,ch=>_ECH[ch]):s;
 }
 function detecterAppareil(){
   const ua=navigator.userAgent;
@@ -2906,7 +2946,14 @@ function clearNFClient(){document.getElementById('nf-cl-id').value='';document.g
 // Nombre de produits affichés d'un coup en caisse.
 // Au-delà, l'affichage devient lent sur un gros catalogue: on limite et on invite
 // à préciser la recherche (ou à scanner, plus rapide encore).
-const POS_MAX_AFFICHE=60;
+// La recherche se déclenchait à chaque lettre, relançant tout le rendu.
+// On attend une courte pause de frappe: l'affichage reste fluide même à 1000 produits.
+let _timerGrid=null;
+function renderGridDiffere(){
+  if(_timerGrid)clearTimeout(_timerGrid);
+  _timerGrid=setTimeout(()=>{_timerGrid=null;renderGrid();},120);
+}
+const POS_MAX_AFFICHE=0;   // 0 = aucune limite, tous les produits sont affichés
 function renderGrid(){
   const qBrut=(document.getElementById('pos-srch')?.value||'');
   const q=_norm(qBrut);
@@ -2923,7 +2970,7 @@ function renderGrid(){
     const st=_statsParProduit(30);
     list=[...list].sort((a,b)=>((st[b.id]?.qty)||0)-((st[a.id]?.qty)||0));
   }
-  const tronque=total>POS_MAX_AFFICHE;
+  const tronque=POS_MAX_AFFICHE>0&&total>POS_MAX_AFFICHE;
   if(tronque)list=list.slice(0,POS_MAX_AFFICHE);
   const info=document.getElementById('pos-info');
   if(info)info.innerHTML=tronque
@@ -4966,9 +5013,23 @@ function installerBoutonsDictee(){
 // ══ ANALYSE VOCALE LOCALE (100% GRATUITE, HORS-LIGNE) ══
 // Comprend les commandes courantes sans appeler aucune IA payante.
 // Ne fait appel à Claude qu'en dernier recours, si la phrase n'est pas reconnue.
-const _norm=s=>(s||'').toLowerCase()
+const _cacheNorm=new Map();
+const _normBrut=s=>(s||'').toLowerCase()
   .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
   .replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+// Mémorisation: _norm est appelé des milliers de fois sur chaque frappe de recherche.
+// Le résultat d'un même texte ne change jamais, on le garde en mémoire.
+function _norm(s){
+  if(!s)return '';
+  const cle=String(s);
+  let v=_cacheNorm.get(cle);
+  if(v===undefined){
+    v=_normBrut(cle);
+    if(_cacheNorm.size>5000)_cacheNorm.clear();  // éviter une croissance sans fin
+    _cacheNorm.set(cle,v);
+  }
+  return v;
+}
 
 const _MOTS_NB={un:1,une:1,deux:2,trois:3,quatre:4,cinq:5,six:6,sept:7,huit:8,neuf:9,dix:10,
   onze:11,douze:12,treize:13,quatorze:14,quinze:15,seize:16,vingt:20,trente:30,quarante:40,cinquante:50,cent:100};
