@@ -2964,19 +2964,9 @@ function renderGrid(){
     const cible=_norm((p.nom||'')+' '+(p.ref||'')+' '+(p.codeBarre||''));
     return mots.every(m=>cible.includes(m));
   });
-  const total=list.length;
-  // Sans recherche, montrer d'abord les produits qui se vendent
-  if(!mots.length){
-    const st=_statsParProduit(30);
-    list=[...list].sort((a,b)=>((st[b.id]?.qty)||0)-((st[a.id]?.qty)||0));
-  }
-  const tronque=POS_MAX_AFFICHE>0&&total>POS_MAX_AFFICHE;
-  if(tronque)list=list.slice(0,POS_MAX_AFFICHE);
+  // Ordre du catalogue conservé, comme avant: pas de tri, pas de limite.
   const info=document.getElementById('pos-info');
-  if(info)info.innerHTML=tronque
-    ? '<span style="font-size:10px;color:var(--text2);">'+POS_MAX_AFFICHE+' produits affichés sur '+total
-      +' — précisez la recherche ou scannez le code</span>'
-    : (total?'<span style="font-size:10px;color:var(--text2);">'+total+' produit(s)</span>':'');
+  if(info)info.innerHTML='';
   const stk=p=>session.boutique==='B1'?p.s1:p.s2;
   document.getElementById('pos-grid').innerHTML=list.length
     ?list.map(p=>`<div class="pbtn ${stk(p)<=0?'oos':''}" onclick="addCart('${p.id}')">
