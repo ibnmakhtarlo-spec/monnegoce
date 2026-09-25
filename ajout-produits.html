@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f0a500">
+<link rel="manifest" href="manifest-produits.json">
+<link rel="apple-touch-icon" href="apple-touch-icon-produits.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ajout Produits">
 <title>Ajout Rapide Produits — Mon Négoce</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -200,6 +204,7 @@ textarea{resize:vertical;min-height:80px;}
       <span class="mic-btn" id="mic-desc" onclick="dicter('f-desc','mic-desc')" style="top:auto;bottom:8px;">🎤</span>
     </div>
 
+    <!-- Nouveau produit : stock initial (écrit une seule fois, à la création) -->
     <div id="stock-zone">
       <div class="row2">
         <div class="fg">
@@ -212,8 +217,27 @@ textarea{resize:vertical;min-height:80px;}
         </div>
       </div>
     </div>
-    <div id="stock-note" class="stock-note" style="display:none;margin-bottom:11px;">
-      ℹ️ Le stock d'un produit existant se modifie dans l'application principale (vente, transfert, réception).
+
+    <!-- Produit existant : ajout au stock actuel, sans jamais écraser une vente en cours -->
+    <div id="ajout-stock-zone" style="display:none;margin-bottom:11px;">
+      <div class="card" style="padding:12px;margin:0 0 11px;background:var(--surf2);">
+        <h3 style="margin-bottom:8px;">➕ Ajouter au stock</h3>
+        <div class="hint" style="margin-bottom:9px;">
+          Les quantités ci-dessous s'AJOUTENT au stock actuel (réception, comptage).
+          Elles ne l'écrasent jamais, même si une vente a lieu au même moment.
+        </div>
+        <div class="row2">
+          <div class="fg" style="margin-bottom:8px;">
+            <label>À ajouter — Rahma Telecom</label>
+            <input id="f-ajout-s1" type="number" min="0" placeholder="0">
+          </div>
+          <div class="fg" style="margin-bottom:8px;">
+            <label>À ajouter — Rayane Telecom</label>
+            <input id="f-ajout-s2" type="number" min="0" placeholder="0">
+          </div>
+        </div>
+        <button class="btn btn-green btn-w" onclick="ajouterAuStock()">➕ Ajouter au stock</button>
+      </div>
     </div>
 
     <div class="fg">
@@ -242,6 +266,14 @@ textarea{resize:vertical;min-height:80px;}
       <button class="btn btn-ghost btn-sm" onclick="fermerReglages()">✕</button>
     </div>
     <div class="fg">
+      <label>Qui ajoute / modifie les produits</label>
+      <input id="regl-identifiant" placeholder="Votre identifiant ou prénom">
+      <div class="hint">
+        Apparaît dans le Journal d'audit de l'application principale, à chaque
+        produit ajouté ou modifié depuis cet appareil.
+      </div>
+    </div>
+    <div class="fg">
       <label>Clé API Anthropic (pour l'analyse de facture)</label>
       <input type="password" id="regl-apikey" placeholder="sk-ant-...">
       <div class="hint">
@@ -255,6 +287,13 @@ textarea{resize:vertical;min-height:80px;}
 </div>
 
 <div id="toast"></div>
+<script>
+if('serviceWorker' in navigator && location.protocol!=='file:'){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw-produits.js').catch(()=>{});
+  });
+}
+</script>
 
 <script>
 // ══════════════════════════════════════════════════════════
@@ -305,19 +344,13 @@ async function chargerCatalogue(){
   }catch(e){toast('❌ Chargement du catalogue : '+e.message,'err');}
 }
 
-// ── Identifiant (traçabilité, pas un mot de passe) ──
-function changerIdentifiant(){
-  const actuel=localStorage.getItem('mn_ajout_id')||'';
-  const v=prompt('Votre identifiant ou prénom (pour la traçabilité) :',actuel);
-  if(v===null)return;
-  localStorage.setItem('mn_ajout_id',v.trim()||'Anonyme');
-  majBadgeId();
-}
+// ── Identifiant (traçabilité, pas un mot de passe) — géré depuis les Réglages ──
+function changerIdentifiant(){ouvrirReglages();}
 function majBadgeId(){
   document.getElementById('id-badge').textContent='👤 '+(localStorage.getItem('mn_ajout_id')||'Définir');
 }
 majBadgeId();
-if(!localStorage.getItem('mn_ajout_id'))setTimeout(changerIdentifiant,400);
+if(!localStorage.getItem('mn_ajout_id'))setTimeout(ouvrirReglages,400);
 
 // ── Utilitaires ──
 function esc(s){
@@ -371,7 +404,9 @@ function chargerProduit(id){
   document.getElementById('photo-prev').innerHTML=p.photo?'<img src="'+p.photo+'">':'📦';
   photoActuelle=p.photo||'';
   document.getElementById('stock-zone').style.display='none';
-  document.getElementById('stock-note').style.display='block';
+  document.getElementById('ajout-stock-zone').style.display='block';
+  document.getElementById('f-ajout-s1').value='';
+  document.getElementById('f-ajout-s2').value='';
   majMarge();
   window.scrollTo({top:document.getElementById('form-titre').offsetTop-70,behavior:'smooth'});
   toast('✏️ Produit chargé pour modification','ok');
@@ -390,7 +425,7 @@ function nouveauFormulaire(){
   document.getElementById('photo-prev').innerHTML='📦';
   photoActuelle='';
   document.getElementById('stock-zone').style.display='';
-  document.getElementById('stock-note').style.display='none';
+  document.getElementById('ajout-stock-zone').style.display='none';
   document.getElementById('marge-info').textContent='';
   document.getElementById('srch').value='';
   document.getElementById('srch-res').innerHTML='';
@@ -543,6 +578,41 @@ function genererDescription(){
 }
 
 // ── Enregistrement (lecture-écriture UNIQUEMENT sur la fiche produit) ──
+// ── Ajouter au stock d'un produit EXISTANT ──
+// Incrément atomique (transaction Firebase), jamais un remplacement : une vente
+// en caisse au même moment n'est jamais écrasée, exactement comme pour l'import
+// de facture.
+async function ajouterAuStock(){
+  if(!produitEnEdition){toast('Chargez d\'abord un produit existant','err');return;}
+  const s1=parseInt(document.getElementById('f-ajout-s1').value)||0;
+  const s2=parseInt(document.getElementById('f-ajout-s2').value)||0;
+  if(s1<=0&&s2<=0){toast('Indiquez une quantité à ajouter','err');return;}
+  if(!fbConnected){toast('⛔ Connexion requise','err');return;}
+  try{
+    if(s1>0)await fbDB.ref('negoce/stock_qty/'+produitEnEdition+'/s1').transaction(cur=>(typeof cur==='number'?cur:0)+s1);
+    if(s2>0)await fbDB.ref('negoce/stock_qty/'+produitEnEdition+'/s2').transaction(cur=>(typeof cur==='number'?cur:0)+s2);
+
+    const identifiant=localStorage.getItem('mn_ajout_id')||'Anonyme';
+    try{
+      const logSnap=await fbDB.ref('negoce/logs/'+identifiant).once('value');
+      const bloc=logSnap.val()||{user:identifiant,logs:[]};
+      bloc.logs=bloc.logs||[];
+      bloc.logs.unshift({date:new Date().toISOString(),user:identifiant,userId:identifiant,role:'app-produits',
+        action:'Ajustement stock',
+        details:document.getElementById('f-nom').value+' : +'+s1+' Rahma / +'+s2+' Rayane (via Ajout Rapide Produits)'});
+      bloc.logs=bloc.logs.slice(0,200);bloc._updated=Date.now();
+      await fbDB.ref('negoce/logs/'+identifiant).set(bloc);
+    }catch(e){}
+
+    document.getElementById('f-ajout-s1').value='';
+    document.getElementById('f-ajout-s2').value='';
+    toast('✅ Stock ajouté : +'+s1+' Rahma / +'+s2+' Rayane','ok');
+  }catch(e){
+    console.error(e);
+    toast('❌ Échec de l\'ajout au stock : '+e.message,'err');
+  }
+}
+
 async function enregistrerProduit(){
   const nom=document.getElementById('f-nom').value.trim();
   const prix=parseFloat(document.getElementById('f-prix').value);
@@ -616,13 +686,20 @@ async function enregistrerProduit(){
   }
 }
 
-// ── Réglages (clé API, strictement locale à cet appareil) ──
+// ── Réglages (identifiant + clé API, strictement locaux à cet appareil) ──
 function ouvrirReglages(){
+  document.getElementById('regl-identifiant').value=localStorage.getItem('mn_ajout_id')||'';
   document.getElementById('regl-apikey').value=localStorage.getItem('mn_ajout_apikey')||'';
   document.getElementById('regl-overlay').style.display='flex';
+  setTimeout(()=>document.getElementById('regl-identifiant').focus(),80);
 }
 function fermerReglages(){document.getElementById('regl-overlay').style.display='none';}
 function sauverReglages(){
+  const nom=document.getElementById('regl-identifiant').value.trim();
+  if(!nom){toast('⚠️ Indiquez qui ajoute les produits','err');return;}
+  localStorage.setItem('mn_ajout_id',nom);
+  majBadgeId();
+
   const v=document.getElementById('regl-apikey').value.trim();
   if(v)localStorage.setItem('mn_ajout_apikey',v); else localStorage.removeItem('mn_ajout_apikey');
   fermerReglages();
