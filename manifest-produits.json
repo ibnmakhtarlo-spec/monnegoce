@@ -1,0 +1,40 @@
+{
+  "name": "Ajout Rapide Produits — Mon Négoce",
+  "short_name": "Ajout Produits",
+  "description": "Ajouter et modifier des produits rapidement : photo, scan, description IA.",
+  "start_url": "./ajout-produits.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#060910",
+  "theme_color": "#f0a500",
+  "lang": "fr",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "icon-produits-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-produits-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-produits-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-produits-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
