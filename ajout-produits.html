@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f0a500">
+<title>Ajout Rapide Produits — Mon Négoce</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#060910;--surf:#0d1421;--surf2:#121c2e;--surf3:#192437;
+  --border:#1e2d45;--border2:#253448;--text:#f0f4ff;--text2:#8899bb;--text3:#5a6b85;
+  --gold:#f0a500;--goldf:rgba(240,165,0,.14);--green:#10b981;--red:#f43f5e;--blue:#3b82f6;
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg);color:var(--text);padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);}
+.topbar{position:sticky;top:0;z-index:50;background:var(--surf);border-bottom:1px solid var(--border);
+  padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.topbar h1{font-size:15px;margin:0;font-weight:900;}
+.topbar h1 span{color:var(--gold);}
+#id-badge{font-size:11px;color:var(--text2);background:var(--surf2);border:1px solid var(--border2);
+  border-radius:20px;padding:5px 11px;cursor:pointer;}
+.wrap{max-width:640px;margin:0 auto;padding:14px 14px 90px;}
+.card{background:var(--surf);border:1px solid var(--border);border-radius:13px;padding:14px;margin-bottom:12px;}
+.card h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin:0 0 10px;}
+label{display:block;font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:600;}
+input,select,textarea{width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:8px;
+  padding:10px 11px;color:var(--text);font-family:inherit;font-size:14px;outline:none;}
+input:focus,select:focus,textarea:focus{border-color:var(--gold);}
+textarea{resize:vertical;min-height:80px;}
+.fg{margin-bottom:11px;position:relative;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.btn{border:none;border-radius:9px;padding:11px 14px;font-size:13px;font-weight:700;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:inherit;}
+.btn-gold{background:var(--gold);color:#3a2400;}
+.btn-ghost{background:var(--surf2);color:var(--text);border:1px solid var(--border2);}
+.btn-green{background:var(--green);color:#04281c;}
+.btn-red{background:rgba(244,63,94,.15);color:var(--red);border:1px solid rgba(244,63,94,.3);}
+.btn-sm{padding:7px 10px;font-size:11.5px;}
+.btn-w{width:100%;}
+.row-btn{display:flex;gap:8px;flex-wrap:wrap;}
+.row-btn .btn{flex:1;min-width:120px;}
+.mic-btn{position:absolute;right:7px;top:30px;background:var(--surf3);border:1px solid var(--border2);
+  border-radius:7px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:14px;}
+.mic-btn.on{background:var(--red);}
+#srch{width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:10px;
+  padding:12px 14px;color:var(--text);font-size:14px;outline:none;}
+#srch-res{margin-top:8px;max-height:220px;overflow-y:auto;}
+.res-item{background:var(--surf2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;
+  margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.res-item:active{border-color:var(--gold);}
+.res-item .rn{font-size:12.5px;font-weight:700;}
+.res-item .rs{font-size:10px;color:var(--text2);}
+#photo-zone{display:flex;gap:10px;align-items:center;margin-bottom:10px;}
+#photo-prev{width:78px;height:78px;border-radius:10px;background:var(--surf2);border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;font-size:26px;overflow:hidden;flex-shrink:0;}
+#photo-prev img{width:100%;height:100%;object-fit:cover;}
+.marge{font-size:11px;color:var(--text2);margin-top:5px;}
+.marge b{color:var(--green);}
+.marge.neg b{color:var(--red);}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+  background:var(--surf3);border:1px solid var(--border2);border-radius:10px;padding:11px 18px;
+  font-size:13px;font-weight:600;opacity:0;transition:all .25s;z-index:999;max-width:90vw;text-align:center;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#toast.ok{border-color:var(--green);color:var(--green);}
+#toast.err{border-color:var(--red);color:var(--red);}
+#scan-overlay{position:fixed;inset:0;background:#000;z-index:900;display:none;flex-direction:column;}
+#scan-overlay.open{display:flex;}
+#scan-reader{flex:1;}
+#scan-close{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:14px;z-index:910;
+  background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:38px;height:38px;font-size:18px;}
+#etat-conn{font-size:10px;padding:4px 10px;border-radius:20px;font-weight:700;}
+#etat-conn.on{background:rgba(16,185,129,.15);color:var(--green);}
+#etat-conn.off{background:rgba(244,63,94,.15);color:var(--red);}
+.hint{font-size:10px;color:var(--text3);margin-top:3px;}
+.stock-note{font-size:11px;color:var(--text2);background:var(--surf2);border-radius:8px;padding:9px 11px;
+  border:1px solid var(--border2);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>📦 <span>Ajout Rapide</span> Produits</h1>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span id="etat-conn" class="off">⏳</span>
+    <span id="id-badge" onclick="changerIdentifiant()">👤 —</span>
+    <button class="btn btn-ghost btn-sm" onclick="ouvrirReglages()" style="padding:7px 9px;" title="Réglages">⚙️</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="card">
+    <h3>🧾 Facture fournisseur — ajout groupé</h3>
+    <div class="hint" style="margin-bottom:9px;">
+      Prenez en photo une facture ou un bon de livraison : l'IA lit chaque ligne
+      et propose d'ajouter les produits au stock d'un coup.
+    </div>
+    <div class="fg">
+      <label>Réception dans la boutique</label>
+      <select id="fact-boutique">
+        <option value="s1">🏪 Rahma Telecom</option>
+        <option value="s2">🏬 Rayane Telecom</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
+      <div id="fact-prev" style="width:66px;height:66px;border-radius:9px;background:var(--surf2);
+        border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;
+        font-size:22px;overflow:hidden;flex-shrink:0;">🧾</div>
+      <div class="row-btn" style="flex:1;">
+        <button class="btn btn-ghost btn-sm" onclick="ouvrirCamera('facture')">📷 Photo</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('fichier-facture').click()">🖼️ Importer</button>
+        <input type="file" id="fichier-facture" accept="image/*" style="display:none;" onchange="importerPhoto(this,'facture')">
+      </div>
+    </div>
+    <button class="btn btn-gold btn-w" id="btn-analyser-facture" style="display:none;" onclick="analyserFacture()">
+      🔍 Analyser la facture (IA)
+    </button>
+    <div class="hint" id="hint-cle-api" style="margin-top:6px;"></div>
+    <div id="fact-resultat" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="card">
+    <h3>🔍 Chercher un produit existant</h3>
+    <input id="srch" placeholder="Nom, référence, code-barres..." oninput="chercher()">
+    <div id="srch-res"></div>
+  </div>
+
+  <div class="card">
+    <h3 id="form-titre">➕ Nouveau produit</h3>
+
+    <div id="photo-zone">
+      <div id="photo-prev">📦</div>
+      <div class="row-btn" style="flex:1;">
+        <button class="btn btn-ghost btn-sm" onclick="ouvrirCamera()">📷 Photo</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('fichier-photo').click()">🖼️ Importer</button>
+        <input type="file" id="fichier-photo" accept="image/*" style="display:none;" onchange="importerPhoto(this)">
+      </div>
+    </div>
+    <video id="cam-video" style="display:none;width:100%;border-radius:9px;margin-bottom:9px;"></video>
+    <canvas id="cam-canvas" style="display:none;"></canvas>
+    <div id="cam-controls" style="display:none;gap:8px;margin-bottom:10px;" class="row-btn">
+      <button class="btn btn-gold btn-sm" onclick="capturerPhoto()">📸 Capturer</button>
+      <button class="btn btn-ghost btn-sm" onclick="fermerCamera()">Annuler</button>
+    </div>
+
+    <div class="fg">
+      <label>Nom du produit *</label>
+      <input id="f-nom" placeholder="Ex: Câble USB-C 1m">
+      <span class="mic-btn" id="mic-nom" onclick="dicter('f-nom','mic-nom')">🎤</span>
+    </div>
+
+    <div class="row2">
+      <div class="fg">
+        <label>Référence / code-barres</label>
+        <input id="f-ref" placeholder="Optionnel">
+      </div>
+      <div class="fg">
+        <label>&nbsp;</label>
+        <button class="btn btn-ghost btn-w" onclick="ouvrirScanner()">📷 Scanner</button>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label>Catégorie</label>
+      <input id="f-cat" list="liste-cat" placeholder="Ex: Chargeurs, Câbles, Écouteurs...">
+      <datalist id="liste-cat"></datalist>
+    </div>
+
+    <div class="fg">
+      <label>Fournisseur</label>
+      <select id="f-fourn"><option value="">— Aucun —</option></select>
+    </div>
+
+    <div class="row2">
+      <div class="fg">
+        <label>Prix d'achat (FCFA)</label>
+        <input id="f-achat" type="number" min="0" placeholder="0" oninput="majMarge()">
+      </div>
+      <div class="fg">
+        <label>Prix de vente (FCFA) *</label>
+        <input id="f-prix" type="number" min="0" placeholder="0" oninput="majMarge()">
+      </div>
+    </div>
+    <div class="marge" id="marge-info"></div>
+
+    <div class="fg" style="margin-top:11px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <label style="margin:0;">Description</label>
+        <button class="btn btn-ghost btn-sm" onclick="genererDescription()">✨ Générer (gratuit)</button>
+      </div>
+      <textarea id="f-desc" placeholder="Caractéristiques, compatibilité, couleurs..."></textarea>
+      <span class="mic-btn" id="mic-desc" onclick="dicter('f-desc','mic-desc')" style="top:auto;bottom:8px;">🎤</span>
+    </div>
+
+    <div id="stock-zone">
+      <div class="row2">
+        <div class="fg">
+          <label>Stock initial — Rahma Telecom</label>
+          <input id="f-s1" type="number" min="0" placeholder="0">
+        </div>
+        <div class="fg">
+          <label>Stock initial — Rayane Telecom</label>
+          <input id="f-s2" type="number" min="0" placeholder="0">
+        </div>
+      </div>
+    </div>
+    <div id="stock-note" class="stock-note" style="display:none;margin-bottom:11px;">
+      ℹ️ Le stock d'un produit existant se modifie dans l'application principale (vente, transfert, réception).
+    </div>
+
+    <div class="fg">
+      <label>Seuil d'alerte stock faible</label>
+      <input id="f-alerte" type="number" min="0" value="1">
+    </div>
+
+    <div class="row-btn" style="margin-top:5px;">
+      <button class="btn btn-gold btn-w" onclick="enregistrerProduit()">💾 Enregistrer</button>
+      <button class="btn btn-ghost" onclick="nouveauFormulaire()">🆕 Vider</button>
+    </div>
+  </div>
+
+</div>
+
+<div id="scan-overlay">
+  <button id="scan-close" onclick="fermerScanner()">✕</button>
+  <div id="scan-reader"></div>
+</div>
+
+<div id="regl-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:920;display:none;
+  align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--surf);border:1px solid var(--border);border-radius:13px;padding:16px;max-width:420px;width:100%;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;">
+      <strong style="font-size:14px;">⚙️ Réglages</strong>
+      <button class="btn btn-ghost btn-sm" onclick="fermerReglages()">✕</button>
+    </div>
+    <div class="fg">
+      <label>Clé API Anthropic (pour l'analyse de facture)</label>
+      <input type="password" id="regl-apikey" placeholder="sk-ant-...">
+      <div class="hint">
+        Reste uniquement sur cet appareil, jamais envoyée à la base de données.
+        Sans clé, tout le reste de l'app fonctionne gratuitement — seule
+        l'analyse de facture fournisseur en a besoin.
+      </div>
+    </div>
+    <button class="btn btn-gold btn-w" onclick="sauverReglages()">💾 Enregistrer</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// CONNEXION À LA MÊME BASE QUE L'APPLICATION PRINCIPALE
+// Cette app ne touche jamais au stock des caisses ni aux ventes :
+// elle lit et écrit uniquement la FICHE des produits (nom, prix,
+// description, photo...). Le stock initial d'un nouveau produit est
+// écrit une seule fois à la création ; ensuite il appartient à l'app
+// principale (ventes, transferts, réceptions de commande).
+// ══════════════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBJjyIhqZ5pc7qw4ep3RyoCnM0GzRBK7To",
+  authDomain: "monnegoce-84a54.firebaseapp.com",
+  databaseURL: "https://monnegoce-84a54-default-rtdb.firebaseio.com",
+  projectId: "monnegoce-84a54",
+  storageBucket: "monnegoce-84a54.firebasestorage.app",
+  messagingSenderId: "926691564469",
+  appId: "1:926691564469:web:6a52bbce94c84ed50a57fc"
+};
+let fbDB=null, fbConnected=false, produitsCache=[], fournisseursCache=[];
+let produitEnEdition=null; // id du produit en cours de modification, ou null = création
+
+firebase.initializeApp(FIREBASE_CONFIG);
+fbDB=firebase.database();
+firebase.auth().signInAnonymously().catch(e=>toast('⚠️ Connexion échouée : '+e.message,'err'));
+firebase.auth().onAuthStateChanged(u=>{
+  if(!u)return;
+  fbDB.ref('.info/connected').on('value',snap=>{
+    fbConnected=snap.val()===true;
+    const el=document.getElementById('etat-conn');
+    el.className=fbConnected?'on':'off';
+    el.textContent=fbConnected?'☁️ En ligne':'📴 Hors ligne';
+    if(fbConnected)chargerCatalogue();
+  });
+});
+
+async function chargerCatalogue(){
+  try{
+    const snap=await fbDB.ref('negoce/shared/data').once('value');
+    const d=snap.val()||{};
+    produitsCache=Array.isArray(d.produits)?d.produits:Object.values(d.produits||{});
+    fournisseursCache=Array.isArray(d.fournisseurs)?d.fournisseurs:Object.values(d.fournisseurs||{});
+    const cats=[...new Set(produitsCache.map(p=>p&&p.cat).filter(Boolean))].sort();
+    document.getElementById('liste-cat').innerHTML=cats.map(c=>'<option value="'+esc(c)+'">').join('');
+    const selF=document.getElementById('f-fourn');
+    selF.innerHTML='<option value="">— Aucun —</option>'
+      +fournisseursCache.map(f=>'<option value="'+f.id+'">'+esc(f.nom)+'</option>').join('');
+  }catch(e){toast('❌ Chargement du catalogue : '+e.message,'err');}
+}
+
+// ── Identifiant (traçabilité, pas un mot de passe) ──
+function changerIdentifiant(){
+  const actuel=localStorage.getItem('mn_ajout_id')||'';
+  const v=prompt('Votre identifiant ou prénom (pour la traçabilité) :',actuel);
+  if(v===null)return;
+  localStorage.setItem('mn_ajout_id',v.trim()||'Anonyme');
+  majBadgeId();
+}
+function majBadgeId(){
+  document.getElementById('id-badge').textContent='👤 '+(localStorage.getItem('mn_ajout_id')||'Définir');
+}
+majBadgeId();
+if(!localStorage.getItem('mn_ajout_id'))setTimeout(changerIdentifiant,400);
+
+// ── Utilitaires ──
+function esc(s){
+  return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+}
+function norm(s){
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+}
+function fmt(n){return Math.round(n||0).toLocaleString('fr-FR')+' FCFA';}
+let _toastT=null;
+function toast(msg,type){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='show '+(type||'');
+  clearTimeout(_toastT);
+  _toastT=setTimeout(()=>{t.className=t.className.replace('show','');},3200);
+}
+
+// ── Recherche ──
+function chercher(){
+  const q=norm(document.getElementById('srch').value);
+  const zone=document.getElementById('srch-res');
+  if(!q){zone.innerHTML='';return;}
+  const mots=q.split(' ').filter(Boolean);
+  const res=produitsCache.filter(p=>{
+    if(!p)return false;
+    const cible=norm((p.nom||'')+' '+(p.ref||'')+' '+(p.codeBarre||''));
+    return mots.every(m=>cible.includes(m));
+  }).slice(0,20);
+  zone.innerHTML=res.length?res.map(p=>
+    '<div class="res-item" onclick="chargerProduit(\''+p.id+'\')">'
+    +'<div><div class="rn">'+esc(p.nom)+'</div>'
+    +'<div class="rs">'+(p.ref?'Réf '+esc(p.ref)+' · ':'')+fmt(p.prix)+'</div></div>'
+    +'<span style="font-size:16px;">✏️</span></div>'
+  ).join('') : '<div class="hint" style="padding:8px;">Aucun résultat — ce sera un nouveau produit</div>';
+}
+
+function chargerProduit(id){
+  const p=produitsCache.find(x=>x.id===id);
+  if(!p)return;
+  produitEnEdition=id;
+  document.getElementById('form-titre').textContent='✏️ Modifier : '+p.nom;
+  document.getElementById('f-nom').value=p.nom||'';
+  document.getElementById('f-ref').value=p.ref||'';
+  document.getElementById('f-cat').value=p.cat||'';
+  document.getElementById('f-fourn').value=p.fourn||'';
+  document.getElementById('f-achat').value=p.achat||'';
+  document.getElementById('f-prix').value=p.prix||'';
+  document.getElementById('f-desc').value=p.desc||'';
+  document.getElementById('f-alerte').value=p.alerte||1;
+  document.getElementById('photo-prev').innerHTML=p.photo?'<img src="'+p.photo+'">':'📦';
+  photoActuelle=p.photo||'';
+  document.getElementById('stock-zone').style.display='none';
+  document.getElementById('stock-note').style.display='block';
+  majMarge();
+  window.scrollTo({top:document.getElementById('form-titre').offsetTop-70,behavior:'smooth'});
+  toast('✏️ Produit chargé pour modification','ok');
+}
+
+function nouveauFormulaire(){
+  produitEnEdition=null;
+  document.getElementById('form-titre').textContent='➕ Nouveau produit';
+  ['f-nom','f-ref','f-cat','f-desc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-fourn').value='';
+  document.getElementById('f-achat').value='';
+  document.getElementById('f-prix').value='';
+  document.getElementById('f-alerte').value='1';
+  document.getElementById('f-s1').value='';
+  document.getElementById('f-s2').value='';
+  document.getElementById('photo-prev').innerHTML='📦';
+  photoActuelle='';
+  document.getElementById('stock-zone').style.display='';
+  document.getElementById('stock-note').style.display='none';
+  document.getElementById('marge-info').textContent='';
+  document.getElementById('srch').value='';
+  document.getElementById('srch-res').innerHTML='';
+}
+
+function majMarge(){
+  const achat=parseFloat(document.getElementById('f-achat').value)||0;
+  const prix=parseFloat(document.getElementById('f-prix').value)||0;
+  const el=document.getElementById('marge-info');
+  if(!achat||!prix){el.textContent='';el.className='marge';return;}
+  const marge=prix-achat;
+  const pct=Math.round(marge/prix*100);
+  if(marge<0){el.className='marge neg';el.innerHTML='🚨 <b>Vente à perte</b> : '+fmt(-marge)+' de moins que l\'achat';}
+  else if(marge===0){el.className='marge neg';el.innerHTML='⚠️ <b>Marge nulle</b>';}
+  else{el.className='marge';el.innerHTML='Marge : <b>'+fmt(marge)+'</b> ('+pct+'%)';}
+}
+
+// ── Photo : appareil photo ou import (partagée entre produit et facture) ──
+let camStream=null, photoActuelle='', camCible='produit';
+async function ouvrirCamera(cible){
+  camCible=cible||'produit';
+  try{
+    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const v=document.getElementById('cam-video');
+    v.srcObject=camStream;v.style.display='block';v.play();
+    document.getElementById('cam-controls').style.display='flex';
+    window.scrollTo({top:v.offsetTop-80,behavior:'smooth'});
+  }catch(e){toast('❌ Caméra indisponible : '+e.message,'err');}
+}
+function fermerCamera(){
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
+  document.getElementById('cam-video').style.display='none';
+  document.getElementById('cam-controls').style.display='none';
+}
+function capturerPhoto(){
+  const v=document.getElementById('cam-video'),cv=document.getElementById('cam-canvas');
+  // Une facture a besoin de plus de détail (texte lisible) qu'une simple photo produit.
+  const taille=camCible==='facture'?1100:480;
+  const r=Math.min(taille/v.videoWidth,taille/v.videoHeight,1);
+  cv.width=v.videoWidth*r;cv.height=v.videoHeight*r;
+  cv.getContext('2d').drawImage(v,0,0,cv.width,cv.height);
+  const data=cv.toDataURL('image/jpeg',camCible==='facture'?0.85:0.8);
+  fermerCamera();
+  if(camCible==='facture'){definirPhotoFacture(data);}
+  else{
+    photoActuelle=data;
+    document.getElementById('photo-prev').innerHTML='<img src="'+photoActuelle+'">';
+    toast('📸 Photo capturée','ok');
+  }
+}
+function importerPhoto(input,cible){
+  const f=input.files&&input.files[0];if(!f)return;
+  if(f.size>8*1024*1024){toast('Image trop lourde (max 8 Mo)','err');return;}
+  cible=cible||'produit';
+  const rd=new FileReader();
+  rd.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const taille=cible==='facture'?1100:480;
+      const r=Math.min(taille/img.width,taille/img.height,1);
+      const cv=document.createElement('canvas');
+      cv.width=img.width*r;cv.height=img.height*r;
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+      const data=cv.toDataURL('image/jpeg',cible==='facture'?0.85:0.8);
+      if(cible==='facture'){definirPhotoFacture(data);}
+      else{
+        photoActuelle=data;
+        document.getElementById('photo-prev').innerHTML='<img src="'+photoActuelle+'">';
+        toast('🖼️ Photo importée','ok');
+      }
+    };
+    img.src=e.target.result;
+  };
+  rd.readAsDataURL(f);
+  input.value='';
+}
+
+// ── Scanner code-barres (gratuit, bibliothèque html5-qrcode) ──
+let scannerActif=null;
+function ouvrirScanner(){
+  document.getElementById('scan-overlay').classList.add('open');
+  scannerActif=new Html5Qrcode('scan-reader');
+  scannerActif.start({facingMode:'environment'},{fps:10,qrbox:{width:260,height:160}},
+    code=>{
+      document.getElementById('f-ref').value=code;
+      fermerScanner();
+      const existant=produitsCache.find(p=>String(p.ref||'')===code||String(p.codeBarre||'')===code);
+      if(existant){chargerProduit(existant.id);toast('✅ Produit trouvé : '+existant.nom,'ok');}
+      else toast('📷 Code scanné : '+code+' — nouveau produit','ok');
+    },
+    ()=>{} // erreurs de lecture image par image : silencieuses
+  ).catch(e=>{toast('❌ Caméra indisponible : '+e.message,'err');fermerScanner();});
+}
+function fermerScanner(){
+  document.getElementById('scan-overlay').classList.remove('open');
+  if(scannerActif){scannerActif.stop().catch(()=>{});scannerActif=null;}
+}
+
+// ── Dictée vocale (gratuite, reconnaissance du navigateur) ──
+let recoActive=null,champActif=null;
+function dicter(champId,btnId){
+  const Reco=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!Reco){toast('Dictée non supportée sur ce navigateur (utilisez Chrome)','err');return;}
+  const btn=document.getElementById(btnId);
+  if(recoActive){recoActive.stop();return;}
+  const champ=document.getElementById(champId);
+  const base=champ.value?champ.value.trim()+' ':'';
+  recoActive=new Reco();
+  recoActive.lang='fr-FR';recoActive.continuous=true;recoActive.interimResults=true;
+  recoActive.onstart=()=>{btn.classList.add('on');btn.textContent='⏹️';toast('🎤 Parlez...','ok');};
+  recoActive.onresult=e=>{
+    let t='';for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;
+    champ.value=base+t;
+    if(champId==='f-prix'||champId==='f-achat')majMarge();
+  };
+  recoActive.onerror=()=>{btn.classList.remove('on');btn.textContent='🎤';recoActive=null;};
+  recoActive.onend=()=>{btn.classList.remove('on');btn.textContent='🎤';recoActive=null;};
+  recoActive.start();
+}
+
+// ── Description automatique gratuite (mots-clés, hors-ligne) ──
+const MOTS_CLES={
+  'cable':['Connecteur renforcé','Transfert de données rapide','Gaine anti-torsion'],
+  'chargeur':['Charge rapide','Protection contre la surcharge','Compact'],
+  'ecouteur':['Son clair','Micro intégré','Léger'],
+  'casque':['Son immersif','Arceau ajustable','Coussinets confortables'],
+  'batterie':['Grande capacité','Charge multiple','Indicateur de niveau'],
+  'coque':['Protection anti-chocs','Bords surélevés','Accès complet aux ports'],
+  'blinde':['Verre trempé haute résistance','Anti-rayures','Pose sans bulles'],
+  'miroir':['Finition miroir','Verre trempé','Anti-traces'],
+  'prive':['Filtre de confidentialité','Verre trempé','Vue restreinte de côté'],
+  'support':['Fixation stable','Angle réglable','Montage rapide'],
+  'adaptateur':['Connexion universelle','Boîtier compact','Transmission stable'],
+  'torche':['Faisceau puissant','Résistant aux chocs','Rechargeable ou à piles'],
+  'lampe':['Éclairage longue durée','Compacte','Facile à transporter'],
+  'montre':['Bracelet ajustable','Cadran résistant','Étanche au quotidien'],
+  'speaker':['Son puissant','Connexion Bluetooth','Autonomie prolongée'],
+};
+function genererDescription(){
+  const nom=document.getElementById('f-nom').value.trim();
+  if(!nom){toast('Saisissez d\'abord le nom du produit','err');return;}
+  const n=norm(nom);
+  let carac=[];
+  Object.entries(MOTS_CLES).forEach(([mot,l])=>{if(n.includes(mot))carac=carac.concat(l);});
+  if(!carac.length)carac=['Qualité contrôlée','Finition soignée','Compatible avec la plupart des modèles'];
+  carac=[...new Set(carac)].slice(0,4);
+  const cat=document.getElementById('f-cat').value.trim();
+  document.getElementById('f-desc').value=nom+(cat?' — '+cat:'')+'.\\n\\nCaractéristiques :\\n- '+carac.join('\\n- ');
+  toast('✨ Description générée (gratuit)','ok');
+}
+
+// ── Enregistrement (lecture-écriture UNIQUEMENT sur la fiche produit) ──
+async function enregistrerProduit(){
+  const nom=document.getElementById('f-nom').value.trim();
+  const prix=parseFloat(document.getElementById('f-prix').value);
+  if(!nom){toast('Le nom du produit est obligatoire','err');return;}
+  if(isNaN(prix)||prix<=0){toast('Le prix de vente est obligatoire','err');return;}
+  if(!fbConnected){toast('⛔ Connexion requise pour enregistrer','err');return;}
+
+  const achat=parseFloat(document.getElementById('f-achat').value)||0;
+  if(achat>prix&&!confirm('🚨 Le prix de vente est inférieur au prix d\'achat.\\n\\nEnregistrer quand même ?'))return;
+
+  try{
+    // Relire le catalogue au dernier moment pour ne pas écraser une modification
+    // faite entre-temps par quelqu'un d'autre.
+    const snap=await fbDB.ref('negoce/shared/data').once('value');
+    const d=snap.val()||{};
+    let liste=Array.isArray(d.produits)?d.produits:Object.values(d.produits||{});
+
+    const id=produitEnEdition||('P'+Date.now().toString(36).toUpperCase().slice(-6));
+    // Empêcher les doublons de nom (comme l'application principale)
+    const doublon=liste.find(p=>p&&p.id!==id&&norm(p.nom)===norm(nom));
+    if(doublon){toast('⚠️ Un produit "'+doublon.nom+'" existe déjà','err');return;}
+
+    const fiche={
+      id,nom,
+      ref:document.getElementById('f-ref').value.trim(),
+      cat:document.getElementById('f-cat').value.trim()||'Accessoire High-Tech',
+      fourn:document.getElementById('f-fourn').value||'',
+      prix,achat,
+      desc:document.getElementById('f-desc').value.trim(),
+      photo:photoActuelle,
+      alerte:parseInt(document.getElementById('f-alerte').value)||1,
+      unite:'pièce',
+      _updated:Date.now()
+    };
+
+    const idx=liste.findIndex(p=>p&&p.id===id);
+    if(idx>=0)liste[idx]=fiche; else liste.push(fiche);
+
+    await fbDB.ref('negoce/shared/data/produits').set(liste);
+
+    // Stock initial : uniquement à la création, une seule fois.
+    if(!produitEnEdition){
+      const s1=parseInt(document.getElementById('f-s1').value)||0;
+      const s2=parseInt(document.getElementById('f-s2').value)||0;
+      await fbDB.ref('negoce/stock_qty/'+id).set({s1,s2});
+    }
+
+    // Traçabilité : visible dans le Journal d'audit de l'application principale.
+    const identifiant=localStorage.getItem('mn_ajout_id')||'Anonyme';
+    try{
+      const logSnap=await fbDB.ref('negoce/logs/'+identifiant).once('value');
+      const bloc=logSnap.val()||{user:identifiant,logs:[]};
+      bloc.logs=bloc.logs||[];
+      bloc.logs.unshift({
+        date:new Date().toISOString(),user:identifiant,userId:identifiant,role:'app-produits',
+        action:produitEnEdition?'Modif produit':'Ajout produit',
+        details:nom+' (via Ajout Rapide Produits)'
+      });
+      bloc.logs=bloc.logs.slice(0,200);
+      bloc._updated=Date.now();
+      await fbDB.ref('negoce/logs/'+identifiant).set(bloc);
+    }catch(e){/* la traçabilité ne doit jamais bloquer l'enregistrement */}
+
+    toast((produitEnEdition?'✅ Produit modifié : ':'✅ Produit créé : ')+nom,'ok');
+    produitEnEdition=null;
+    nouveauFormulaire();
+    chargerCatalogue();
+  }catch(e){
+    console.error(e);
+    toast('❌ Échec de l\'enregistrement : '+e.message,'err');
+  }
+}
+
+// ── Réglages (clé API, strictement locale à cet appareil) ──
+function ouvrirReglages(){
+  document.getElementById('regl-apikey').value=localStorage.getItem('mn_ajout_apikey')||'';
+  document.getElementById('regl-overlay').style.display='flex';
+}
+function fermerReglages(){document.getElementById('regl-overlay').style.display='none';}
+function sauverReglages(){
+  const v=document.getElementById('regl-apikey').value.trim();
+  if(v)localStorage.setItem('mn_ajout_apikey',v); else localStorage.removeItem('mn_ajout_apikey');
+  fermerReglages();
+  majHintCleApi();
+  toast('✅ Réglages enregistrés','ok');
+}
+function majHintCleApi(){
+  const ok=!!localStorage.getItem('mn_ajout_apikey');
+  document.getElementById('hint-cle-api').innerHTML=ok?''
+    :'⚠️ Clé API non configurée — <span style="color:var(--gold);cursor:pointer;text-decoration:underline;" onclick="ouvrirReglages()">réglages ⚙️</span>';
+}
+majHintCleApi();
+
+// ── Photo de facture ──
+let photoFacture='';
+function definirPhotoFacture(data){
+  photoFacture=data;
+  document.getElementById('fact-prev').innerHTML='<img src="'+data+'" style="width:100%;height:100%;object-fit:cover;">';
+  document.getElementById('btn-analyser-facture').style.display='block';
+  document.getElementById('fact-resultat').innerHTML='';
+  toast('🧾 Photo de facture prête','ok');
+}
+
+// ── Analyse par IA (nécessite une clé API — seule fonction payante de cette app) ──
+async function analyserFacture(){
+  if(!photoFacture){toast('Prenez d\'abord une photo de la facture','err');return;}
+  const cle=localStorage.getItem('mn_ajout_apikey');
+  if(!cle){toast('⚠️ Clé API requise — voir Réglages ⚙️','err');ouvrirReglages();return;}
+  const zone=document.getElementById('fact-resultat');
+  zone.innerHTML='<div class="hint">🤖 Lecture de la facture en cours...</div>';
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':cle,'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:[
+        {type:'image',source:{type:'base64',media_type:photoFacture.split(';')[0].split(':')[1],data:photoFacture.split(',')[1]}},
+        {type:'text',text:'Lis cette facture ou bon de livraison fournisseur. Extrait CHAQUE ligne de produit. '
+          +'JSON UNIQUEMENT (tableau) :\n[{"nom":"","qte":0,"prix_achat":0}]\n'
+          +'Prix d\'achat unitaire en FCFA. Ignore les lignes qui ne sont pas des produits (totaux, taxes, remises, etc).'}
+      ]}]})
+    });
+    const data=await res.json();
+    if(data.error){zone.innerHTML='<div style="color:var(--red);font-size:11px;">❌ '+esc(data.error.message)+'</div>';return;}
+    const lignes=JSON.parse((data.content?.[0]?.text||'').replace(/```json|```/g,'').trim());
+    if(!Array.isArray(lignes)||!lignes.length){
+      zone.innerHTML='<div style="color:var(--red);font-size:11px;">❌ Aucun produit détecté sur cette photo</div>';return;
+    }
+    afficherApercuFacture(lignes);
+  }catch(e){zone.innerHTML='<div style="color:var(--red);font-size:11px;">❌ '+esc(e.message)+'</div>';}
+}
+
+// Fait correspondre chaque ligne lue avec le catalogue existant, pour édition avant validation
+function afficherApercuFacture(lignes){
+  const matches=lignes.map((l,i)=>{
+    const existant=produitsCache.find(p=>p&&p.nom&&l.nom&&
+      (norm(p.nom).includes(norm(l.nom))||norm(l.nom).includes(norm(p.nom))));
+    return{i,nom:l.nom,qte:Math.max(0,Math.round(l.qte)||0),
+           prix_achat:Math.max(0,Math.round(l.prix_achat)||0),existantId:existant?existant.id:null};
+  });
+  window._lignesFacture=matches;
+  const zone=document.getElementById('fact-resultat');
+  zone.innerHTML='<div class="hint" style="margin-bottom:8px;">'+matches.length+' produit(s) détecté(s) — vérifiez avant de valider :</div>'
+    +matches.map(m=>
+      '<div class="res-item" style="cursor:default;flex-direction:column;align-items:stretch;gap:6px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+      +'<input value="'+esc(m.nom)+'" oninput="_lignesFacture['+m.i+'].nom=this.value"'
+      +' style="flex:1;background:transparent;border:none;color:var(--text);font-size:12.5px;font-weight:700;padding:2px;">'
+      +'<span style="font-size:9px;flex-shrink:0;color:'+(m.existantId?'var(--green)':'var(--gold)')+';">'
+      +(m.existantId?'✓ existant':'🆕 nouveau')+'</span></div>'
+      +'<div style="display:flex;gap:7px;">'
+      +'<div style="flex:1;"><label style="margin:0;font-size:9px;">Quantité</label>'
+      +'<input type="number" min="0" value="'+m.qte+'" oninput="_lignesFacture['+m.i+'].qte=parseInt(this.value)||0"'
+      +' style="padding:6px 8px;font-size:12px;"></div>'
+      +'<div style="flex:1;"><label style="margin:0;font-size:9px;">Prix achat</label>'
+      +'<input type="number" min="0" value="'+m.prix_achat+'" oninput="_lignesFacture['+m.i+'].prix_achat=parseInt(this.value)||0"'
+      +' style="padding:6px 8px;font-size:12px;"></div>'
+      +'</div></div>'
+    ).join('')
+    +'<button class="btn btn-green btn-w" style="margin-top:6px;" onclick="validerFacture()">✅ Ajouter au stock ('+matches.length+' produit(s))</button>';
+}
+
+// Applique les lignes validées : création des nouveaux produits + incrément ATOMIQUE
+// du stock (transaction Firebase), pour ne jamais entrer en collision avec une vente
+// en cours sur une caisse — exactement comme le fait l'application principale.
+async function validerFacture(){
+  const lignes=(window._lignesFacture||[]).filter(l=>l.nom&&l.qte>0);
+  if(!lignes.length){toast('Aucune ligne valide à ajouter','err');return;}
+  if(!fbConnected){toast('⛔ Connexion requise','err');return;}
+  const champ=document.getElementById('fact-boutique').value; // 's1' ou 's2'
+  const zone=document.getElementById('fact-resultat');
+  zone.innerHTML='<div class="hint">⏳ Mise à jour du stock...</div>';
+
+  try{
+    const snap=await fbDB.ref('negoce/shared/data').once('value');
+    const d=snap.val()||{};
+    let liste=Array.isArray(d.produits)?d.produits:Object.values(d.produits||{});
+    let nbNouveaux=0;
+
+    for(const l of lignes){
+      let p=l.existantId?liste.find(x=>x&&x.id===l.existantId):null;
+      if(!p)p=liste.find(x=>x&&x.nom&&norm(x.nom)===norm(l.nom));
+      if(!p){
+        p={id:'P'+Date.now().toString(36).toUpperCase().slice(-6)+Math.floor(Math.random()*90+10),
+           nom:l.nom,ref:'',cat:'Accessoire High-Tech',fourn:'',
+           prix:Math.round((l.prix_achat||0)*1.3),achat:l.prix_achat||0,
+           alerte:1,unite:'pièce',desc:'',photo:'',_updated:Date.now()};
+        liste.push(p);
+        await fbDB.ref('negoce/stock_qty/'+p.id).set({s1:0,s2:0});
+        nbNouveaux++;
+      } else if(l.prix_achat>0){
+        p.achat=l.prix_achat;p._updated=Date.now();
+      }
+      await fbDB.ref('negoce/stock_qty/'+p.id+'/'+champ).transaction(cur=>(typeof cur==='number'?cur:0)+l.qte);
+    }
+
+    await fbDB.ref('negoce/shared/data/produits').set(liste);
+
+    const identifiant=localStorage.getItem('mn_ajout_id')||'Anonyme';
+    try{
+      const logSnap=await fbDB.ref('negoce/logs/'+identifiant).once('value');
+      const bloc=logSnap.val()||{user:identifiant,logs:[]};
+      bloc.logs=bloc.logs||[];
+      bloc.logs.unshift({date:new Date().toISOString(),user:identifiant,userId:identifiant,role:'app-produits',
+        action:'Scanner facture IA',details:lignes.length+' ligne(s) — '+nbNouveaux+' nouveau(x) (via Ajout Rapide Produits)'});
+      bloc.logs=bloc.logs.slice(0,200);bloc._updated=Date.now();
+      await fbDB.ref('negoce/logs/'+identifiant).set(bloc);
+    }catch(e){}
+
+    zone.innerHTML='<div style="color:var(--green);font-size:12px;font-weight:700;">✅ '+lignes.length
+      +' produit(s) mis à jour, dont '+nbNouveaux+' nouveau(x).</div>';
+    document.getElementById('btn-analyser-facture').style.display='none';
+    document.getElementById('fact-prev').innerHTML='🧾';
+    photoFacture='';window._lignesFacture=null;
+    toast('✅ Stock mis à jour depuis la facture','ok');
+    chargerCatalogue();
+  }catch(e){
+    console.error(e);
+    zone.innerHTML='<div style="color:var(--red);font-size:11px;">❌ '+esc(e.message)+'</div>';
+  }
+}
+</script>
+</body>
+</html>
