@@ -2,7 +2,7 @@
 <html lang="fr" data-theme="dark">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#f0a500">
@@ -220,6 +220,68 @@ tbody tr:hover{background:var(--surf2);}
 .admin-stat{display:none!important;}
 .role-admin .admin-stat{display:flex!important;}
 .print-area{display:none;}
+/* ══════════════════════════════════════════════════════════
+   AFFICHAGE TÉLÉPHONE
+   Le logiciel a été conçu pour un écran d'ordinateur : menu latéral fixe,
+   caisse en deux colonnes. Sur un téléphone, tout était écrasé.
+   ══════════════════════════════════════════════════════════ */
+@media (max-width:820px){
+  /* Respecter les encoches et la barre gestuelle */
+  .topbar{padding-top:calc(8px + env(safe-area-inset-top,0px));}
+  #sidebar{padding-top:env(safe-area-inset-top,0px);}
+  /* Menu latéral : masqué, ouvert par un bouton */
+  #sidebar{position:fixed;left:0;top:0;z-index:900;transform:translateX(-100%);
+    transition:transform .25s ease;box-shadow:4px 0 24px rgba(0,0,0,.45);width:82vw;max-width:300px;}
+  #sidebar.ouvert{transform:translateX(0);}
+  .voile-menu{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:880;display:none;}
+  .voile-menu.ouvert{display:block;}
+  .btn-menu{display:flex!important;}
+  .content{padding:10px 10px 70px;}
+
+  /* Caisse : produits en haut, panier en bas */
+  .pos-layout{grid-template-columns:1fr;grid-template-rows:auto auto;height:auto;gap:9px;}
+  .pos-left{overflow:visible;}
+  .pos-right{overflow:visible;}
+  .pos-prods{max-height:46vh;overflow-y:auto;}
+  .pgrid{grid-template-columns:repeat(2,1fr);gap:6px;}
+  .pbtn{padding:11px 8px;}          /* cible tactile plus large */
+  .pbtn .pn{font-size:11.5px;}
+  .pbtn .pp{font-size:12px;}
+  .panwrap{max-height:none;}
+
+  /* Grilles de cartes : 2 colonnes au lieu de 4 */
+  .accueil-grid{grid-template-columns:repeat(2,1fr);gap:8px;}
+  .perf-grid{grid-template-columns:repeat(2,1fr);gap:8px;}
+  .quick-actions-grid{grid-template-columns:repeat(2,1fr);gap:8px;}
+  .row{flex-direction:column;}
+  .col{width:100%;}
+  .fgrid{grid-template-columns:1fr;}
+
+  /* Tableaux : défilement horizontal plutôt que texte écrasé */
+  .tbl-wrap,.card{overflow-x:auto;}
+  table{min-width:520px;}
+
+  /* Fenêtres : plein écran en bas, plus faciles à atteindre au pouce */
+  .modal{max-width:100%;width:100%;max-height:92vh;border-radius:14px 14px 0 0;}
+  .overlay{align-items:flex-end;}
+
+  /* Chat */
+  .chat-layout{flex-direction:column;height:auto;}
+  .chat-sidebar{width:100%;max-height:150px;}
+}
+
+/* Très petits écrans */
+@media (max-width:400px){
+  .pgrid{grid-template-columns:repeat(2,1fr);}
+  .accueil-grid,.perf-grid,.quick-actions-grid{grid-template-columns:1fr 1fr;}
+  .content{padding:8px 8px 70px;}
+}
+
+/* Bouton d'ouverture du menu : visible uniquement sur téléphone */
+.btn-menu{display:none;align-items:center;justify-content:center;background:var(--surf2);
+  border:1px solid var(--border2);border-radius:9px;width:38px;height:38px;cursor:pointer;
+  font-size:17px;color:var(--text);flex-shrink:0;}
+
 @media print{body>*{display:none!important;}.print-area{display:block!important;position:fixed;inset:0;background:#fff;color:#000;padding:18px;font-family:sans-serif;z-index:99999;overflow:auto;}}
 .setting-card{background:var(--surf2);border:1px solid var(--border);border-radius:9px;padding:14px;margin-bottom:11px;}
 .setting-card h4{font-size:12px;font-weight:700;margin-bottom:11px;color:var(--gold);}
@@ -505,6 +567,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
     <button class="lbtn" onclick="doLogin()">🔓 Se connecter</button>
     <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);margin-top:11px;padding-top:8px;">
       <span id="login-etat" style="font-size:10px;color:var(--text3);">⏳ Connexion...</span>
+      <button id="maj-dispo" onclick="location.reload(true)" style="display:none;background:var(--gold);border:none;border-radius:6px;padding:4px 9px;color:#412402;font-family:var(--font);font-size:10px;font-weight:700;cursor:pointer;">🔄 Mettre à jour</button>
       <span style="font-size:10px;color:var(--text3);">v<span id="login-version">2.4</span></span>
     </div>
     <div id="reset-panel" style="display:none;margin-top:9px;background:rgba(240,165,0,.08);border:1px solid rgba(240,165,0,.3);border-radius:8px;padding:10px;">
@@ -575,8 +638,10 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="sbout" onclick="logout()">🚪 Déconnexion</div>
 </aside>
 
+<div class="voile-menu" id="voile-menu" onclick="fermerMenu()"></div>
 <div id="main">
   <div class="topbar">
+    <button class="btn-menu" onclick="basculerMenu()" title="Menu" aria-label="Ouvrir le menu">☰</button>
     <div class="tbtitle" id="tb-title">Caisse / <span>POS</span></div>
     <div class="tbright">
       <div class="autosave" id="autosave-ind">💾 <span id="autosave-txt">Auto-save</span></div>
@@ -2864,6 +2929,19 @@ function changeBoutique(b){session.boutique=b;updCSig();renderGrid();}
 const TITLES={accueil:'<span>Accueil</span>',caisse:'Caisse / <span>POS</span>','ventes-jour':'Ventes du <span>Jour</span>',factures:'Historique <span>Factures</span>',devis:'<span>Devis</span>',retours:'<span>Retours</span>',depenses:'<span>Dépenses</span>',produits:'Gestion <span>Produits</span>',fournisseurs:'<span>Fournisseurs</span>',clients:'Gestion <span>Clients</span>',dashboard:'Tableau de <span>Bord</span>',benefice:'Bénéfice <span>Journalier</span>',inventaire:'Inventaire & <span>Analyses</span>','ia-centre':'Centre <span>IA</span>',agenda:'<span>Agenda</span> & Rappels',creances:'<span>Créances</span> & Relances','heures-fortes':'🔥 Heures <span>Fortes</span>','produits-lents':'🐢 Produits <span>Lents</span>',chat:'💬 Chat <span>Personnel</span>',comparaison:'📊 Comparaison <span>Boutiques</span>',previsions:'🤖 IA <span>Prévisions</span>',users:'Utilisateurs & <span>Rôles</span>','caisses-config':'Config <span>Caisses</span>',salaires:'<span>Salaires</span>',rapports:'<span>Rapports</span>',parametres:'<span>Paramètres</span>',mouvements:'🔄 Mouvements de <span>Stock</span>',tresorerie:'🏦 <span>Trésorerie</span>',connexions:'🔑 Journal des <span>Connexions</span>',audit:'📋 Journal d\'<span>Audit</span>',diagnostic:'🩺 <span>Diagnostic</span>',commandes:'🛒 À <span>Commander</span>',attente:'📋 Factures en <span>Attente</span>'};
 const RENDERS={accueil:renderAccueil,caisse:renderGrid,'ventes-jour':renderVentesJour,factures:renderFactures,devis:renderDevis,retours:renderRetours,depenses:renderDepenses,produits:renderProduits,fournisseurs:renderFourn,clients:renderClients,dashboard:renderDash,benefice:renderBenefice,inventaire:renderInventaire,'ia-centre':renderIACentre,agenda:renderAgenda,creances:renderCreances,'heures-fortes':renderHeuresFortes,'produits-lents':renderProduitsLents,chat:renderChat,comparaison:renderComparaison,previsions:()=>{},users:renderUsers,'caisses-config':renderCaissesConfig,salaires:renderSalaires,rapports:renderRapports,parametres:loadSettings,mouvements:renderMouvements,tresorerie:renderTresorerie,connexions:renderConnexions,audit:renderAudit,diagnostic:renderDiagnostic,commandes:renderCommandes,attente:renderBrouillons};
 
+// ══ MENU SUR TÉLÉPHONE ══
+function basculerMenu(){
+  const sb=document.getElementById('sidebar'),v=document.getElementById('voile-menu');
+  const ouvert=sb&&sb.classList.contains('ouvert');
+  if(sb)sb.classList.toggle('ouvert',!ouvert);
+  if(v)v.classList.toggle('ouvert',!ouvert);
+}
+function fermerMenu(){
+  const sb=document.getElementById('sidebar'),v=document.getElementById('voile-menu');
+  if(sb)sb.classList.remove('ouvert');
+  if(v)v.classList.remove('ouvert');
+}
+
 function nav(page){
   // Sécurité: pages strictement admin, bloquées même via appel direct (console, etc.)
   const adminStrictPages=['comparaison','previsions','connexions','audit'];
@@ -2889,6 +2967,7 @@ function nav(page){
   if(agendaSec){agendaSec.style.display='none';agendaSec.classList.remove('active');}
   const sec=document.getElementById('sec-'+page);if(sec)sec.classList.add('active');
   const ni=document.querySelector(`.ni[onclick="nav('${page}')"]`);if(ni)ni.classList.add('active');
+  fermerMenu();   // sur téléphone, refermer après le choix
   document.getElementById('tb-title').innerHTML=TITLES[page]||page;
   if(RENDERS[page])RENDERS[page]();
   // Ajouter les boutons micro aux champs de texte de la page
@@ -9066,7 +9145,26 @@ fetchWeather(cwConf.ville);
 if('serviceWorker' in navigator && location.hostname !== 'www.claudeusercontent.com' && location.protocol !== 'file:'){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js')
-      .then(()=>console.log('✅ PWA actif'))
+      .then(reg=>{
+        console.log('✅ PWA actif');
+        // Prévenir quand une nouvelle version est disponible, au lieu de laisser
+        // la caisse tourner des jours sur une version périmée.
+        reg.addEventListener('updatefound',()=>{
+          const nouveau=reg.installing;
+          if(!nouveau)return;
+          nouveau.addEventListener('statechange',()=>{
+            if(nouveau.state==='installed'&&navigator.serviceWorker.controller){
+              try{
+                toast('🔄 Nouvelle version disponible — rechargez la page','info');
+                const b=document.getElementById('maj-dispo');
+                if(b)b.style.display='';
+              }catch(e){}
+            }
+          });
+        });
+        // Vérifier les mises à jour toutes les 30 minutes
+        setInterval(()=>{reg.update().catch(()=>{});},1800000);
+      })
       .catch(e=>console.log('SW:',e));
   });
 }
