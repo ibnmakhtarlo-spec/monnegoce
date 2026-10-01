@@ -558,7 +558,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <div class="lfg" style="flex:1;"><label>Identifiant</label><input id="l-id" placeholder="ADM01" onkeydown="if(event.key==='Enter')doLogin()"></div>
       <div class="lfg" style="flex:1;"><label>Code Secret</label>
         <div style="position:relative;">
-          <input type="password" id="l-pwd" placeholder="••••••" style="padding-right:32px;" onkeydown="if(event.key==='Enter')doLogin()">
+          <input type="password" id="l-pwd" placeholder="••••••" style="padding-right:32px;" onkeydown="if(event.key==='Enter')doLogin()" oninput="verifierAutoConnexion()">
           <span onclick="toggleVoirCode()" id="l-pwd-eye" title="Afficher le code"
             style="position:absolute;right:9px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:14px;opacity:.6;">👁️</span>
         </div>
@@ -2441,6 +2441,30 @@ function majEtatLogin(){
   else {el.innerHTML='📴 Hors ligne';el.style.color='var(--red)';}
 }
 setInterval(()=>{try{if(document.getElementById('login-screen')?.offsetParent!==null)majEtatLogin();}catch(e){}},3000);
+
+// ── Connexion automatique dès que le code secret tapé correspond ──
+// Ne compte jamais une frappe en cours comme un échec : aucune tentative n'est
+// enregistrée tant que le code n'est pas complet et exact.
+let _autoLoginT=null;
+function verifierAutoConnexion(){
+  clearTimeout(_autoLoginT);
+  _autoLoginT=setTimeout(async()=>{
+    const idEl=document.getElementById('l-id'),pwdEl=document.getElementById('l-pwd');
+    if(!idEl||!pwdEl)return;
+    const id=idEl.value.trim().toUpperCase();
+    const pwd=pwdEl.value;
+    if(!id||!pwd||pwd.length<4)return;
+    const att=_loginAttempts[id]||{count:0,lockUntil:0};
+    if(att.lockUntil>Date.now())return; // compte verrouillé : ne pas forcer, laisser le message habituel
+    const userFound=DB.users.find(u=>u.id===id);
+    if(!userFound||userFound.actif===false)return;
+    const ok=await checkPwd(pwd,userFound.pwd);
+    // Revérifier que rien n'a changé pendant le calcul, et que l'écran de connexion est toujours affiché
+    if(ok&&pwdEl.value===pwd&&document.getElementById('login-screen')?.style.display!=='none'){
+      doLogin();
+    }
+  },200);
+}
 
 function buildBoutiqueSelects(){
   const s=DB.settings;
