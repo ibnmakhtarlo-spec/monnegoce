@@ -232,15 +232,25 @@ textarea{resize:vertical;min-height:80px;}
       <span class="mic-btn" id="mic-desc" onclick="dicter('f-desc','mic-desc')" style="top:auto;bottom:8px;">🎤</span>
     </div>
 
+    <div class="fg">
+      <label>Unité de mesure</label>
+      <select id="f-unite" onchange="majUniteLabels()">
+        <option value="pièce">Pièce</option>
+        <option value="mètre">Mètre</option>
+        <option value="boîte">Boîte</option>
+        <option value="carton">Carton</option>
+      </select>
+    </div>
+
     <!-- Nouveau produit : stock initial (écrit une seule fois, à la création) -->
     <div id="stock-zone">
       <div class="row2">
         <div class="fg">
-          <label>Stock initial — Rahma Telecom</label>
+          <label id="lbl-s1">Stock initial — Rahma Telecom</label>
           <input id="f-s1" type="number" min="0" placeholder="0">
         </div>
         <div class="fg">
-          <label>Stock initial — Rayane Telecom</label>
+          <label id="lbl-s2">Stock initial — Rayane Telecom</label>
           <input id="f-s2" type="number" min="0" placeholder="0">
         </div>
       </div>
@@ -256,11 +266,11 @@ textarea{resize:vertical;min-height:80px;}
         </div>
         <div class="row2">
           <div class="fg" style="margin-bottom:8px;">
-            <label>À ajouter — Rahma Telecom</label>
+            <label id="lbl-ajout-s1">À ajouter — Rahma Telecom</label>
             <input id="f-ajout-s1" type="number" min="0" placeholder="0">
           </div>
           <div class="fg" style="margin-bottom:8px;">
-            <label>À ajouter — Rayane Telecom</label>
+            <label id="lbl-ajout-s2">À ajouter — Rayane Telecom</label>
             <input id="f-ajout-s2" type="number" min="0" placeholder="0">
           </div>
         </div>
@@ -493,6 +503,7 @@ function chargerProduit(id){
   document.getElementById('f-prix').value=p.prix||'';
   document.getElementById('f-desc').value=p.desc||'';
   document.getElementById('f-alerte').value=p.alerte||1;
+  document.getElementById('f-unite').value=p.unite||'pièce';
   document.getElementById('photo-prev').innerHTML=p.photo?'<img src="'+p.photo+'">':'📦';
   photoActuelle=p.photo||'';
   document.getElementById('stock-zone').style.display='none';
@@ -500,6 +511,7 @@ function chargerProduit(id){
   document.getElementById('f-ajout-s1').value='';
   document.getElementById('f-ajout-s2').value='';
   majMarge();
+  majUniteLabels();
   window.scrollTo({top:document.getElementById('form-titre').offsetTop-70,behavior:'smooth'});
   toast('✏️ Produit chargé pour modification','ok');
 }
@@ -513,6 +525,7 @@ function nouveauFormulaire(){
   document.getElementById('f-achat').value='';
   document.getElementById('f-prix').value='';
   document.getElementById('f-alerte').value='1';
+  document.getElementById('f-unite').value='pièce';
   document.getElementById('f-s1').value='';
   document.getElementById('f-s2').value='';
   document.getElementById('photo-prev').innerHTML='📦';
@@ -522,7 +535,19 @@ function nouveauFormulaire(){
   document.getElementById('marge-info').textContent='';
   document.getElementById('srch').value='';
   document.getElementById('srch-res').innerHTML='';
+  majUniteLabels();
 }
+
+// ── Libellés des champs de stock selon l'unité choisie (pièce, mètre, boîte, carton) ──
+function majUniteLabels(){
+  const u=document.getElementById('f-unite').value||'pièce';
+  const pluriel={'pièce':'pièces','mètre':'mètres','boîte':'boîtes','carton':'cartons'}[u]||u;
+  document.getElementById('lbl-s1').textContent='Stock initial — Rahma Telecom ('+pluriel+')';
+  document.getElementById('lbl-s2').textContent='Stock initial — Rayane Telecom ('+pluriel+')';
+  document.getElementById('lbl-ajout-s1').textContent='À ajouter — Rahma Telecom ('+pluriel+')';
+  document.getElementById('lbl-ajout-s2').textContent='À ajouter — Rayane Telecom ('+pluriel+')';
+}
+majUniteLabels();
 
 // ── Alerte quasi-doublon : noms très ressemblants mais pas identiques ──
 function levenshtein(a,b){
@@ -784,7 +809,7 @@ async function enregistrerProduit(){
       desc:document.getElementById('f-desc').value.trim(),
       photo:photoActuelle,
       alerte:parseInt(document.getElementById('f-alerte').value)||1,
-      unite:'pièce',
+      unite:document.getElementById('f-unite').value||'pièce',
       _updated:Date.now()
     };
 
