@@ -671,7 +671,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
             <span style="font-weight:800;font-size:12px;">🛒 Panier</span>
             <div style="display:flex;gap:4px;align-items:center;position:relative;">
               <div style="position:relative;">
-                <input id="pos-cl-srch" placeholder="👤 Client (optionnel)" style="background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:10px;border-radius:5px;padding:3px 7px;outline:none;width:120px;" oninput="filterPOSClient(this.value)" autocomplete="off">
+                <input id="pos-cl-srch" placeholder="👤 Client (obligatoire)" style="background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:10px;border-radius:5px;padding:3px 7px;outline:none;width:120px;" oninput="filterPOSClient(this.value)" autocomplete="off">
                 <div id="pos-cl-drop" class="client-drop" style="display:none;width:200px;"></div>
               </div>
               <button class="btn btn-red btn-xs" onclick="clearCart()">🗑</button>
@@ -1773,7 +1773,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
     <div class="mtitle"><span>🧾 Nouvelle Facture</span><span class="mclose" onclick="closeModal('modal-nf')">✕</span></div>
     <div class="fgrid" style="margin-bottom:11px;">
       <div class="fg">
-        <label>Client (laisser vide = Anonyme)</label>
+        <label>Client (obligatoire)</label>
         <div style="position:relative;">
           <input id="nf-cl-srch" placeholder="🔍 Rechercher client..." style="width:100%;background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;color:var(--text);font-family:var(--font);font-size:12px;outline:none;" oninput="filterNFClient(this.value)" autocomplete="off">
           <div id="nf-cl-drop" class="client-drop" style="display:none;"></div>
@@ -2246,16 +2246,7 @@ const ROLE_PERMS={
 };
 
 let DB={
-  produits:LS('produits')||[
-    {id:'P001',nom:'Écouteurs Bluetooth',ref:'HT001',cat:'Accessoire High-Tech',fourn:'',prix:15000,achat:9000,s1:20,s2:15,alerte:5,unite:'pièce',desc:'Bluetooth 5.0, autonomie 8h',photo:''},
-    {id:'P002',nom:'Câble USB-C 2m',ref:'HT002',cat:'Accessoire High-Tech',fourn:'',prix:3500,achat:1500,s1:50,s2:30,alerte:10,unite:'pièce',desc:'Charge rapide 60W',photo:''},
-    {id:'P003',nom:'Chargeur 65W GaN',ref:'HT003',cat:'Accessoire High-Tech',fourn:'',prix:12000,achat:7000,s1:4,s2:8,alerte:5,unite:'pièce',desc:'3 ports USB',photo:''},
-    {id:'P004',nom:'Coque iPhone 15',ref:'HT004',cat:'Accessoire High-Tech',fourn:'',prix:5000,achat:2000,s1:30,s2:25,alerte:8,unite:'pièce',desc:'Protection renforcée',photo:''},
-    {id:'P005',nom:'Batterie externe 20000mAh',ref:'HT005',cat:'Accessoire High-Tech',fourn:'',prix:18000,achat:11000,s1:12,s2:8,alerte:3,unite:'pièce',desc:'2 ports USB',photo:''},
-    {id:'P006',nom:'Support téléphone voiture',ref:'HT006',cat:'Accessoire High-Tech',fourn:'',prix:4500,achat:2000,s1:2,s2:1,alerte:5,unite:'pièce',desc:'Magnétique',photo:''},
-    {id:'P007',nom:'Film protecteur 9H',ref:'HT007',cat:'Accessoire High-Tech',fourn:'',prix:2000,achat:700,s1:60,s2:40,alerte:15,unite:'pièce',desc:'Verre trempé',photo:''},
-    {id:'P008',nom:'Hub USB 4 ports',ref:'HT008',cat:'Accessoire High-Tech',fourn:'',prix:9500,achat:5000,s1:10,s2:6,alerte:3,unite:'pièce',desc:'USB 3.0',photo:''},
-  ],
+  produits:LS('produits')||[],
   clients:LS('clients')||[
     {id:'CL001',nom:'Moussa Diallo',tel:'770000001',email:'',ville:'Dakar',achats:0,total:0,credit:0},
     {id:'CL002',nom:'Fatou Koné',tel:'770000002',email:'',ville:'Thiès',achats:0,total:0,credit:0},
@@ -2818,7 +2809,36 @@ function startApp(){
     onFbAuthReady(()=>setTimeout(startRealtimeSync,500));
     // Pull users seulement si DB.users est vide (premier démarrage)
     onFbAuthReady(()=>setTimeout(()=>{pullUsersFromFirebase();},500));
+    onFbAuthReady(()=>setTimeout(()=>{try{nettoyerProduitsDemo();}catch(e){}},1500));
   },800);
+}
+
+// Retire les produits de démonstration ("Écouteurs Bluetooth", "Câble USB-C 2m"...) qui
+// n'ont plus leur place une fois que de vrais produits ont été ajoutés. Lit directement
+// le catalogue cloud (jamais seulement la copie locale, pour ne jamais republier une liste
+// incomplète par-dessus les produits des autres appareils) et ne retire que les 8 fiches
+// de démo exactes (id + référence), jamais un produit créé par l'utilisateur.
+async function nettoyerProduitsDemo(){
+  if(session.user?.role!=='admin')return; // un seul appareil suffit, évite les écritures simultanées
+  if(localStorage.getItem('mn_demo_cleaned_v1'))return;
+  if(!fbDB)return;
+  const DEMO_IDS=new Set(['P001','P002','P003','P004','P005','P006','P007','P008']);
+  const estDemo=p=>p&&DEMO_IDS.has(p.id)&&p.ref&&/^HT00[1-8]$/.test(p.ref);
+  try{
+    const snap=await fbDB.ref('negoce/shared/data/produits').once('value');
+    const cloudVal=snap.val();
+    if(!cloudVal){localStorage.setItem('mn_demo_cleaned_v1','1');return;}
+    const liste=Array.isArray(cloudVal)?cloudVal:Object.values(cloudVal);
+    const demoPresents=liste.filter(estDemo);
+    if(!demoPresents.length){localStorage.setItem('mn_demo_cleaned_v1','1');return;}
+    const nettoye=liste.filter(p=>!estDemo(p));
+    await fbDB.ref('negoce/shared/data/produits').set(nettoye);
+    DB.produits=DB.produits.filter(p=>!estDemo(p));
+    localStorage.setItem('mn_demo_cleaned_v1','1');
+    logAction&&logAction('Nettoyage','Suppression de '+demoPresents.length+' produit(s) de démonstration');
+    toast('🧹 '+demoPresents.length+' produit(s) de démo supprimé(s) du catalogue','ok');
+    try{renderGrid();}catch(e){}
+  }catch(e){console.warn('Nettoyage démo échoué',e);}
 }
 
 // Migration unique: donner à TOUS les utilisateurs existants le droit de créer/modifier
@@ -3136,6 +3156,13 @@ function calcAcompte(){
 }
 function validerVente(){
   if(!cart.length){soundErr();toast('Panier vide !','err');return;}
+  // Client obligatoire : évite les ventes "Anonyme" par oubli en caisse.
+  if(!document.getElementById('pos-cl-id').value){
+    soundErr();
+    toast('⛔ Choisissez un client avant d\'encaisser','err');
+    document.getElementById('pos-cl-srch')?.focus();
+    return;
+  }
   // Bloquer si un produit a prix achat = 0
   const achatZero=cart.filter(i=>!i.achat||Number(i.achat)===0);
   if(achatZero.length>0){
@@ -3715,6 +3742,12 @@ function nfRenderLignes(){
 function nfCalcTotal(){const sub=nfLignes.reduce((s,l)=>s+l.prix*l.qty,0);const r=parseFloat(document.getElementById('nf-remise')?.value)||0;const disc=sub*r/100;const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};set('nf-subtotal',fmt(sub));set('nf-remise-v','-'+fmt(disc));set('nf-total',fmt(sub-disc));}
 function nfValider(){
   if(!nfLignes.length){soundErr();toast('Ajoutez au moins un produit','err');return;}
+  if(!document.getElementById('nf-cl-id').value){
+    soundErr();
+    toast('⛔ Choisissez un client avant de valider','err');
+    document.getElementById('nf-cl-srch')?.focus();
+    return;
+  }
   const sub=nfLignes.reduce((s,l)=>s+l.prix*l.qty,0);const r=parseFloat(document.getElementById('nf-remise').value)||0;const total=sub*(1-r/100);
   const cid=document.getElementById('nf-cl-id').value||'';const client=DB.clients.find(c=>c.id===cid);const mode=document.getElementById('nf-pay').value;
   nfLignes.forEach(l=>{const p=DB.produits.find(x=>x.id===l.id);if(p){applyStockDelta(l.id,session.boutique==='B1'?'s1':'s2',-l.qty);}});
