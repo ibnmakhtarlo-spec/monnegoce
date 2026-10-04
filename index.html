@@ -170,7 +170,7 @@ tbody tr:hover{background:var(--surf2);}
 .pos-right{display:flex;flex-direction:column;overflow:hidden;}
 .pos-prods{overflow-y:auto;flex:1;}
 .pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:2px;}
-.pbtn{background:var(--surf2);border:1px solid var(--border2);border-radius:8px;padding:9px 7px;cursor:pointer;transition:all .2s;text-align:center;}
+.pbtn{background:var(--surf2);border:1px solid var(--border2);border-radius:8px;padding:9px 7px;cursor:pointer;transition:all .2s;text-align:center;content-visibility:auto;contain-intrinsic-size:0 120px;}
 .pbtn:hover{border-color:var(--gold);background:var(--goldf);transform:translateY(-2px);}
 .pbtn .pn{font-size:10px;font-weight:700;margin-bottom:2px;}
 .pbtn .pp{font-size:12px;font-weight:900;color:var(--gold);font-family:var(--mono);}
@@ -3133,11 +3133,10 @@ function renderGrid(){
   const stk=p=>session.boutique==='B1'?p.s1:p.s2;
   document.getElementById('pos-grid').innerHTML=list.length
     ?list.map(p=>`<div class="pbtn ${stk(p)<=0?'oos':''}" onclick="addCart('${p.id}')">
-        ${p.photo?`<img src="${p.photo}" class="pbtn-img" alt="${p.nom}">`:''}
+        ${p.photo?`<img src="${p.photo}" class="pbtn-img" alt="${p.nom}" loading="lazy" decoding="async">`:''}
         <div class="pn">${p.nom}</div><div class="pp">${fmt(p.prix)}</div>
         <div class="ps">Stock: ${stk(p)}</div></div>`).join('')
     :`<div class="empty" style="grid-column:1/-1"><div class="ei">📦</div>Aucun produit</div>`;
-  renderCart();
 }
 function addCart(id){
   const p=DB.produits.find(x=>x.id===id);if(!p)return;
