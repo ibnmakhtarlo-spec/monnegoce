@@ -2405,6 +2405,7 @@ function buildCaisseSelect(sel,val=''){
 }
 // Écran de connexion: afficher le logo de la boutique sélectionnée
 const APP_VERSION='2.4';
+const _appLoadTime=Date.now(); // sert à ignorer les anciennes alertes sécurité au démarrage
 function majLogoLogin(){
   const box=document.getElementById('login-logo-box');
   if(!box)return;
@@ -2620,6 +2621,10 @@ async function logConnexion(user,statut){
   if(estNouveau){
     addNotif('🚨 Alerte sécurité',user.nom+' s\'est connecté depuis un nouvel appareil ou pays ('+appareil+', '+pays+')','err');
     logAction&&logAction('Sécurité','Connexion suspecte: '+user.nom+' — '+appareil+' — '+pays+' — IP '+ip);
+    // Diffusion en temps réel à l'administrateur, dès que Firebase sera prêt (voir startApp).
+    window._alertesSecuriteEnAttente=window._alertesSecuriteEnAttente||[];
+    window._alertesSecuriteEnAttente.push({type:'nouveau_appareil',userId:user.id,userNom:user.nom,
+      role:user.role,appareil,pays,ip,date:entry.date});
   }
   save();
   if(fbConnected)pushToFirebase();
@@ -2732,6 +2737,10 @@ async function doLogin(){
       _loginAttempts[id].lockUntil=Date.now()+5*60*1000;
       _loginAttempts[id].count=0;
       logAction&&logAction('Sécurité','🔒 Verrouillage du compte '+id+' après 5 échecs',{nom:id,id:id,role:'inconnu'});
+      window._alertesSecuriteEnAttente=window._alertesSecuriteEnAttente||[];
+      window._alertesSecuriteEnAttente.push({type:'verrouillage',userId:id,
+        userNom:userFound?userFound.nom:id,role:userFound?userFound.role:'inconnu',
+        appareil:detecterAppareil(),date:new Date().toISOString()});
       toast('🔒 5 échecs — Compte verrouillé 5 minutes','err');
       return;
     }
@@ -2810,7 +2819,38 @@ function startApp(){
     // Pull users seulement si DB.users est vide (premier démarrage)
     onFbAuthReady(()=>setTimeout(()=>{pullUsersFromFirebase();},500));
     onFbAuthReady(()=>setTimeout(()=>{try{nettoyerProduitsDemo();}catch(e){}},1500));
+    onFbAuthReady(()=>setTimeout(()=>{try{diffuserAlertesSecuriteEnAttente();}catch(e){}},600));
+    if(session.user?.role==='admin')onFbAuthReady(()=>setTimeout(()=>{try{ecouterAlertesSecurite();}catch(e){}},900));
   },800);
+}
+
+// Envoie au cloud les alertes sécurité (nouvel appareil, verrouillage) accumulées
+// avant que Firebase ne soit prêt — voir logConnexion() et doLogin().
+function diffuserAlertesSecuriteEnAttente(){
+  if(!fbDB)return;
+  const liste=window._alertesSecuriteEnAttente||[];
+  window._alertesSecuriteEnAttente=[];
+  liste.forEach(a=>{fbDB.ref('negoce/alertes_securite').push(a).catch(()=>{});});
+}
+
+// Écoute en temps réel les alertes sécurité émises par N'IMPORTE QUEL appareil de
+// l'entreprise, pour que l'administrateur soit prévenu même si l'incident se
+// produit sur le téléphone d'un vendeur ailleurs. Ignore tout ce qui date d'avant
+// l'ouverture de cette session, pour ne pas rejouer l'historique à chaque connexion.
+function ecouterAlertesSecurite(){
+  if(!fbDB||window._alertesSecuriteEcouteActive)return;
+  window._alertesSecuriteEcouteActive=true;
+  fbDB.ref('negoce/alertes_securite').limitToLast(20).on('child_added',snap=>{
+    const a=snap.val();if(!a)return;
+    if(new Date(a.date).getTime()<_appLoadTime)return; // alerte déjà connue avant ce chargement
+    if(a.userId===session.user?.id&&a.type==='nouveau_appareil')return; // ma propre connexion
+    const libelle=a.type==='verrouillage'
+      ?'🔒 '+(a.userNom||a.userId)+' verrouillé après 5 échecs ('+(a.appareil||'?')+')'
+      :'🚨 '+(a.userNom||a.userId)+' connecté depuis un nouvel appareil ('+(a.appareil||'?')+', '+(a.pays||'?')+')';
+    addNotif('Sécurité — autre appareil',libelle,'err');
+    try{soundErr&&soundErr();}catch(e){}
+    try{notifier('🚨 Alerte sécurité — Mon Négoce',libelle);}catch(e){}
+  });
 }
 
 // Retire les produits de démonstration ("Écouteurs Bluetooth", "Câble USB-C 2m"...) qui
