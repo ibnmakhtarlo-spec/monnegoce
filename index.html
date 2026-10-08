@@ -1041,6 +1041,8 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <div class="col card" style="padding:13px;"><h3 style="font-size:12px;font-weight:800;margin-bottom:9px;">💸 Dépenses</h3>
         <div class="twrap"><table><thead><tr><th>Libellé</th><th>Montant</th></tr></thead><tbody id="bj-dep-list"></tbody></table></div></div>
     </div>
+    <div class="card admin-stat" style="padding:13px;margin-top:11px;"><h3 style="font-size:12px;font-weight:800;margin-bottom:9px;">📦 Bénéfice par produit <span style="font-size:10px;font-weight:600;color:var(--text2);">(du jour choisi, du plus rentable au moins rentable)</span></h3>
+      <div class="twrap"><table><thead><tr><th>Produit</th><th>Qté vendue</th><th>Ventes</th><th>Coût</th><th>Bénéfice</th><th>Marge</th></tr></thead><tbody id="bj-prod-list"></tbody></table></div></div>
   </div>
 
   <!-- INVENTAIRE -->
@@ -5996,6 +5998,25 @@ function renderBenefice(){
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};set('bj-ventes',fmt(totalV));set('bj-nb-v',ventes.length+' transactions');set('bj-dep',fmt(totalD));set('bj-cout',fmt(cout));set('bj-ben',fmt(ben));
   document.getElementById('bj-ventes-list').innerHTML=ventes.length?ventes.map(f=>`<tr><td class="mono" style="color:var(--gold);font-size:11px;">${f.id}</td><td>${escapeHtml(f.client)}</td><td class="mono" style="color:var(--green);font-weight:700">${fmt(f.total)}</td><td>${payIcon(f.mode,16)} ${f.mode}</td><td style="font-size:10px;">${new Date(f.date).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</td></tr>`).join(''):`<tr><td colspan="5" class="empty">Aucune vente</td></tr>`;
   document.getElementById('bj-dep-list').innerHTML=depJour.length?depJour.map(d=>`<tr><td>${d.lib}</td><td class="mono" style="color:var(--red)">${fmt(d.montant)}</td></tr>`).join(''):`<tr><td colspan="2" class="empty">Aucune dépense</td></tr>`;
+  // Bénéfice par produit (jour choisi): regroupe les lignes de toutes les ventes du jour
+  const parProd={};
+  ventes.forEach(f=>(f.items||[]).forEach(i=>{
+    const cle=i.id||i.nom;
+    const o=parProd[cle]||(parProd[cle]={nom:i.nom||cle,qty:0,ca:0,cout:0});
+    const q=Number(i.qty)||0;
+    o.qty+=q;o.ca+=(Number(i.prix)||0)*q;o.cout+=(Number(i.achat)||0)*q;
+  }));
+  const lignes=Object.values(parProd).map(o=>({...o,ben:o.ca-o.cout})).sort((a,b)=>b.ben-a.ben);
+  const elProd=document.getElementById('bj-prod-list');
+  if(elProd){
+    const tCa=lignes.reduce((s,o)=>s+o.ca,0),tCout=lignes.reduce((s,o)=>s+o.cout,0),tQty=lignes.reduce((s,o)=>s+o.qty,0);
+    elProd.innerHTML=lignes.length
+      ?lignes.map(o=>{const m=o.ca>0?Math.round(o.ben/o.ca*100):0;
+          const col=o.ben<0?'var(--red)':'var(--green)';
+          return `<tr><td><b>${escapeHtml(o.nom)}</b></td><td style="text-align:center">${o.qty}</td><td class="mono">${fmt(o.ca)}</td><td class="mono" style="color:var(--text2)">${fmt(o.cout)}</td><td class="mono" style="color:${col};font-weight:700">${fmt(o.ben)}</td><td class="mono" style="color:${col}">${m}%</td></tr>`;}).join('')
+        +`<tr style="border-top:2px solid var(--border2);font-weight:800"><td>TOTAL</td><td style="text-align:center">${tQty}</td><td class="mono">${fmt(tCa)}</td><td class="mono">${fmt(tCout)}</td><td class="mono" style="color:var(--gold)">${fmt(tCa-tCout)}</td><td class="mono">${tCa>0?Math.round((tCa-tCout)/tCa*100):0}%</td></tr>`
+      :`<tr><td colspan="6" class="empty">Aucune vente ce jour</td></tr>`;
+  }
 }
 
 // ══ INVENTAIRE ══
@@ -8430,7 +8451,10 @@ function startRealtimeSync(){
     const localFacts=DB.factures.filter(f=>f&&f.id&&!f.id.startsWith('OLD_'));
     const localIds=new Set(localFacts.map(f=>f.id));
     // Ajouter les factures cloud absentes localement
-    const cloudOnly=cloudFacts.filter(f=>!localIds.has(f.id));
+    // Écarter aussi les factures supprimées volontairement: elles restent dans le cloud
+    // mais sont retirées en local, ce qui les faisait réapparaître comme "nouvelles"
+    // à chaque changement et répétait la notification de vente.
+    const cloudOnly=filtrerSupprimees(cloudFacts.filter(f=>!localIds.has(f.id)));
     // Récupérer aussi les CORRECTIONS de factures déjà connues (modifiées par l'admin),
     // sinon la caisse garderait indéfiniment son ancienne version.
     let corrigees=0;
@@ -8452,12 +8476,20 @@ function startRealtimeSync(){
     DB.factures=filtrerSupprimees(merged);
     if(window._origSave)window._origSave();else save();
     fbLoading=false;
-    toast('🔄 '+cloudOnly.length+' nouvelle(s) vente(s) reçue(s) !','ok');
-    // Prévenir l'administrateur même si l'app est en arrière-plan
-    if(session.user?.role==='admin'){
-      const somme=cloudOnly.reduce((s,f)=>s+(Number(f.total)||0),0);
-      notifier('💰 '+cloudOnly.length+' nouvelle(s) vente(s)',
-        fmt(somme)+' — '+(cloudOnly[0]?.vendeur||'caisse'));
+    // Mémoire des ventes déjà signalées (survit au rechargement): une même vente
+    // ne déclenche JAMAIS deux fois le message ni la notification.
+    const dejaSignalees=new Set(LS('ventes_signalees')||[]);
+    const nouvelles=cloudOnly.filter(f=>!dejaSignalees.has(f.id));
+    if(nouvelles.length){
+      nouvelles.forEach(f=>dejaSignalees.add(f.id));
+      try{SS('ventes_signalees',[...dejaSignalees].slice(-3000));}catch(e){}
+      toast('🔄 '+nouvelles.length+' nouvelle(s) vente(s) reçue(s) !','ok');
+      // Prévenir l'administrateur même si l'app est en arrière-plan
+      if(session.user?.role==='admin'){
+        const somme=nouvelles.reduce((s,f)=>s+(Number(f.total)||0),0);
+        notifier('💰 '+nouvelles.length+' nouvelle(s) vente(s)',
+          fmt(somme)+' — '+(nouvelles[0]?.vendeur||'caisse'));
+      }
     }
     const active=document.querySelector('.ni.active');
     if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m&&['factures','ventes-jour','dashboard','accueil','benefice','rapports','creances'].includes(m[1]))nav(m[1]);}
