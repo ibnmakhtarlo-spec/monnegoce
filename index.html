@@ -7999,27 +7999,27 @@ function pushToFirebase(){
       const canPushFact=(myRole==='vendeur'||myRole==='caissier'||myRole==='superviseur')
                         ||(myRole==='admin'&&myFactures.some(f=>f._modifiePar));
       if(canPushFact&&myFactures.length>0){
-        // Lire d'abord pour fusionner sans jamais effacer les factures des autres
-        let mergedAll=[];
-        try{
-          const existingSnap=await fbDB.ref('negoce/all_factures').once('value');
-          const existing=existingSnap.val();
-          mergedAll=Array.isArray(existing)?[...existing]:[];
-        }catch(e){}
-        // Ajouter/mettre à jour seulement MES factures
-        myFactures.forEach(f=>{
-          const idx=mergedAll.findIndex(x=>x.id===f.id);
-          if(idx>=0){
-            // Ne pas écraser une correction plus récente faite par quelqu'un d'autre
-            const dejaLa=mergedAll[idx];
-            const tCloud=Number(dejaLa._modifieLe)||0, tLocal=Number(f._modifieLe)||0;
-            if(tCloud>tLocal)return;   // la version du cloud est plus récente: on la garde
-            mergedAll[idx]=f;
-          } else mergedAll.push(f);
+        // TRANSACTION: Firebase rejoue la fusion si une autre caisse a écrit entre-temps.
+        // Avant (lecture puis réécriture complète), deux caisses qui envoyaient au même
+        // moment pouvaient effacer la vente l'une de l'autre dans la liste commune.
+        await fbDB.ref('negoce/all_factures').transaction(existing=>{
+          const mergedAll=Array.isArray(existing)?[...existing]
+            :(existing&&typeof existing==='object'?Object.values(existing):[]);
+          // Ajouter/mettre à jour seulement MES factures
+          myFactures.forEach(f=>{
+            const idx=mergedAll.findIndex(x=>x&&x.id===f.id);
+            if(idx>=0){
+              // Ne pas écraser une correction plus récente faite par quelqu'un d'autre
+              const dejaLa=mergedAll[idx];
+              const tCloud=Number(dejaLa._modifieLe)||0, tLocal=Number(f._modifieLe)||0;
+              if(tCloud>tLocal)return;   // la version du cloud est plus récente: on la garde
+              mergedAll[idx]=f;
+            } else mergedAll.push(f);
+          });
+          const propre=mergedAll.filter(f=>f&&f.id&&!String(f.id).startsWith('OLD_'));
+          propre.sort((a,b)=>new Date(b.date)-new Date(a.date));
+          return propre;
         });
-        mergedAll=mergedAll.filter(f=>f&&f.id&&!f.id.startsWith('OLD_'));
-        mergedAll.sort((a,b)=>new Date(b.date)-new Date(a.date));
-        await fbDB.ref('negoce/all_factures').set(mergedAll);
       }
       // Admin : ne touche JAMAIS all_factures (ni en lecture-écriture)
 
@@ -8435,10 +8435,20 @@ function startRealtimeSync(){
   });
 
   // Écouter toutes les factures — nœud commun (mis à jour à chaque vente)
-  fbDB.ref('negoce/all_factures').on('value',snap=>{
-    if(fbSyncing||fbLoading)return;
-    const newFactures=snap.val();
-    if(!newFactures||!Array.isArray(newFactures)||newFactures.length===0)return;
+  const traiterAllFactures=snap=>{
+    if(fbSyncing||fbLoading){
+      // Ne pas perdre cette arrivée: on relit la liste dès que la synchro locale est finie.
+      // Avant, elle était ignorée et la dernière vente n'apparaissait qu'à la vente suivante.
+      clearTimeout(window._retryAllFact);
+      window._retryAllFact=setTimeout(()=>{
+        fbDB.ref('negoce/all_factures').once('value').then(traiterAllFactures).catch(e=>console.error('relecture factures:',e));
+      },2000);
+      return;
+    }
+    const brut=snap.val();
+    // Firebase peut renvoyer un objet au lieu d'une liste (trous dans les indices)
+    const newFactures=Array.isArray(brut)?brut:(brut&&typeof brut==='object'?Object.values(brut):null);
+    if(!newFactures||newFactures.length===0)return;
     // Dédupliquer les factures du cloud
     const seen=new Set();
     const cloudFacts=newFactures.filter(f=>{
@@ -8493,7 +8503,8 @@ function startRealtimeSync(){
     }
     const active=document.querySelector('.ni.active');
     if(active){const m=(active.getAttribute('onclick')||'').match(/nav\('([^']+)'\)/);if(m&&['factures','ventes-jour','dashboard','accueil','benefice','rapports','creances'].includes(m[1]))nav(m[1]);}
-  });
+  };
+  fbDB.ref('negoce/all_factures').on('value',traiterAllFactures);
 }
 
 
