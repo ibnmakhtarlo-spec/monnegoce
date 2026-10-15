@@ -142,6 +142,14 @@ tbody tr:hover{background:var(--surf2);}
 .bg{background:rgba(16,185,129,.15);color:var(--green);} .br{background:rgba(239,68,68,.15);color:var(--red);}
 .by{background:rgba(240,165,0,.15);color:var(--gold);} .bb{background:rgba(59,130,246,.12);color:var(--blue);}
 .bo{background:rgba(249,115,22,.12);color:var(--orange);} .bgr{background:var(--surf2);color:var(--text2);}
+/* Couleur d'identité des boutiques: Rahma (B1) = orange, Rayane (B2) = bleu */
+.bB1{background:rgba(249,115,22,.15);color:var(--orange);font-weight:700;} .bB2{background:rgba(59,130,246,.15);color:var(--blue);font-weight:700;}
+[data-boutique="B1"]{--bcol:var(--orange);} [data-boutique="B2"]{--bcol:var(--blue);}
+[data-boutique] .topbar{box-shadow:inset 0 3px 0 var(--bcol);}
+[data-boutique] .csig{color:var(--bcol);border-color:var(--bcol);background:color-mix(in srgb,var(--bcol) 12%,transparent);}
+[data-boutique] .csig .dot{background:var(--bcol);}
+[data-boutique] #sb-boutique,[data-boutique] #l-boutique{border:2px solid var(--bcol);color:var(--bcol);font-weight:800;}
+[data-boutique] .lbox{border-top:5px solid var(--bcol);}
 .bcy{background:rgba(6,182,212,.12);color:var(--cyan);}
 /* FORM */
 .fg{display:flex;flex-direction:column;gap:3px;margin-bottom:9px;}
@@ -2408,7 +2416,13 @@ function buildCaisseSelect(sel,val=''){
 // Écran de connexion: afficher le logo de la boutique sélectionnée
 const APP_VERSION='2.4';
 const _appLoadTime=Date.now(); // sert à ignorer les anciennes alertes sécurité au démarrage
+// Colore l'interface selon la boutique: Rahma (B1) orange, Rayane (B2) bleu
+function appliquerCouleurBoutique(b){
+  if(b==='B1'||b==='B2')document.documentElement.setAttribute('data-boutique',b);
+  else document.documentElement.removeAttribute('data-boutique');
+}
 function majLogoLogin(){
+  try{appliquerCouleurBoutique(document.getElementById('l-boutique')?.value);}catch(e){}
   const box=document.getElementById('login-logo-box');
   if(!box)return;
   const b=document.getElementById('l-boutique')?.value||'B1';
@@ -2771,6 +2785,7 @@ function startApp(){
   document.getElementById('sb-uname').textContent=session.user.nom;
   document.getElementById('sb-urole').textContent=roleLabel(session.user.role)+' — '+session.caisse;
   document.getElementById('sb-boutique').value=session.boutique;
+  appliquerCouleurBoutique(session.boutique);
   buildCaisseSelect('sb-caisse',session.caisse);
   document.getElementById('sb-caisse').onchange=function(){session.caisse=this.value;updCSig();};
   document.getElementById('sb-brand').textContent=DB.settings.appNom||'Mon Négoce';
@@ -3009,7 +3024,7 @@ function logout(){
 
 function roleLabel(r){return{admin:'👑 Admin',superviseur:'🔑 Superviseur',vendeur:'🧑 Vendeur',caissier:'💵 Caissier'}[r]||r;}
 function updCSig(){document.getElementById('csig-label').textContent=session.caisse+'—'+session.boutique;}
-function changeBoutique(b){session.boutique=b;updCSig();renderGrid();}
+function changeBoutique(b){session.boutique=b;appliquerCouleurBoutique(b);updCSig();renderGrid();}
 
 // ══ NAV ══
 const TITLES={accueil:'<span>Accueil</span>',caisse:'Caisse / <span>POS</span>','ventes-jour':'Ventes du <span>Jour</span>',factures:'Historique <span>Factures</span>',devis:'<span>Devis</span>',retours:'<span>Retours</span>',depenses:'<span>Dépenses</span>',produits:'Gestion <span>Produits</span>',fournisseurs:'<span>Fournisseurs</span>',clients:'Gestion <span>Clients</span>',dashboard:'Tableau de <span>Bord</span>',benefice:'Bénéfice <span>Journalier</span>',inventaire:'Inventaire & <span>Analyses</span>','ia-centre':'Centre <span>IA</span>',agenda:'<span>Agenda</span> & Rappels',creances:'<span>Créances</span> & Relances','heures-fortes':'🔥 Heures <span>Fortes</span>','produits-lents':'🐢 Produits <span>Lents</span>',chat:'💬 Chat <span>Personnel</span>',comparaison:'📊 Comparaison <span>Boutiques</span>',previsions:'🤖 IA <span>Prévisions</span>',users:'Utilisateurs & <span>Rôles</span>','caisses-config':'Config <span>Caisses</span>',salaires:'<span>Salaires</span>',rapports:'<span>Rapports</span>',parametres:'<span>Paramètres</span>',mouvements:'🔄 Mouvements de <span>Stock</span>',tresorerie:'🏦 <span>Trésorerie</span>',connexions:'🔑 Journal des <span>Connexions</span>',audit:'📋 Journal d\'<span>Audit</span>',diagnostic:'🩺 <span>Diagnostic</span>',commandes:'🛒 À <span>Commander</span>',attente:'📋 Factures en <span>Attente</span>'};
@@ -3284,11 +3299,11 @@ function renderVentesJour(){
     // Bloc par vendeur
     const vendeurs={};bV.forEach(f=>{const v=f.vendeur||f.userId||'Inconnu';if(!vendeurs[v])vendeurs[v]={nom:v,count:0,ca:0};vendeurs[v].count++;vendeurs[v].ca+=f.total;});
     const vendeursBlock=Object.values(vendeurs).length?'<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px;"><div style="font-size:10px;font-weight:800;color:var(--text2);margin-bottom:4px;">👤 Par vendeur</div>'+Object.values(vendeurs).map(v=>`<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0;"><span style="color:var(--cyan);">👤 ${v.nom}</span><span style="color:var(--text2)">${v.count} vente(s)</span><span class="mono" style="color:var(--gold);font-weight:700;">${fmt(v.ca)}</span></div>`).join('')+'</div>':'';
-    return`<div class="boutiqueSection"><div class="boutiqueSectionHdr"><h3>${b==='B1'?'🏪':'🏬'} ${getBName(b)}</h3><div style="display:flex;gap:5px;align-items:center;"><span class="badge ${b==='B1'?'bb':'bo'}">${bV.length}</span><span class="mono" style="font-size:12px;font-weight:900;color:var(--gold)">${fmt(bCA)}</span></div></div><div style="padding:9px 13px;">${caisses}${vendeursBlock}</div></div>`;
+    return`<div class="boutiqueSection"><div class="boutiqueSectionHdr"><h3>${b==='B1'?'🏪':'🏬'} ${getBName(b)}</h3><div style="display:flex;gap:5px;align-items:center;"><span class="badge ${b==='B1'?'bB1':'bB2'}">${bV.length}</span><span class="mono" style="font-size:12px;font-weight:900;color:var(--gold)">${fmt(bCA)}</span></div></div><div style="padding:9px 13px;">${caisses}${vendeursBlock}</div></div>`;
   }).join('');
   const tP={};allV.forEach(f=>f.items.forEach(i=>tP[i.nom]=(tP[i.nom]||0)+i.qty));const topArr=Object.entries(tP).sort((a,b)=>b[1]-a[1]).slice(0,5);const mx=Math.max(...topArr.map(x=>x[1]),1);
   const topHTML=topArr.length?topArr.map(([n,q],i)=>`<div style="margin-bottom:6px;"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;"><span>${['🥇','🥈','🥉'][i]||'▫️'} ${n}</span><span class="mono" style="color:var(--gold)">${q}</span></div><div style="background:var(--surf2);border-radius:2px;height:4px;"><div style="width:${(q/mx)*100}%;height:100%;background:var(--gold);border-radius:2px;"></div></div></div>`).join(''):`<div class="empty"><div class="ei">📊</div>Aucune vente</div>`;
-  const txHTML=[...allV].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(f=>`<tr><td class="mono" style="color:var(--gold);font-size:10px;cursor:pointer;" onclick="openFactDetail('${f.id}')">${f.id}</td><td><span class="badge ${f.boutique==='B1'?'bb':'bo'}" style="font-size:8px;">${getBName(f.boutique).substring(0,8)}</span></td><td><span class="badge bcy" style="font-size:8px;">${f.caisse}</span></td><td style="font-size:10px;color:var(--cyan);">${f.vendeur||f.userId||'?'}</td><td style="font-size:10px;">${f.client}</td><td class="mono" style="color:var(--green);font-weight:700;font-size:11px;">${fmt(f.total)}</td><td style="font-size:10px;">${IC[f.mode]||''} ${f.mode}</td><td style="font-size:10px;color:var(--text2);">${new Date(f.date).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</td></tr>`).join('');
+  const txHTML=[...allV].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(f=>`<tr><td class="mono" style="color:var(--gold);font-size:10px;cursor:pointer;" onclick="openFactDetail('${f.id}')">${f.id}</td><td><span class="badge ${f.boutique==='B1'?'bB1':'bB2'}" style="font-size:8px;">${getBName(f.boutique).substring(0,8)}</span></td><td><span class="badge bcy" style="font-size:8px;">${f.caisse}</span></td><td style="font-size:10px;color:var(--cyan);">${f.vendeur||f.userId||'?'}</td><td style="font-size:10px;">${f.client}</td><td class="mono" style="color:var(--green);font-weight:700;font-size:11px;">${fmt(f.total)}</td><td style="font-size:10px;">${IC[f.mode]||''} ${f.mode}</td><td style="font-size:10px;color:var(--text2);">${new Date(f.date).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</td></tr>`).join('');
   document.getElementById('vj-view-global').innerHTML=`
     <div class="global-summary"><h3>🌍 Résumé Global</h3>
       <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:9px;">
@@ -3345,7 +3360,7 @@ function renderFactures(){
   }
   document.getElementById('tb-f').innerHTML=list.length?list.map(f=>`<tr>
     <td><span class="mono" style="color:var(--gold);font-weight:700;font-size:11px;">${f.id}</span></td>
-    <td><span class="badge ${f.boutique==='B1'?'bb':'bo'}">${getBName(f.boutique).substring(0,9)}</span></td>
+    <td><span class="badge ${f.boutique==='B1'?'bB1':'bB2'}">${getBName(f.boutique).substring(0,9)}</span></td>
     <td><span class="badge bcy">${f.caisse}</span></td>
     <td>${escapeHtml(f.client)}</td><td>${f.items.length}</td>
     <td class="mono" style="color:var(--green);font-weight:700;">${fmt(f.total)}</td>
@@ -8709,23 +8724,23 @@ function renderComparaison(){
       <div class="comp-bar-track"><div style="height:100%;background:${bColor};width:${totalCA?bCA/totalCA*100:0}%;transition:width .5s;"></div></div></div>
     </div>`;
   };
-  document.getElementById('comp-boutiques-grid').innerHTML=buildCard(b1F,b1CA,b1Ben,DB.settings.B1.nom,'var(--gold)','b1-card')+buildCard(b2F,b2CA,b2Ben,DB.settings.B2.nom,'var(--blue)','b2-card');
+  document.getElementById('comp-boutiques-grid').innerHTML=buildCard(b1F,b1CA,b1Ben,DB.settings.B1.nom,'var(--orange)','b1-card')+buildCard(b2F,b2CA,b2Ben,DB.settings.B2.nom,'var(--blue)','b2-card');
   // Top produits
   const topB1={},topB2={};
   b1F.forEach(f=>f.items.forEach(i=>topB1[i.nom]=(topB1[i.nom]||0)+i.qty));
   b2F.forEach(f=>f.items.forEach(i=>topB2[i.nom]=(topB2[i.nom]||0)+i.qty));
   const t1=Object.entries(topB1).sort((a,b)=>b[1]-a[1]).slice(0,5),t2=Object.entries(topB2).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  document.getElementById('comp-top-prods').innerHTML=`<div style="margin-bottom:6px;font-size:11px;font-weight:700;color:var(--gold);">${DB.settings.B1.nom}</div>${t1.length?t1.map(([n,q],i)=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--border);"><span>${i+1}. ${n.substring(0,20)}</span><span class="mono" style="color:var(--gold)">${q}</span></div>`).join(''):'<div style="color:var(--text3);font-size:11px;">Aucune vente</div>'}<div style="margin:9px 0 5px;font-size:11px;font-weight:700;color:var(--blue);">${DB.settings.B2.nom}</div>${t2.length?t2.map(([n,q],i)=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--border);"><span>${i+1}. ${n.substring(0,20)}</span><span class="mono" style="color:var(--blue)">${q}</span></div>`).join(''):'<div style="color:var(--text3);font-size:11px;">Aucune vente</div>'}`;
+  document.getElementById('comp-top-prods').innerHTML=`<div style="margin-bottom:6px;font-size:11px;font-weight:700;color:var(--orange);">${DB.settings.B1.nom}</div>${t1.length?t1.map(([n,q],i)=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--border);"><span>${i+1}. ${n.substring(0,20)}</span><span class="mono" style="color:var(--gold)">${q}</span></div>`).join(''):'<div style="color:var(--text3);font-size:11px;">Aucune vente</div>'}<div style="margin:9px 0 5px;font-size:11px;font-weight:700;color:var(--blue);">${DB.settings.B2.nom}</div>${t2.length?t2.map(([n,q],i)=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--border);"><span>${i+1}. ${n.substring(0,20)}</span><span class="mono" style="color:var(--blue)">${q}</span></div>`).join(''):'<div style="color:var(--text3);font-size:11px;">Aucune vente</div>'}`;
   setTimeout(()=>{
     const daysCount=COMP_PERIOD==='jour'?1:COMP_PERIOD==='semaine'?7:COMP_PERIOD==='mois'?30:12;
     if(COMP_PERIOD==='annee'){
       const months=[],labels=[];
       for(let i=0;i<12;i++){const d=new Date(now.getFullYear(),i,1);months.push(d.toISOString().slice(0,7));labels.push(['J','F','M','A','M','J','J','A','S','O','N','D'][i]);}
-      drawBarChart('chart-comp-ca',labels,[{data:months.map(m=>b1F.filter(f=>f.date.startsWith(m)).reduce((s,f)=>s+f.total,0)),color:'#f0a500',label:DB.settings.B1.nom.substring(0,8)},{data:months.map(m=>b2F.filter(f=>f.date.startsWith(m)).reduce((s,f)=>s+f.total,0)),color:'#3b82f6',label:DB.settings.B2.nom.substring(0,8)}]);
+      drawBarChart('chart-comp-ca',labels,[{data:months.map(m=>b1F.filter(f=>f.date.startsWith(m)).reduce((s,f)=>s+f.total,0)),color:'#f97316',label:DB.settings.B1.nom.substring(0,8)},{data:months.map(m=>b2F.filter(f=>f.date.startsWith(m)).reduce((s,f)=>s+f.total,0)),color:'#3b82f6',label:DB.settings.B2.nom.substring(0,8)}]);
     } else {
       const days=[],labels=[];
       for(let i=daysCount-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const ds=d.toISOString().slice(0,10);days.push(ds);labels.push(d.getDate()+'/'+(d.getMonth()+1));}
-      drawBarChart('chart-comp-ca',labels,[{data:days.map(ds=>b1F.filter(f=>f.date.startsWith(ds)).reduce((s,f)=>s+f.total,0)),color:'#f0a500',label:DB.settings.B1.nom.substring(0,8)},{data:days.map(ds=>b2F.filter(f=>f.date.startsWith(ds)).reduce((s,f)=>s+f.total,0)),color:'#3b82f6',label:DB.settings.B2.nom.substring(0,8)}]);
+      drawBarChart('chart-comp-ca',labels,[{data:days.map(ds=>b1F.filter(f=>f.date.startsWith(ds)).reduce((s,f)=>s+f.total,0)),color:'#f97316',label:DB.settings.B1.nom.substring(0,8)},{data:days.map(ds=>b2F.filter(f=>f.date.startsWith(ds)).reduce((s,f)=>s+f.total,0)),color:'#3b82f6',label:DB.settings.B2.nom.substring(0,8)}]);
     }
   },80);
 }
