@@ -2345,7 +2345,9 @@ window.addEventListener('beforeunload',saveImmediat);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveImmediat();});
 function startAutoSave(){if(autoSaveTimer)clearInterval(autoSaveTimer);autoSaveTimer=setInterval(save,30000);}
 
-const _fmtBase=n=>{const num=Number(n||0);return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g,' ');};
+// Le FCFA n'a pas de centimes: on arrondit à l'unité. Sans cela, une moyenne comme
+// 10096.900826446281 s'affichait "10 096.900 826 446 281" (décimales découpées par 3).
+const _fmtBase=n=>{let num=Math.round(Number(n||0));if(!isFinite(num)||Object.is(num,-0))num=0;return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g,' ');};
 let fmt=n=>_fmtBase(n)+' FCFA';
 const today=()=>new Date().toISOString().slice(0,10);
 const getBName=b=>DB.settings[b]?.nom||b;
