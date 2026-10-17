@@ -5909,24 +5909,27 @@ function renderTrophee(){
     const gagnant=i===0&&ecart>0;
     const pct=total?Math.round(b.ca/total*100):0;
     const mienne=b.code===maBoutique;
-    return '<div style="background:'+(gagnant?'rgba(240,165,0,.10)':'rgba(148,163,184,.06)')+';'
-      +'border:1px solid '+(gagnant?'rgba(240,165,0,.35)':(mienne?'var(--cyan)':'var(--border)'))+';'
+    // Couleur d'identité de la boutique: Rahma (B1) orange, Rayane (B2) bleu
+    const col=b.code==='B1'?'var(--orange)':'var(--blue)';
+    const rgb=b.code==='B1'?'249,115,22':'59,130,246';
+    return '<div style="background:rgba('+rgb+','+(gagnant?'.12':'.06')+');'
+      +'border:'+(mienne?'2px solid '+col:'1px solid rgba('+rgb+','+(gagnant?'.45':'.25')+')')+';'
       +'border-radius:11px;padding:11px 12px;margin-bottom:8px;">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;gap:9px;flex-wrap:wrap;">'
       +'<div style="display:flex;align-items:center;gap:9px;min-width:0;">'
       +'<span style="font-size:19px;flex-shrink:0;">'+(gagnant?'🏆':(i===0?'🤝':'🥈'))+'</span>'
       +'<div style="min-width:0;">'
-      +'<div style="font-size:12.5px;font-weight:800;">'+escapeHtml(b.nom)
-      +(mienne?' <span style="font-size:9px;font-weight:700;color:var(--cyan);">VOUS</span>':'')+'</div>'
+      +'<div style="font-size:12.5px;font-weight:800;color:'+col+';">'+escapeHtml(b.nom)
+      +(mienne?' <span style="font-size:9px;font-weight:700;color:'+col+';">VOUS</span>':'')+'</div>'
       +'<div style="font-size:10px;color:var(--text2);">'+b.nb+' vente(s) · panier '+fmt(b.panier)+'</div>'
       +'</div></div>'
       +'<div style="text-align:right;flex-shrink:0;">'
-      +'<div style="font-size:16px;font-weight:900;color:'+(gagnant?'var(--gold)':'var(--text)')+';">'+fmt(b.ca)+'</div>'
+      +'<div style="font-size:16px;font-weight:900;color:'+col+';">'+fmt(b.ca)+'</div>'
       +'<div style="font-size:9.5px;color:var(--text2);">'+pct+' % du total</div>'
       +'</div></div>'
       // Barre de proportion
       +'<div style="height:5px;background:rgba(148,163,184,.14);border-radius:3px;margin-top:8px;overflow:hidden;">'
-      +'<div style="height:100%;width:'+pct+'%;background:'+(gagnant?'var(--gold)':'var(--text3)')+';border-radius:3px;"></div>'
+      +'<div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:3px;"></div>'
       +'</div></div>';
   }).join('')
   + _messageEncouragement(rangs,ecart,maBoutique);
