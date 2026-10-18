@@ -142,6 +142,9 @@ tbody tr:hover{background:var(--surf2);}
 .bg{background:rgba(16,185,129,.15);color:var(--green);} .br{background:rgba(239,68,68,.15);color:var(--red);}
 .by{background:rgba(240,165,0,.15);color:var(--gold);} .bb{background:rgba(59,130,246,.12);color:var(--blue);}
 .bo{background:rgba(249,115,22,.12);color:var(--orange);} .bgr{background:var(--surf2);color:var(--text2);}
+/* Dictée de vente en caisse */
+.pos-voix-btn{flex-shrink:0;font-size:16px;padding:0 13px;}
+.pos-voix-btn.ecoute{background:var(--red)!important;color:#fff;animation:voixPulse 1.2s ease-in-out infinite;}
 /* Assistant vocal */
 .voix-micro{width:76px;height:76px;border-radius:50%;border:none;cursor:pointer;font-size:32px;background:linear-gradient(135deg,var(--purple),#6d28d9);color:#fff;box-shadow:0 6px 18px rgba(139,92,246,.35);transition:transform .15s;}
 .voix-micro:active{transform:scale(.95);}
@@ -682,7 +685,10 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="sec active" id="sec-caisse">
     <div class="pos-layout">
       <div class="pos-left">
-        <input class="srch" style="width:100%" placeholder="🔍 Produit, référence, code-barres..." id="pos-srch" oninput="renderGridDiffere()">
+        <div style="display:flex;gap:6px;align-items:stretch;">
+          <input class="srch" style="flex:1;min-width:0" placeholder="🔍 Produit, référence, code-barres..." id="pos-srch" oninput="renderGridDiffere()">
+          <button class="btn btn-purple pos-voix-btn" id="pos-voix-btn" onclick="dicterVente()" title="Dicter la vente : « 2 câbles type C et une pochette pour Moussa, en Wave »">🎤</button>
+        </div>
         <div class="pos-prods"><div class="pgrid" id="pos-grid"></div></div>
       </div>
       <div class="pos-right">
@@ -7816,6 +7822,216 @@ function voixQuestionEcrite(){
   el.value='';
   if(!_voixEcoute)_voixEtat('Touchez le micro pour parler',false);
   repondreVocal(q);
+}
+
+// ══ DICTÉE DE VENTE EN CAISSE ══
+// La caissière dit « 2 câbles type C et une pochette pour Moussa, en Wave » :
+// le panier se remplit, le client et le mode de paiement sont choisis. L'encaissement
+// reste un geste volontaire (bouton Encaisser), pour qu'une erreur de micro ne valide rien.
+const _dvNombres={un:1,une:1,deux:2,trois:3,quatre:4,cinq:5,six:6,sept:7,huit:8,neuf:9,dix:10,onze:11,douze:12,
+  treize:13,quatorze:14,quinze:15,seize:16,vingt:20,trente:30,quarante:40,cinquante:50,soixante:60,cent:100};
+const _dvVides=new Set(('de du des d l le la les un une en a au aux et avec x fois piece pieces unite unites '
+  +'article articles produit produits metre metres m boite boites carton cartons paquet paquets sachet sachets '
+  +'donne donnez mets mettez met ajoute ajouter ajoutez je veux voudrais il faut aussi encore svp stp pour').split(' '));
+const _dvModes=[
+  [/\b(en )?(especes|espece|cash|liquide)\b/,'especes'],
+  [/\b(par |en |avec )?wave\b/,'wave'],
+  [/\b(par |en |avec )?(orange money|om)\b/,'orange'],
+  [/\b(par |en |avec )?(free money|yas|mobile money)\b/,'mobile'],
+  [/\b(par |en |avec )?carte( bancaire)?\b/,'carte'],
+  [/\b(a |en |sur )?credit\b/,'credit'],
+];
+function _dvQte(m){
+  if(/^\d+$/.test(m))return parseInt(m,10);
+  return _dvNombres[m]||0;
+}
+function _dvSing(m){return m.length>3&&/[sx]$/.test(m)?m.slice(0,-1):m;}
+
+// Meilleur produit pour une liste de mots (ou null)
+function _dvMeilleurProduit(mots,boutique){
+  mots=mots.filter(m=>m&&!_dvVides.has(m)).map(_dvSing);
+  if(!mots.length)return null;
+  let best=null,egaux=[];
+  (DB.produits||[]).forEach(p=>{
+    const cible=_norm((p.nom||'')+' '+(p.ref||''));
+    const colle=cible.replace(/ /g,'');
+    let score=0;
+    mots.forEach(m=>{if(cible.split(' ').some(w=>w===m||_dvSing(w)===m)||(m.length>=3&&colle.includes(m)))score++;});
+    if(mots.length>1&&colle.includes(mots.join('')))score=mots.length;
+    if(!score)return;
+    const motsNom=cible.split(' ').length;
+    const stk=Number(boutique==='B2'?p.s2:p.s1)||0;
+    // Classement: mots reconnus, puis nom le plus "serré", puis produit en stock
+    const cle=[score,score/motsNom,stk>0?1:0];
+    if(!best||cle[0]>best.cle[0]){best={p,cle,score};egaux=[p];return;}
+    if(cle[0]===best.cle[0]){
+      egaux.push(p);
+      if(cle[1]>best.cle[1]||(cle[1]===best.cle[1]&&cle[2]>best.cle[2]))best={p,cle,score};
+    }
+  });
+  if(!best)return null;
+  const seuil=Math.max(1,Math.ceil(mots.length*0.6));
+  if(best.score<seuil)return null;
+  // Plusieurs produits aussi probables: on ne devine pas, la caissière choisira
+  // (sauf si le nom du meilleur est dit en entier, ex. « fer 30 cm »)
+  return {p:best.p,score:best.score,total:mots.length,ambigu:(egaux.length>1&&best.cle[1]<1)?mots.join(' '):null};
+}
+
+// Analyse un segment "2 cables type c" -> [{p,qty}] (peut découper s'il contient plusieurs articles)
+function _dvAnalyserSegment(mots,boutique){
+  if(!mots.length)return {lignes:[],inconnus:[],ambigus:[]};
+  let qty=1,debut=0;
+  const q0=_dvQte(mots[0]);
+  if(q0>0){qty=q0;debut=1;}
+  const reste=mots.slice(debut);
+  const m=_dvMeilleurProduit(reste,boutique);
+  const motsUtiles=reste.filter(x=>!_dvVides.has(x));
+  // Correspondance complète: on garde tel quel
+  if(m&&m.ambigu)return {lignes:[],inconnus:[],ambigus:[{mots:m.ambigu,qty}]};
+  if(m&&m.score>=m.total)return {lignes:[{p:m.p,qty}],inconnus:[],ambigus:[]};
+  // Sinon, essayer de couper avant une autre quantité ("2 cables 3 pochettes")
+  for(let i=1;i<reste.length;i++){
+    if(_dvQte(reste[i])>0){
+      const g=_dvAnalyserSegment(mots.slice(0,debut+i),boutique);
+      const d=_dvAnalyserSegment(reste.slice(i),boutique);
+      if(g.lignes.length&&d.lignes.length&&!g.inconnus.length&&!g.ambigus.length)
+        return {lignes:[...g.lignes,...d.lignes],inconnus:d.inconnus,ambigus:d.ambigus};
+    }
+  }
+  if(m)return {lignes:[{p:m.p,qty}],inconnus:[],ambigus:[]};
+  return {lignes:[],inconnus:motsUtiles.length?[reste.join(' ')]:[],ambigus:[]};
+}
+
+// Analyse complète d'une phrase dictée
+function analyserDicteeVente(texte,boutique){
+  let q=' '+_norm(texte)+' ';
+  const res={lignes:[],inconnus:[],ambigus:[],client:null,clientCherche:null,mode:null,vider:false};
+  if(/\b(vide|vider|videz|efface|effacer|annule|annuler)\b.*\b(panier|tout|vente)\b|^ (vide|annule)/.test(q)){res.vider=true;return res;}
+  // Mode de paiement
+  for(const [re,mode] of _dvModes){
+    if(re.test(q)){res.mode=mode;q=q.replace(re,' ');break;}
+  }
+  // Client: "pour X", "client X", "au nom de X" — seulement s'il correspond à un vrai client
+  const clients=DB.clients||[];
+  const reCl=/\b(pour|client|cliente|au nom de|nom)\s+((?:[a-z0-9]+\s*){1,3})/g;
+  let mm,trouve=null;
+  while((mm=reCl.exec(q))){
+    const mots=mm[2].trim().split(' ');
+    for(let n=Math.min(3,mots.length);n>=1&&!trouve;n--){
+      const cand=mots.slice(0,n);
+      const c=clients.filter(c=>{const nn=_norm(c.nom).split(' ');return cand.every(w=>nn.includes(w));});
+      if(c.length){trouve={c:c[0],txt:mm[1]+' '+cand.join(' ')};}
+    }
+    if(!trouve&&!res.clientCherche&&/^(client|cliente|au nom de|nom)$/.test(mm[1]))res.clientCherche=mots.slice(0,2).join(' ');
+    if(trouve)break;
+  }
+  if(trouve){res.client=trouve.c;q=q.replace(' '+trouve.txt,' ');}
+  else if(res.clientCherche)q=q.replace(new RegExp('\\b(client|cliente|au nom de|nom)\\s+'+res.clientCherche),' ');
+  else{
+    // "pour Moussa" en fin de phrase avec un nom inconnu: le signaler sans l'utiliser comme produit
+    const fin=q.match(/\bpour\s+([a-z]+(?:\s+[a-z]+)?)\s*$/);
+    if(fin&&!_dvMeilleurProduit(fin[1].split(' '),boutique)){res.clientCherche=fin[1];q=q.replace(fin[0],' ');}
+  }
+  // Articles: séparés par "et", virgules, "puis", "ensuite"
+  const segments=q.split(/,|\bet\b|\bpuis\b|\bensuite\b|\bavec\b/).map(s=>s.trim()).filter(Boolean);
+  segments.forEach(s=>{
+    const r=_dvAnalyserSegment(s.split(' ').filter(Boolean),boutique);
+    res.lignes.push(...r.lignes);res.inconnus.push(...r.inconnus);res.ambigus.push(...(r.ambigus||[]));
+  });
+  return res;
+}
+
+// Ajoute une quantité au panier en respectant le stock de la boutique
+function _dvAjouterAuPanier(p,qty){
+  const ms=Number(session.boutique==='B1'?p.s1:p.s2)||0;
+  const ex=cart.find(x=>x.id===p.id);
+  const deja=ex?ex.qty:0;
+  const possible=Math.max(0,Math.min(qty,ms-deja));
+  if(possible>0){
+    if(ex)ex.qty+=possible;
+    else cart.push({id:p.id,nom:p.nom,prix:p.prix,achat:p.achat||0,unite:p.unite,qty:possible,ms,_achatZero:(!p.achat||p.achat===0)});
+  }
+  return possible;
+}
+
+function appliquerDicteeVente(texte){
+  const r=analyserDicteeVente(texte,session.boutique);
+  const dits=[],ecrits=[],soucis=[];
+  if(r.vider){
+    cart=[];clearPOSClientSel();renderCart();
+    toast('🗑 Panier vidé','info');parlerVoix('Panier vidé.');return r;
+  }
+  r.lignes.forEach(({p,qty})=>{
+    const ok=_dvAjouterAuPanier(p,qty);
+    if(ok===qty){dits.push(qty+' '+p.nom);ecrits.push(qty+' × '+p.nom);}
+    else if(ok>0){dits.push(ok+' '+p.nom);ecrits.push(ok+' × '+p.nom);soucis.push('stock insuffisant pour '+p.nom+' (seulement '+ok+')');}
+    else soucis.push(p.nom+' en rupture');
+  });
+  r.inconnus.forEach(t=>soucis.push('« '+t+' » non trouvé'));
+  if(r.ambigus.length){
+    // Afficher les produits possibles dans la grille: la caissière touche le bon
+    const a=r.ambigus[r.ambigus.length-1];
+    const champ=document.getElementById('pos-srch');
+    if(champ){champ.value=a.mots;try{renderGrid();}catch(e){}}
+    r.ambigus.forEach(x=>soucis.push('plusieurs produits pour « '+x.mots+' », touchez le bon'));
+  }
+  if(r.client)selectPOSClient(r.client.id,r.client.nom);
+  else if(r.clientCherche){
+    const champ=document.getElementById('pos-cl-srch');
+    if(champ){champ.value=r.clientCherche;try{filterPOSClient(r.clientCherche);}catch(e){}}
+    soucis.push('client « '+r.clientCherche+' » introuvable, choisissez-le ou créez-le');
+  }
+  if(r.mode){
+    const el=[...document.querySelectorAll('.paybtn')].find(b=>(b.getAttribute('onclick')||'').includes("'"+r.mode+"'"));
+    if(el)setPay(el,r.mode);
+  }
+  if(dits.length){document.getElementById('btn-voir-fact')&&(document.getElementById('btn-voir-fact').style.display='none');pt&&pt(660,.08,'sine',.25);}
+  renderCart();
+  const totTxt=(document.getElementById('p-tot')?.textContent||'').replace(/\D/g,'');
+  let oral=dits.length?'Ajouté : '+dits.join(', ')+'.':'';
+  if(r.client)oral+=' Client '+r.client.nom+'.';
+  if(dits.length&&totTxt)oral+=' Total '+totTxt+' francs.';
+  if(soucis.length)oral+=' Attention : '+soucis.join(', ')+'.';
+  if(!dits.length&&!r.client&&!r.mode&&!soucis.length)oral="Je n'ai reconnu aucun produit. Dites par exemple : deux câbles type C et une pochette pour Moussa.";
+  toast((ecrits.length?'🎤 '+ecrits.join(' · '):'🎤 Rien ajouté')+(soucis.length?' — ⚠️ '+soucis.join(' · '):''),soucis.length?'err':'ok');
+  parlerVoix(oral.trim());
+  return r;
+}
+
+let _dvRec=null;
+function dicterVente(){
+  const btn=document.getElementById('pos-voix-btn');
+  if(_dvRec){try{_dvRec.stop();}catch(e){}return;}
+  if(!dicteeDisponible()){toast('Micro non supporté — utilisez Chrome ou Edge','err');return;}
+  try{speechSynthesis.cancel();}catch(e){}
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  _dvRec=new SR();
+  _dvRec.lang='fr-FR';_dvRec.continuous=false;_dvRec.interimResults=true;
+  let final='',inter='';
+  const champ=document.getElementById('pos-srch');
+  const ancien=champ?champ.placeholder:'';
+  _dvRec.onstart=()=>{btn&&btn.classList.add('ecoute');if(champ)champ.placeholder='🎤 Dites la vente : « 2 câbles type C et une pochette pour Moussa »';};
+  _dvRec.onresult=e=>{
+    final='';inter='';
+    for(let i=0;i<e.results.length;i++){
+      if(e.results[i].isFinal)final+=e.results[i][0].transcript;else inter+=e.results[i][0].transcript;
+    }
+    if(champ)champ.placeholder='🎤 '+(final||inter);
+  };
+  _dvRec.onerror=e=>{
+    if(e.error==='not-allowed'||e.error==='service-not-allowed')toast('Micro refusé — autorisez-le dans le navigateur','err');
+    else if(e.error==='no-speech')toast("🎤 Je n'ai rien entendu",'info');
+    else if(e.error==='network')toast('La dictée a besoin d\'internet','err');
+    else if(e.error!=='aborted')toast('Erreur micro : '+e.error,'err');
+  };
+  _dvRec.onend=()=>{
+    btn&&btn.classList.remove('ecoute');
+    if(champ)champ.placeholder=ancien;
+    _dvRec=null;
+    const t=(final||inter).trim();
+    if(t)appliquerDicteeVente(t);
+  };
+  try{_dvRec.start();}catch(e){_dvRec=null;btn&&btn.classList.remove('ecoute');toast('Impossible de démarrer le micro','err');}
 }
 
 // ══ NOTIFICATIONS SYSTÈME ══
