@@ -142,6 +142,17 @@ tbody tr:hover{background:var(--surf2);}
 .bg{background:rgba(16,185,129,.15);color:var(--green);} .br{background:rgba(239,68,68,.15);color:var(--red);}
 .by{background:rgba(240,165,0,.15);color:var(--gold);} .bb{background:rgba(59,130,246,.12);color:var(--blue);}
 .bo{background:rgba(249,115,22,.12);color:var(--orange);} .bgr{background:var(--surf2);color:var(--text2);}
+/* Assistant vocal */
+.voix-micro{width:76px;height:76px;border-radius:50%;border:none;cursor:pointer;font-size:32px;background:linear-gradient(135deg,var(--purple),#6d28d9);color:#fff;box-shadow:0 6px 18px rgba(139,92,246,.35);transition:transform .15s;}
+.voix-micro:active{transform:scale(.95);}
+.voix-micro.ecoute{background:linear-gradient(135deg,var(--red),#b91c1c);animation:voixPulse 1.2s ease-in-out infinite;}
+@keyframes voixPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.45);}50%{box-shadow:0 0 0 14px rgba(239,68,68,0);}}
+.voix-etat{font-size:11.5px;color:var(--text2);margin-top:9px;font-weight:600;}
+.voix-transcript{font-size:13px;font-style:italic;margin-top:5px;min-height:18px;color:var(--text);}
+.voix-rep{background:var(--surf2);border:1px solid var(--border2);border-left:3px solid var(--purple);border-radius:9px;padding:10px 12px;font-size:13px;line-height:1.55;margin-top:8px;}
+.voix-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;}
+.voix-chips button{background:var(--surf2);border:1px solid var(--border2);color:var(--text2);font-family:var(--font);font-size:10.5px;border-radius:14px;padding:4px 9px;cursor:pointer;}
+.voix-chips button:hover{color:var(--text);border-color:var(--purple);}
 /* Couleur d'identité des boutiques: Rahma (B1) = orange, Rayane (B2) = bleu */
 .bB1{background:rgba(249,115,22,.15);color:var(--orange);font-weight:700;} .bB2{background:rgba(59,130,246,.15);color:var(--blue);font-weight:700;}
 [data-boutique="B1"]{--bcol:var(--orange);} [data-boutique="B2"]{--bcol:var(--blue);}
@@ -661,6 +672,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <div id="topbar-clock"></div>
       <div class="notif-bell" id="notif-bell" onclick="toggleNotifPanel(event)" title="Notifications">🔔<span class="notif-badge" id="notif-badge" style="display:none">0</span></div>
       <button class="theme-btn" onclick="toggleTheme()" id="app-theme-btn">☀️</button>
+      <button class="btn btn-ghost btn-sm" id="voix-btn" onclick="ouvrirAssistantVocal()" title="Assistant vocal : posez une question à voix haute">🎤</button>
       <button class="btn btn-purple btn-sm" id="ia-btn" onclick="openModal('modal-ia')" style="display:none">🤖 IA</button>
     </div>
   </div>
@@ -2075,6 +2087,34 @@ canvas.chart-canvas{display:block;width:100%!important;}
     <button class="btn btn-purple" style="width:100%" onclick="askIA()">🚀 Demander</button>
     <div id="ia-modal-result" style="margin-top:11px;"></div>
     <div class="mfooter"><button class="btn btn-ghost" onclick="closeModal('modal-ia')">Fermer</button></div>
+  </div>
+</div>
+
+<!-- ASSISTANT VOCAL -->
+<div class="overlay" id="modal-voix">
+  <div class="modal sm">
+    <div class="mtitle"><span>🎤 Assistant vocal</span><span class="mclose" onclick="fermerAssistantVocal()">✕</span></div>
+    <div style="text-align:center;padding:4px 0 2px;">
+      <button id="voix-micro" class="voix-micro" onclick="demarrerEcouteVocale()" aria-label="Parler">🎤</button>
+      <div id="voix-etat" class="voix-etat">Touchez le micro pour parler</div>
+      <div id="voix-transcript" class="voix-transcript"></div>
+    </div>
+    <div id="voix-reponse"></div>
+    <div style="display:flex;gap:6px;margin-top:10px;">
+      <input id="voix-texte" placeholder="Ou écrivez votre question…" onkeydown="if(event.key==='Enter')voixQuestionEcrite()"
+        style="flex:1;min-width:0;background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:12px;border-radius:8px;padding:8px 10px;outline:none;">
+      <button class="btn btn-gold btn-sm" onclick="voixQuestionEcrite()" title="Envoyer">➤</button>
+      <button class="btn btn-ghost btn-sm" onclick="parlerVoix(_voixDerniere)" title="Répéter la réponse">🔊</button>
+    </div>
+    <div class="voix-chips">
+      <button onclick="repondreVocal(this.textContent)">Ventes aujourd'hui</button>
+      <button onclick="repondreVocal(this.textContent)">Meilleure boutique</button>
+      <button onclick="repondreVocal(this.textContent)">Produits en rupture</button>
+      <button onclick="repondreVocal(this.textContent)">Stock faible</button>
+      <button onclick="repondreVocal(this.textContent)">Qui me doit de l'argent ?</button>
+      <button onclick="repondreVocal(this.textContent)">Aide</button>
+    </div>
+    <div style="font-size:9.5px;color:var(--text2);margin-top:8px;text-align:center;">Français pour l'instant — le wolof n'est pas encore reconnu.</div>
   </div>
 </div>
 
@@ -7455,6 +7495,327 @@ function qteVendue(factures,p){
   return (factures||[]).flatMap(f=>f&&f.items||[])
     .filter(i=>ligneCorrespond(i,p))
     .reduce((s,i)=>s+(Number(i.qty)||0),0);
+}
+
+// ══ ASSISTANT VOCAL ══
+// On pose une question à voix haute ("combien j'ai vendu aujourd'hui ?", "stock câble type C")
+// et l'application répond à voix haute. Réponses calculées sur place (gratuit, hors ligne pour
+// les calculs) ; l'IA Claude n'est appelée que si la question n'est pas reconnue ET qu'une clé existe.
+// Langue : français. Le wolof n'est pas reconnu par les navigateurs (service externe nécessaire).
+let _voixRec=null,_voixEcoute=false,_voixDerniere=null;
+
+function _vMontant(n){return Math.round(Number(n)||0)+' francs';}     // pour la voix
+function _vPl(n,mot){return n+' '+mot+(n>1?'s':'');}
+function _vPeriode(q){
+  const now=new Date();
+  const j0=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const J=86400000;
+  if(/avant hier/.test(q))return {debut:new Date(j0-2*J),fin:new Date(j0-J),label:'avant-hier'};
+  if(/\bhier\b/.test(q))return {debut:new Date(j0-J),fin:j0,label:'hier'};
+  if(/mois dernier|mois passe|dernier mois/.test(q)){
+    const d=new Date(now.getFullYear(),now.getMonth()-1,1);
+    return {debut:d,fin:new Date(now.getFullYear(),now.getMonth(),1),label:'le mois dernier'};
+  }
+  if(/semaine derniere|semaine passee/.test(q))
+    return {debut:new Date(j0-13*J),fin:new Date(j0-6*J),label:'la semaine dernière'};
+  if(/semaine|7 jours|sept jours/.test(q))return {debut:new Date(j0-6*J),fin:new Date(+j0+J),label:'ces 7 derniers jours'};
+  if(/\bmois\b/.test(q))return {debut:new Date(now.getFullYear(),now.getMonth(),1),fin:new Date(+j0+J),label:'ce mois-ci'};
+  if(/annee|\ban\b/.test(q))return {debut:new Date(now.getFullYear(),0,1),fin:new Date(+j0+J),label:'cette année'};
+  return {debut:j0,fin:new Date(+j0+J),label:"aujourd'hui"};
+}
+// Boutique citée dans la question (sinon les deux)
+function _vBoutiques(q){
+  const nom=b=>_norm(DB.settings[b]?.nom||'').split(' ')[0]||'';
+  const b1=/rahma/.test(q)||(nom('B1')&&q.includes(nom('B1')));
+  const b2=/rayan/.test(q)||(nom('B2')&&q.includes(nom('B2')));
+  if(b1&&!b2)return ['B1'];
+  if(b2&&!b1)return ['B2'];
+  return ['B1','B2'];
+}
+const _vMotsVides=new Set(('le la les de du des d l un une en a au aux et est il elle on je j me moi mon ma mes '
+  +'combien quel quelle quels quelles reste restent stock stocks prix coute coutent cout tarif vend vends '
+  +'disponible dispo quantite qte encore y ya avons avez ai as on nous dans pour sur chez boutique magasin '
+  +'rahma rayane rayan telecom donne dis moi svp stp please s il te plait c cest ce cet cette qu que qui '
+  +'combien de piece pieces unite unites article articles produit produits '
+  +'aujourd hui hier avant semaine mois annee an matin soir vente ventes vendu vendus').split(' '));
+function _vSingulier(m){return m.length>3&&/[sx]$/.test(m)?m.slice(0,-1):m;}
+// Trouve les produits cités ("câble type C" -> CABLE TYPEC IPHON...)
+function _vTrouverProduits(q){
+  const mots=q.split(' ').filter(m=>m&&!_vMotsVides.has(m)).map(_vSingulier);
+  if(!mots.length)return [];
+  const res=[];
+  (DB.produits||[]).forEach(p=>{
+    const cible=_norm((p.nom||'')+' '+(p.ref||''));
+    const colle=cible.replace(/ /g,'');
+    let score=0;
+    mots.forEach(m=>{if(cible.includes(m)||colle.includes(m))score++;});
+    // "type c" dit en deux mots mais écrit "typec"
+    if(mots.length>1&&colle.includes(mots.join('')))score=mots.length;
+    if(score>0)res.push({p,score});
+  });
+  if(!res.length)return [];
+  const max=Math.max(...res.map(r=>r.score));
+  const seuil=Math.max(1,Math.ceil(mots.length*0.6));
+  if(max<seuil)return [];
+  return res.filter(r=>r.score===max).map(r=>r.p);
+}
+function _vListe(noms){
+  if(noms.length<=1)return noms.join('');
+  return noms.slice(0,-1).join(', ')+' et '+noms[noms.length-1];
+}
+
+function assistantVocalLocal(question){
+  const q=_norm(question);
+  if(!q)return null;
+  const nomB=b=>DB.settings[b]?.nom||b;
+  const stk=p=>({s1:Number(p.s1)||0,s2:Number(p.s2)||0});
+
+  // Aide
+  if(/^(aide|help)|que (peux|sais)|quoi demander|tu sais faire/.test(q))
+    return {ecrit:"Exemples : « Combien j'ai vendu aujourd'hui ? » · « Ventes de Rayane hier » · « Stock câble type C » · « Prix de la pochette » · « Quels produits sont en rupture ? » · « Combien doit Moussa ? » · « Dépenses du mois »",
+            oral:"Vous pouvez me demander vos ventes, votre stock, un prix, les ruptures, les dépenses ou la dette d'un client."};
+
+  // Heure / date
+  if(/quelle heure|il est quelle/.test(q)){
+    const t=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    return {ecrit:'🕐 Il est '+t,oral:'Il est '+t};
+  }
+
+  // Dette d'un client
+  if(/\b(doit|dette|dettes|credit|credits|creance|creances|impaye)/.test(q)){
+    const mots=q.split(' ').filter(m=>m.length>2&&!_vMotsVides.has(m)&&!/^(doit|doivent|dette|dettes|credit|credits|creance|creances|impaye|impayes|client|clients|total|argent|qui|personne|gens|tout|tous|monde|liste|encore)$/.test(m));
+    const clients=(DB.clients||[]);
+    const trouves=mots.length?clients.filter(c=>{const n=_norm(c.nom);return mots.every(m=>n.includes(m));}):[];
+    if(trouves.length){
+      const l=trouves.slice(0,3).map(c=>c.nom+' : '+((c.credit||0)>0?fmt(c.credit):'rien'));
+      const o=trouves.slice(0,3).map(c=>c.nom+((c.credit||0)>0?' doit '+_vMontant(c.credit):" ne doit rien")).join('. ');
+      return {ecrit:'💳 '+l.join(' · '),oral:o+'.'};
+    }
+    if(mots.length)return {ecrit:'❓ Client « '+mots.join(' ')+' » introuvable dans cette boutique',
+                           oral:"Je ne trouve pas ce client dans cette boutique."};
+    const endettes=clients.filter(c=>(c.credit||0)>0).sort((a,b)=>b.credit-a.credit);
+    const tot=endettes.reduce((s,c)=>s+c.credit,0);
+    if(!endettes.length)return {ecrit:'✅ Aucun client ne doit d\'argent',oral:"Aucun client ne vous doit d'argent."};
+    return {ecrit:'💳 '+endettes.length+' client(s) doivent '+fmt(tot)+' — le plus gros : '+endettes[0].nom+' ('+fmt(endettes[0].credit)+')',
+            oral:(endettes.length>1?endettes.length+' clients vous doivent':'Un client vous doit')+' au total '+_vMontant(tot)+'. Le plus gros est '+endettes[0].nom+', avec '+_vMontant(endettes[0].credit)+'.'};
+  }
+
+  // Ruptures
+  if(/rupture|epuise|plus de stock|fini|manque/.test(q)){
+    const bs=_vBoutiques(q);
+    const rup=(DB.produits||[]).filter(p=>bs.every(b=>stk(p)[b==='B1'?'s1':'s2']<=0));
+    const ou=bs.length===2?'dans les deux boutiques':'à '+nomB(bs[0]);
+    if(!rup.length)return {ecrit:'✅ Aucun produit en rupture '+ou,oral:'Aucun produit en rupture '+ou+'.'};
+    const noms=rup.slice(0,5).map(p=>p.nom);
+    return {ecrit:'🔴 '+rup.length+' produit(s) en rupture '+ou+' : '+noms.join(', ')+(rup.length>5?'…':''),
+            oral:(rup.length>1?rup.length+' produits sont':'Un produit est')+' en rupture '+ou+(rup.length>1?', par exemple ':' : ')+_vListe(noms.slice(0,3))+'.'};
+  }
+  // Stock faible
+  if(/stock faible|bientot fini|presque fini|alerte stock|stock bas/.test(q)){
+    const faibles=(DB.produits||[]).filter(p=>{const t=stk(p).s1+stk(p).s2;return t>0&&t<=(Number(p.alerte)||1);});
+    if(!faibles.length)return {ecrit:'✅ Aucun produit en stock faible',oral:'Aucun produit en stock faible.'};
+    const noms=faibles.slice(0,5).map(p=>p.nom);
+    return {ecrit:'🟠 '+faibles.length+' produit(s) en stock faible : '+noms.join(', ')+(faibles.length>5?'…':''),
+            oral:(faibles.length>1?faibles.length+' produits sont presque épuisés, par exemple ':'Un produit est presque épuisé : ')+_vListe(noms.slice(0,3))+'.'};
+  }
+
+  // Prix d'un produit
+  if(/\b(prix|coute|coutent|tarif|vend a)\b/.test(q)){
+    const ps=_vTrouverProduits(q);
+    if(!ps.length)return {ecrit:'❓ Produit non trouvé. Dites par exemple « prix câble type C ».',oral:"Je n'ai pas trouvé ce produit."};
+    const l=ps.slice(0,3);
+    return {ecrit:'🏷️ '+l.map(p=>p.nom+' : '+fmt(p.prix)).join(' · ')+(ps.length>3?' (+'+(ps.length-3)+' autres)':''),
+            oral:l.map(p=>p.nom+' est à '+_vMontant(p.prix)).join('. ')+'.'};
+  }
+
+  // Bénéfice
+  if(/benefice|marge|gagne|profit/.test(q)){
+    if(!peutVoirBenefices())return {ecrit:'🔒 Les bénéfices sont réservés à l\'administrateur',oral:"Les bénéfices sont réservés à l'administrateur."};
+    const per=_vPeriode(q),bs=_vBoutiques(q);
+    const dans=d=>{const x=new Date(d);return x>=per.debut&&x<per.fin;};
+    let brut=0,dep=0;
+    bs.forEach(b=>{brut+=_caBoutique(b,per.debut,per.fin).benef;});
+    dep=(DB.depenses||[]).filter(d=>d&&d.date&&dans(d.date)&&(bs.length===2||d.boutique===bs[0]))
+      .reduce((s,d)=>s+(Number(d.montant)||0),0);
+    const ou=bs.length===2?'':' pour '+nomB(bs[0]);
+    return {ecrit:'💰 Bénéfice '+per.label+ou+' : '+fmt(brut)+' sur les ventes'+(dep?' · '+fmt(dep)+' de dépenses · net '+fmt(brut-dep):''),
+            oral:'Le bénéfice '+per.label+ou+' est de '+_vMontant(brut)+(dep?'. Après '+_vMontant(dep)+' de dépenses, il reste '+_vMontant(brut-dep):'')+'.'};
+  }
+
+  // Dépenses
+  if(/depense/.test(q)){
+    const per=_vPeriode(q);
+    const dans=d=>{const x=new Date(d);return x>=per.debut&&x<per.fin;};
+    const l=(DB.depenses||[]).filter(d=>d&&d.date&&dans(d.date));
+    const tot=l.reduce((s,d)=>s+(Number(d.montant)||0),0);
+    if(!l.length)return {ecrit:'💸 Aucune dépense '+per.label,oral:'Aucune dépense '+per.label+'.'};
+    return {ecrit:'💸 Dépenses '+per.label+' : '+fmt(tot)+' ('+l.length+')',
+            oral:'Les dépenses '+per.label+' font '+_vMontant(tot)+(l.length>1?', en '+l.length+' fois.':'.')};
+  }
+
+  // Meilleure boutique
+  if(/(meilleur|premiere|en tete|gagne).*(boutique|magasin)|quelle boutique|qui (est|mene) (en tete|devant)/.test(q)){
+    const per=_vPeriode(q);
+    const r=['B1','B2'].map(b=>_caBoutique(b,per.debut,per.fin)).sort((a,b)=>b.ca-a.ca);
+    if(!r[0].ca)return {ecrit:'📊 Aucune vente '+per.label,oral:'Aucune vente '+per.label+'.'};
+    const ecart=r[0].ca-r[1].ca;
+    if(!ecart)return {ecrit:'🤝 Égalité '+per.label,oral:'Les deux boutiques sont à égalité '+per.label+'.'};
+    return {ecrit:'🏆 '+r[0].nom+' en tête '+per.label+' : '+fmt(r[0].ca)+' contre '+fmt(r[1].ca)+' ('+fmt(ecart)+' d\'avance)',
+            oral:r[0].nom+' est en tête '+per.label+', avec '+_vMontant(ecart)+" d'avance sur "+r[1].nom+'.'};
+  }
+
+  // Meilleur produit sur la période
+  if(/meilleur|plus vendu|top|marche le mieux/.test(q)&&!/boutique/.test(q)){
+    const per=_vPeriode(q),bs=_vBoutiques(q);
+    const dans=d=>{const x=new Date(d);return x>=per.debut&&x<per.fin;};
+    const qty={};
+    (DB.factures||[]).filter(f=>f&&f.date&&bs.includes(f.boutique)&&dans(f.date))
+      .forEach(f=>(f.items||[]).forEach(i=>{qty[i.nom]=(qty[i.nom]||0)+(Number(i.qty)||0);}));
+    const top=Object.entries(qty).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    if(!top.length)return {ecrit:'📊 Aucune vente '+per.label,oral:'Aucune vente '+per.label+'.'};
+    return {ecrit:'🏆 Plus vendus '+per.label+' : '+top.map(([n,x],i)=>(i+1)+'. '+n+' ('+x+')').join(' · '),
+            oral:'Le plus vendu '+per.label+' est '+top[0][0]+', avec '+_vPl(top[0][1],'unité')+(top[1]?', puis '+top[1][0]:'')+'.'};
+  }
+
+  // Stock d'un produit
+  if(/stock|reste|combien de|disponible|quantite|on a encore|il y a/.test(q)){
+    const ps=_vTrouverProduits(q);
+    if(ps.length){
+      const l=ps.slice(0,3);
+      return {ecrit:'📦 '+l.map(p=>p.nom+' — '+nomB('B1')+' : '+stk(p).s1+' · '+nomB('B2')+' : '+stk(p).s2).join(' | ')+(ps.length>3?' (+'+(ps.length-3)+' autres)':''),
+              oral:l.map(p=>p.nom+' : '+stk(p).s1+' chez '+nomB('B1').split(' ')[0]+', '+stk(p).s2+' chez '+nomB('B2').split(' ')[0]).join('. ')+'.'};
+    }
+    if(/stock/.test(q)&&!/vente|vendu/.test(q))
+      return {ecrit:'❓ Produit non trouvé. Dites par exemple « stock câble type C ».',oral:"Je n'ai pas trouvé ce produit."};
+  }
+
+  // Ventes / chiffre d'affaires
+  if(/vente|vendu|vendre|chiffre|\bca\b|recette|encaisse|caisse|fait combien|combien.*(fait|gagn|entre)/.test(q)){
+    const per=_vPeriode(q),bs=_vBoutiques(q);
+    const r=bs.map(b=>_caBoutique(b,per.debut,per.fin));
+    const tot=r.reduce((s,x)=>s+x.ca,0),nb=r.reduce((s,x)=>s+x.nb,0);
+    if(!nb)return {ecrit:'📊 Aucune vente '+per.label+(bs.length===1?' à '+nomB(bs[0]):''),
+                   oral:'Aucune vente '+per.label+(bs.length===1?' à '+nomB(bs[0]):'')+'.'};
+    const ecrit='📊 Ventes '+per.label+' : '+r.map(x=>x.nom+' '+fmt(x.ca)+' ('+x.nb+')').join(' · ')+(r.length>1?' — Total '+fmt(tot):'');
+    const oral=(r.length>1
+      ? per.label.charAt(0).toUpperCase()+per.label.slice(1)+', '+r.map(x=>x.nom.split(' ')[0]+' a fait '+_vPl(x.nb,'vente')+' pour '+_vMontant(x.ca)).join(', et ')+'. Au total, '+_vMontant(tot)+'.'
+      : per.label.charAt(0).toUpperCase()+per.label.slice(1)+', '+r[0].nom+' a fait '+_vPl(r[0].nb,'vente')+' pour '+_vMontant(r[0].ca)+'.');
+    return {ecrit,oral};
+  }
+
+  // Stock sans mot-clé ("câble type C ?") : si la phrase désigne clairement un produit
+  const ps=_vTrouverProduits(q);
+  if(ps.length&&ps.length<=3)
+    return {ecrit:'📦 '+ps.map(p=>p.nom+' — '+fmt(p.prix)+' · stock '+nomB('B1')+' : '+stk(p).s1+' · '+nomB('B2')+' : '+stk(p).s2).join(' | '),
+            oral:ps.map(p=>p.nom+', '+_vMontant(p.prix)+', '+stk(p).s1+' chez '+nomB('B1').split(' ')[0]+' et '+stk(p).s2+' chez '+nomB('B2').split(' ')[0]).join('. ')+'.'};
+  return null;
+}
+
+// Voix de l'application (français)
+function parlerVoix(texte){
+  if(!('speechSynthesis' in window)||!texte)return;
+  try{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(texte);
+    u.lang='fr-FR';u.rate=1;u.pitch=1;
+    const v=(speechSynthesis.getVoices()||[]).find(x=>/^fr/i.test(x.lang));
+    if(v)u.voice=v;
+    speechSynthesis.speak(u);
+  }catch(e){console.error('voix:',e);}
+}
+
+function _voixAfficher(html){const el=document.getElementById('voix-reponse');if(el)el.innerHTML=html;}
+function _voixEtat(txt,actif){
+  const b=document.getElementById('voix-micro');
+  const e=document.getElementById('voix-etat');
+  if(e)e.textContent=txt;
+  if(b)b.classList.toggle('ecoute',!!actif);
+}
+
+async function repondreVocal(question){
+  question=(question||'').trim();
+  if(!question)return;
+  const t=document.getElementById('voix-transcript');if(t)t.textContent='« '+question+' »';
+  // 1) Réponse locale gratuite
+  const r=assistantVocalLocal(question);
+  if(r){_voixDerniere=r.oral;_voixAfficher('<div class="voix-rep">'+escapeHtml(r.ecrit)+'</div>');parlerVoix(r.oral);return;}
+  // 2) Analyses locales existantes du Centre IA
+  const loc=assistantLocal(question);
+  if(loc){
+    const oral=[loc.titre.replace(/[^\p{L}\p{N}\s',.:-]/gu,'').trim(),loc.texte,...(loc.lignes||[]).slice(0,3),loc.pied]
+      .filter(Boolean).join('. ').replace(/FCFA/g,'francs');
+    _voixDerniere=oral;_voixAfficher(_renduAnalyse(loc));parlerVoix(oral);return;
+  }
+  // 3) IA Claude si une clé est configurée
+  if(DB.settings.apiKey){
+    _voixAfficher('<div class="ia-panel"><div class="ia-loading"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div></div></div>');
+    await callIA(buildContext()+'\nRéponds en français, en 2 phrases courtes maximum, sans mise en forme ni liste, car la réponse sera lue à voix haute.\nQuestion: '+question,
+      rep=>{_voixDerniere=rep;_voixAfficher('<div class="voix-rep">'+escapeHtml(rep)+'</div>');parlerVoix(rep);},
+      err=>{_voixAfficher('<div class="voix-rep">❌ '+escapeHtml(err)+'</div>');});
+    return;
+  }
+  const msg="Je n'ai pas compris. Demandez par exemple : combien j'ai vendu aujourd'hui, ou stock câble type C.";
+  _voixDerniere=msg;
+  _voixAfficher('<div class="voix-rep">🤔 '+escapeHtml(msg)+'</div>');
+  parlerVoix(msg);
+}
+
+function ouvrirAssistantVocal(){
+  openModal('modal-voix');
+  _voixAfficher('');
+  const t=document.getElementById('voix-transcript');if(t)t.textContent='';
+  if(dicteeDisponible())demarrerEcouteVocale();
+  else _voixEtat('Micro non disponible ici — écrivez votre question (Chrome ou Edge conseillé)',false);
+}
+function demarrerEcouteVocale(){
+  if(_voixEcoute){try{_voixRec&&_voixRec.stop();}catch(e){}return;}
+  if(!dicteeDisponible()){toast('Micro non supporté — utilisez Chrome ou Edge','err');return;}
+  try{speechSynthesis&&speechSynthesis.cancel();}catch(e){}
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  _voixRec=new SR();
+  _voixRec.lang='fr-FR';
+  _voixRec.continuous=false;
+  _voixRec.interimResults=true;
+  _voixRec.maxAlternatives=1;
+  let final='';
+  _voixRec.onstart=()=>{_voixEcoute=true;_voixEtat('🎤 Je vous écoute…',true);};
+  _voixRec.onresult=e=>{
+    let inter='';final='';
+    for(let i=0;i<e.results.length;i++){
+      if(e.results[i].isFinal)final+=e.results[i][0].transcript;
+      else inter+=e.results[i][0].transcript;
+    }
+    const t=document.getElementById('voix-transcript');if(t)t.textContent='« '+(final||inter)+' »';
+  };
+  _voixRec.onerror=e=>{
+    if(e.error==='not-allowed'||e.error==='service-not-allowed')_voixEtat('Micro refusé — autorisez-le dans le navigateur',false);
+    else if(e.error==='no-speech')_voixEtat("Je n'ai rien entendu — touchez le micro et parlez",false);
+    else if(e.error==='network')_voixEtat('La reconnaissance vocale a besoin d\'internet',false);
+    else if(e.error!=='aborted')_voixEtat('Erreur micro : '+e.error,false);
+  };
+  _voixRec.onend=()=>{
+    _voixEcoute=false;_voixRec=null;
+    const e=document.getElementById('voix-etat');
+    if(final.trim()){_voixEtat('Touchez le micro pour une autre question',false);repondreVocal(final);}
+    else if(e&&/coute/.test(e.textContent))_voixEtat('Touchez le micro pour parler',false);
+    else document.getElementById('voix-micro')?.classList.remove('ecoute');
+  };
+  try{_voixRec.start();}
+  catch(e){_voixRec=null;_voixEcoute=false;_voixEtat('Impossible de démarrer le micro',false);}
+}
+function fermerAssistantVocal(){
+  try{_voixRec&&_voixRec.abort();}catch(e){}
+  _voixRec=null;_voixEcoute=false;
+  try{speechSynthesis.cancel();}catch(e){}
+  closeModal('modal-voix');
+}
+function voixQuestionEcrite(){
+  const el=document.getElementById('voix-texte');
+  const q=(el?.value||'').trim();
+  if(!q)return;
+  el.value='';
+  if(!_voixEcoute)_voixEtat('Touchez le micro pour parler',false);
+  repondreVocal(q);
 }
 
 // ══ NOTIFICATIONS SYSTÈME ══
