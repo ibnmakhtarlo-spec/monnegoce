@@ -142,6 +142,16 @@ tbody tr:hover{background:var(--surf2);}
 .bg{background:rgba(16,185,129,.15);color:var(--green);} .br{background:rgba(239,68,68,.15);color:var(--red);}
 .by{background:rgba(240,165,0,.15);color:var(--gold);} .bb{background:rgba(59,130,246,.12);color:var(--blue);}
 .bo{background:rgba(249,115,22,.12);color:var(--orange);} .bgr{background:var(--surf2);color:var(--text2);}
+/* Fiche client intelligente (caisse) */
+.pos-cl-fiche{padding:6px 10px;border-bottom:1px solid var(--border);font-size:10.5px;line-height:1.6;color:var(--text);background:var(--surf2);}
+.fc-chip{display:inline-block;background:var(--goldf);color:var(--gold);border:1px solid rgba(240,165,0,.35);border-radius:10px;padding:0 7px;margin:1px 2px;cursor:pointer;font-weight:700;}
+.fc-chip:hover{background:var(--gold);color:#412402;}
+.fc-chip-off{cursor:default;opacity:.65;}
+.fc-lien{color:var(--cyan);cursor:pointer;font-weight:700;}
+/* Réception de marchandise */
+.rec-inconnu{margin-top:8px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.35);border-radius:9px;padding:9px 11px;font-size:11.5px;}
+.rec-assoc-item{padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;border:1px solid var(--border);margin-top:4px;background:var(--surf);}
+.rec-assoc-item:hover{border-color:var(--gold);}
 /* Dictée de vente en caisse */
 .pos-voix-btn{flex-shrink:0;font-size:16px;padding:0 13px;}
 .pos-voix-btn.ecoute{background:var(--red)!important;color:#fff;animation:voixPulse 1.2s ease-in-out infinite;}
@@ -704,6 +714,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
             </div>
           </div>
           <div id="pos-cl-badge" style="padding:3px 10px;background:var(--goldf);border-bottom:1px solid var(--border);font-size:10px;color:var(--gold);font-weight:700;display:none;"></div>
+          <div id="pos-cl-fiche" class="pos-cl-fiche" style="display:none;"></div>
           <div class="panbody" id="pan-body"></div>
           <div class="panfoot">
             <div class="tline"><span>Sous-total</span><span id="p-sub">0 FCFA</span></div>
@@ -983,6 +994,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <input class="srch" style="flex:1;min-width:130px;" placeholder="🔍 Nom, référence..." id="srch-p" oninput="renderProduits()">
       <select id="fil-cat-p" style="background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:11px;border-radius:7px;padding:5px 9px;outline:none;" onchange="renderProduits()"><option value="">Toutes catégories</option></select>
       <button class="btn btn-ghost btn-sm" onclick="openModal('modal-categories');renderCategories();">🏷️ Catégories</button>
+      <button class="btn btn-purple btn-sm" id="btn-reception" onclick="ouvrirReception()" title="Réception de marchandise au scanner">📥 Réception</button>
       <button class="btn btn-gold btn-sm" id="btn-add-prod" onclick="openModalProd()">+ Ajouter</button>
     </div>
     <div class="card"><div class="twrap">
@@ -2096,6 +2108,31 @@ canvas.chart-canvas{display:block;width:100%!important;}
   </div>
 </div>
 
+<!-- RÉCEPTION DE MARCHANDISE -->
+<div class="overlay" id="modal-reception">
+  <div class="modal lg">
+    <div class="mtitle"><span>📥 Réception de marchandise</span><span class="mclose" onclick="fermerReception()">✕</span></div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px;">
+      <select id="rec-boutique" onchange="_recSauver();renderReception()" style="flex:1;min-width:140px;background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:12px;border-radius:7px;padding:7px;outline:none;font-weight:700;"></select>
+      <select id="rec-fourn" onchange="_recSauver()" style="flex:1;min-width:140px;background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:12px;border-radius:7px;padding:7px;outline:none;"></select>
+    </div>
+    <div style="display:flex;gap:7px;">
+      <input id="rec-scan" class="srch" style="flex:1;min-width:0;font-size:14px;padding:10px;" placeholder="🔫 Scannez (douchette) ou tapez le code / nom puis Entrée" onkeydown="recScanEntree(event)" autocomplete="off">
+      <button class="btn btn-ghost" id="rec-cam-btn" onclick="recCamera()">📷 Caméra</button>
+    </div>
+    <video id="rec-video" playsinline muted style="display:none;width:100%;max-height:200px;object-fit:cover;border-radius:9px;margin-top:7px;background:#000;"></video>
+    <div id="rec-inconnu" class="rec-inconnu" style="display:none;"></div>
+    <div class="twrap" style="margin-top:8px;max-height:42vh;overflow:auto;">
+      <table><thead><tr><th>Produit</th><th>Quantité reçue</th><th id="rec-th-achat">Prix d'achat</th><th></th></tr></thead><tbody id="rec-lignes"></tbody></table>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap;">
+      <div id="rec-totaux" style="font-size:12px;color:var(--text2);"></div>
+      <button class="btn btn-gold" id="rec-valider" onclick="validerReception()">✅ Valider la réception</button>
+    </div>
+    <div style="font-size:9.5px;color:var(--text2);margin-top:6px;">Chaque scan ajoute 1 article. La réception en cours est gardée si l'app se ferme.</div>
+  </div>
+</div>
+
 <!-- ASSISTANT VOCAL -->
 <div class="overlay" id="modal-voix">
   <div class="modal sm">
@@ -3053,6 +3090,8 @@ function applyNavPerms(){
   // Bouton ajouter produit
   const addProd=document.getElementById('btn-add-prod');
   if(addProd)addProd.style.display=perms.includes('produits_edit')?'flex':'none';
+  const btnRec=document.getElementById('btn-reception');
+  if(btnRec)btnRec.style.display=(perms.includes('produits_edit')||session.user?.role==='admin')?'flex':'none';
 
   // Colonne prix achat
   const thAchat=document.getElementById('th-achat');
@@ -3152,8 +3191,9 @@ function selectPOSClient(id,nom){
   document.getElementById('pos-cl-id').value=id;document.getElementById('pos-cl-srch').value=nom;document.getElementById('pos-cl-drop').style.display='none';
   const badge=document.getElementById('pos-cl-badge');badge.style.display='block';badge.textContent=`👤 ${nom}`;
   const c=DB.clients.find(x=>x.id===id);if(c&&(c.credit||0)>0)badge.textContent+=` — Crédit: ${fmt(c.credit)}`;
+  try{afficherFicheClientPOS(id);}catch(e){console.error('fiche client:',e);}
 }
-function clearPOSClientSel(){document.getElementById('pos-cl-id').value='';document.getElementById('pos-cl-srch').value='';document.getElementById('pos-cl-badge').style.display='none';}
+function clearPOSClientSel(){document.getElementById('pos-cl-id').value='';document.getElementById('pos-cl-srch').value='';document.getElementById('pos-cl-badge').style.display='none';const fz=document.getElementById('pos-cl-fiche');if(fz){fz.style.display='none';fz.innerHTML='';}}
 
 // NF Client Search
 function filterNFClient(q){
@@ -8033,6 +8073,289 @@ function dicterVente(){
   };
   try{_dvRec.start();}catch(e){_dvRec=null;btn&&btn.classList.remove('ecoute');toast('Impossible de démarrer le micro','err');}
 }
+
+// ══ FICHE CLIENT INTELLIGENTE (CAISSE) ══
+// Dès qu'un client est choisi en caisse: ses habitudes d'achat, sa dernière visite,
+// ce qu'il achète souvent (ajout en un geste) et ce qu'il doit.
+function _facturesDuClient(c){
+  if(!c)return [];
+  const n=_norm(c.nom);
+  return (DB.factures||[]).filter(f=>f&&(f.clientId===c.id||(!f.clientId&&f.client&&_norm(f.client)===n)));
+}
+function profilClient(c){
+  const facts=_facturesDuClient(c).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const total=facts.reduce((s,f)=>s+(Number(f.total)||0),0);
+  const qte={},ids={};
+  facts.forEach(f=>(f.items||[]).forEach(i=>{
+    const k=i.id||i.nom;qte[k]=(qte[k]||0)+(Number(i.qty)||0);ids[k]={id:i.id,nom:i.nom};
+  }));
+  const habitudes=Object.entries(qte).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,q])=>({...ids[k],qte:q}));
+  const derniere=facts[0]?new Date(facts[0].date):null;
+  const jours=derniere?Math.floor((Date.now()-derniere.getTime())/86400000):null;
+  return {nb:facts.length,total,panier:facts.length?total/facts.length:0,derniere,jours,habitudes,
+          credit:Number(c.credit)||0,boutiques:[...new Set(facts.map(f=>f.boutique))]};
+}
+function _depuisQuand(j){
+  if(j===null)return '';
+  if(j===0)return "aujourd'hui";
+  if(j===1)return 'hier';
+  if(j<30)return 'il y a '+j+' jours';
+  if(j<60)return 'il y a 1 mois';
+  return 'il y a '+Math.floor(j/30)+' mois';
+}
+function afficherFicheClientPOS(id){
+  const zone=document.getElementById('pos-cl-fiche');
+  if(!zone)return;
+  const c=(DB.clients||[]).find(x=>x.id===id);
+  if(!c){zone.style.display='none';zone.innerHTML='';return;}
+  const p=profilClient(c);
+  let h='';
+  if(!p.nb){
+    h+='<div>🆕 <b>Nouveau client</b> — aucun achat enregistré</div>';
+  } else {
+    const absent=p.jours!==null&&p.jours>=30;
+    h+='<div>🛍️ <b>'+p.nb+'</b> achat'+(p.nb>1?'s':'')+' · <b>'+fmt(p.total)+'</b> · panier moyen '+fmt(p.panier)+'</div>';
+    h+='<div style="'+(absent?'color:var(--orange);font-weight:700;':'')+'">🕐 Dernière visite : '+_depuisQuand(p.jours)
+      +(p.derniere?' ('+p.derniere.toLocaleDateString('fr-FR')+')':'')+(absent?' — client de retour 🎉':'')+'</div>';
+    if(p.habitudes.length){
+      h+='<div style="margin-top:3px;">❤️ Achète souvent : '+p.habitudes.map(x=>{
+        const prod=x.id?(DB.produits||[]).find(pp=>pp.id===x.id):null;
+        const lib=escapeHtml(x.nom||'?')+' ×'+x.qte;
+        return prod
+          ?'<span class="fc-chip" title="Ajouter au panier" onclick="addCart(\''+prod.id+'\')">+ '+lib+'</span>'
+          :'<span class="fc-chip fc-chip-off">'+lib+'</span>';
+      }).join(' ')+'</div>';
+    }
+  }
+  h+='<div style="margin-top:3px;"><span class="fc-lien" onclick="openFicheClient(\''+c.id+'\')">Voir la fiche complète →</span></div>';
+  zone.innerHTML=h;
+  zone.style.display='block';
+}
+
+// ══ RÉCEPTION DE MARCHANDISE AU SCANNER ══
+// On scanne chaque article reçu (douchette USB ou caméra): la quantité monte à chaque scan.
+// À la validation, le stock de la boutique choisie augmente (écriture atomique) et
+// chaque ligne est inscrite dans les mouvements de stock. Le brouillon survit à un
+// rechargement de la page.
+let _recLignes=[],_recInconnu=null,_recStream=null,_recTimer=null,_recDernier={code:'',t:0};
+function _recVoitAchat(){return session.user?.role==='admin'||(session.user?.perms||[]).includes('prix_achat');}
+function _recSauver(){
+  try{SS('receptionBrouillon',{lignes:_recLignes.map(l=>({id:l.id,qte:l.qte,achat:l.achat})),
+    boutique:document.getElementById('rec-boutique')?.value,fourn:document.getElementById('rec-fourn')?.value});}catch(e){}
+}
+function ouvrirReception(){
+  const b=document.getElementById('rec-boutique');
+  if(b){
+    b.innerHTML=['B1','B2'].map(x=>'<option value="'+x+'">'+escapeHtml(DB.settings[x]?.nom||x)+'</option>').join('');
+    b.value=session.boutique||'B1';
+  }
+  const f=document.getElementById('rec-fourn');
+  if(f)f.innerHTML='<option value="">— Fournisseur (facultatif) —</option>'
+    +(DB.fournisseurs||[]).map(x=>'<option value="'+escapeHtml(x.id)+'">'+escapeHtml(x.nom||x.id)+'</option>').join('');
+  // Reprendre un brouillon non validé
+  const br=LS('receptionBrouillon');
+  _recLignes=[];
+  if(br&&br.lignes&&br.lignes.length){
+    br.lignes.forEach(l=>{const p=(DB.produits||[]).find(x=>x.id===l.id);if(p)_recLignes.push({id:p.id,qte:Number(l.qte)||1,achat:l.achat});});
+    if(b&&br.boutique)b.value=br.boutique;
+    if(f&&br.fourn)f.value=br.fourn;
+    if(_recLignes.length)toast('📥 Réception en cours reprise ('+_recLignes.length+' produit(s))','info');
+  }
+  _recInconnu=null;
+  openModal('modal-reception');
+  renderReception();
+  setTimeout(()=>document.getElementById('rec-scan')?.focus(),150);
+}
+function _recTrouver(code){
+  const p=_trouverParCode(code);
+  if(p)return {p};
+  // Pas un code connu: essayer comme nom de produit (un seul résultat clair)
+  try{
+    const l=_vTrouverProduits(_norm(code));
+    if(l.length===1)return {p:l[0]};
+    if(l.length>1)return {plusieurs:l};
+  }catch(e){}
+  return {};
+}
+function recevoirCode(code){
+  code=String(code||'').trim();
+  if(!code)return;
+  const r=_recTrouver(code);
+  if(r.p){
+    const l=_recLignes.find(x=>x.id===r.p.id);
+    if(l)l.qte++;
+    else _recLignes.unshift({id:r.p.id,qte:1,achat:r.p.achat||0});
+    try{soundOk();}catch(e){}
+    _recInconnu=null;
+  } else {
+    try{soundErr();}catch(e){}
+    _recInconnu={code,choix:r.plusieurs||null};
+  }
+  _recSauver();
+  renderReception();
+}
+function recScanEntree(e){
+  if(e.key!=='Enter')return;
+  e.preventDefault();
+  const el=e.target;const v=el.value;el.value='';
+  recevoirCode(v);
+}
+// Associe un code-barres inconnu à un produit existant, puis compte l'article
+function recAssocier(prodId){
+  const p=(DB.produits||[]).find(x=>x.id===prodId);
+  if(!p||!_recInconnu)return;
+  const code=_recInconnu.code;
+  // On n'écrase pas un code-barres déjà enregistré si la saisie était un nom
+  const estCode=/^[0-9A-Za-z\-]{4,}$/.test(code)&&!/\s/.test(code);
+  if(estCode&&!p.codeBarre){
+    p.codeBarre=code;p._updated=Date.now();
+    logMouvement(p.id,p.nom,'ajustement',0,document.getElementById('rec-boutique')?.value||session.boutique,'Code-barres associé : '+code);
+    save();
+    toast('🔗 Code '+code+' associé à '+p.nom,'ok');
+  }
+  _recInconnu=null;
+  const l=_recLignes.find(x=>x.id===p.id);
+  if(l)l.qte++;else _recLignes.unshift({id:p.id,qte:1,achat:p.achat||0});
+  _recSauver();renderReception();
+  document.getElementById('rec-scan')?.focus();
+}
+function recChercherAssoc(q){
+  const zone=document.getElementById('rec-assoc-res');if(!zone)return;
+  const n=_norm(q);
+  if(n.length<2){zone.innerHTML='';return;}
+  const mots=n.split(' ');
+  const L=(DB.produits||[]).filter(p=>{const c=_norm(p.nom+' '+(p.ref||''));return mots.every(m=>c.includes(m));}).slice(0,6);
+  zone.innerHTML=L.length?L.map(p=>'<div class="rec-assoc-item" onclick="recAssocier(\''+p.id+'\')">'+escapeHtml(p.nom)+'</div>').join('')
+    :'<div style="font-size:10.5px;color:var(--text2);padding:4px;">Aucun produit — créez-le dans Produits</div>';
+}
+function recQte(id,v){
+  const l=_recLignes.find(x=>x.id===id);if(!l)return;
+  v=Math.round(Number(v));
+  if(!(v>0)){_recLignes=_recLignes.filter(x=>x.id!==id);}
+  else l.qte=Math.min(v,100000);
+  _recSauver();renderReception();
+}
+function recAchat(id,v){
+  const l=_recLignes.find(x=>x.id===id);if(!l)return;
+  const n=Number(v);l.achat=isFinite(n)&&n>=0?n:l.achat;
+  _recSauver();renderReceptionTotaux();
+}
+function renderReceptionTotaux(){
+  const nb=_recLignes.reduce((s,l)=>s+l.qte,0);
+  const cout=_recLignes.reduce((s,l)=>s+l.qte*(Number(l.achat)||0),0);
+  const el=document.getElementById('rec-totaux');
+  if(el)el.innerHTML='<b>'+_recLignes.length+'</b> produit(s) · <b>'+nb+'</b> article(s)'+(_recVoitAchat()?' · coût <b>'+fmt(cout)+'</b>':'');
+  const btn=document.getElementById('rec-valider');if(btn)btn.disabled=!_recLignes.length;
+}
+function renderReception(){
+  const voit=_recVoitAchat();
+  const inc=document.getElementById('rec-inconnu');
+  if(inc){
+    if(_recInconnu){
+      inc.style.display='block';
+      inc.innerHTML='<div style="font-weight:800;color:var(--red);margin-bottom:5px;">❓ « '+escapeHtml(_recInconnu.code)+' » n\'est relié à aucun produit</div>'
+        +(_recInconnu.choix?'<div style="font-size:10.5px;margin-bottom:4px;">Plusieurs produits possibles, touchez le bon :</div>'
+            +_recInconnu.choix.slice(0,6).map(p=>'<div class="rec-assoc-item" onclick="recAssocier(\''+p.id+'\')">'+escapeHtml(p.nom)+'</div>').join('')
+          :'<div style="font-size:10.5px;margin-bottom:4px;">Cherchez le produit pour lui associer ce code (il sera reconnu la prochaine fois) :</div>'
+            +'<input class="srch" style="width:100%;" placeholder="Nom du produit…" oninput="recChercherAssoc(this.value)"><div id="rec-assoc-res"></div>')
+        +'<div style="margin-top:5px;"><span class="fc-lien" onclick="_recInconnu=null;renderReception();document.getElementById(\'rec-scan\').focus()">Ignorer</span></div>';
+    } else {inc.style.display='none';inc.innerHTML='';}
+  }
+  const tb=document.getElementById('rec-lignes');
+  if(tb){
+    tb.innerHTML=_recLignes.length?_recLignes.map(l=>{
+      const p=(DB.produits||[]).find(x=>x.id===l.id)||{nom:'?'};
+      const b=document.getElementById('rec-boutique')?.value||'B1';
+      const avant=Number(b==='B1'?p.s1:p.s2)||0;
+      return '<tr><td><b>'+escapeHtml(p.nom)+'</b><div style="font-size:9.5px;color:var(--text2);">stock '+avant+' → <b style="color:var(--green);">'+(avant+l.qte)+'</b></div></td>'
+        +'<td style="white-space:nowrap;"><button class="btn btn-ghost btn-xs" onclick="recQte(\''+l.id+'\','+(l.qte-1)+')">−</button>'
+        +'<input type="number" min="0" value="'+l.qte+'" onchange="recQte(\''+l.id+'\',this.value)" style="width:52px;text-align:center;background:var(--surf3);border:1px solid var(--border2);color:var(--text);border-radius:5px;padding:3px;margin:0 3px;">'
+        +'<button class="btn btn-ghost btn-xs" onclick="recQte(\''+l.id+'\','+(l.qte+1)+')">+</button></td>'
+        +(voit?'<td><input type="number" min="0" value="'+(Number(l.achat)||0)+'" onchange="recAchat(\''+l.id+'\',this.value)" title="Prix d\'achat unitaire" style="width:80px;background:var(--surf3);border:1px solid var(--border2);color:var(--text);border-radius:5px;padding:3px;"></td>':'')
+        +'<td><button class="btn btn-red btn-xs" onclick="recQte(\''+l.id+'\',0)">🗑</button></td></tr>';
+    }).join(''):'<tr><td colspan="4" class="empty"><div class="ei">📥</div>Scannez le premier article reçu</td></tr>';
+  }
+  const th=document.getElementById('rec-th-achat');if(th)th.style.display=voit?'':'none';
+  renderReceptionTotaux();
+}
+function validerReception(){
+  if(!_recLignes.length)return;
+  const b=document.getElementById('rec-boutique')?.value||session.boutique||'B1';
+  const fId=document.getElementById('rec-fourn')?.value||'';
+  const f=(DB.fournisseurs||[]).find(x=>x.id===fId);
+  const nb=_recLignes.reduce((s,l)=>s+l.qte,0);
+  if(!confirm('Ajouter '+nb+' article(s) au stock de '+(DB.settings[b]?.nom||b)+' ?'))return;
+  const field=b==='B1'?'s1':'s2';
+  const detail='Réception scanner'+(f?' — '+f.nom:'');
+  let n=0;
+  _recLignes.forEach(l=>{
+    const p=(DB.produits||[]).find(x=>x.id===l.id);if(!p)return;
+    applyStockDelta(p.id,field,l.qte);
+    logMouvement(p.id,p.nom,'reception',l.qte,b,detail);
+    const nouv=Number(l.achat);
+    if(_recVoitAchat()&&isFinite(nouv)&&nouv>0&&nouv!==(Number(p.achat)||0)){
+      logMouvement(p.id,p.nom,'prix_achat',0,b,'Prix d\'achat : '+fmt(p.achat||0)+' → '+fmt(nouv)+' (réception)');
+      p.achat=nouv;p._updated=Date.now();
+    }
+    n++;
+  });
+  try{logAction&&logAction('Réception',n+' produit(s), '+nb+' article(s) → '+(DB.settings[b]?.nom||b)+(f?' — '+f.nom:''));}catch(e){}
+  save();
+  _recLignes=[];_recInconnu=null;
+  try{localStorage.removeItem('mn5_receptionBrouillon');}catch(e){}
+  renderReception();
+  toast('✅ Réception enregistrée : '+nb+' article(s) ajouté(s) au stock','ok');
+  try{soundOk();}catch(e){}
+  try{renderGrid();}catch(e){}
+  try{if(document.getElementById('sec-produits')?.classList.contains('active'))renderProduits();}catch(e){}
+}
+// Caméra: scan continu, le même code n'est compté qu'une fois toutes les 1,5 s
+async function recCamera(){
+  if(_recStream){recStopCamera();return;}
+  const v=document.getElementById('rec-video');
+  if(!('BarcodeDetector' in window)){toast('Caméra-scanner non disponible ici — utilisez une douchette ou tapez le code','err');return;}
+  try{
+    _recStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    v.srcObject=_recStream;v.style.display='block';await v.play();
+    document.getElementById('rec-cam-btn').textContent='⏹ Caméra';
+    const det=new BarcodeDetector({formats:['ean_13','ean_8','code_128','code_39','qr_code','upc_a','upc_e']});
+    _recTimer=setInterval(async()=>{
+      // Fenêtre fermée (Échap...) : on coupe la caméra
+      if(!document.getElementById('modal-reception')?.classList.contains('open')){recStopCamera();return;}
+      try{
+        const r=await det.detect(v);
+        if(r.length){
+          const code=r[0].rawValue,now=Date.now();
+          if(code===_recDernier.code&&now-_recDernier.t<1500)return;
+          _recDernier={code,t:now};
+          recevoirCode(code);
+        }
+      }catch(e){}
+    },350);
+  }catch(e){toast('❌ Caméra non accessible','err');recStopCamera();}
+}
+function recStopCamera(){
+  if(_recTimer){clearInterval(_recTimer);_recTimer=null;}
+  if(_recStream){_recStream.getTracks().forEach(t=>t.stop());_recStream=null;}
+  const v=document.getElementById('rec-video');if(v){v.style.display='none';v.srcObject=null;}
+  const b=document.getElementById('rec-cam-btn');if(b)b.textContent='📷 Caméra';
+}
+function fermerReception(){recStopCamera();closeModal('modal-reception');}
+// Douchette: si le curseur n'est plus dans la case de scan, on y renvoie la saisie.
+// Sinon la touche Entrée envoyée par la douchette pourrait déclencher un raccourci
+// de la caisse (comme « Entrée = encaisser »).
+(function(){
+  if(window._recClavierOk)return;window._recClavierOk=true;
+  document.addEventListener('keydown',e=>{
+    const m=document.getElementById('modal-reception');
+    if(!m||!m.classList.contains('open'))return;
+    const t=e.target&&e.target.tagName;
+    if(t==='INPUT'||t==='TEXTAREA'||t==='SELECT')return;
+    const champ=document.getElementById('rec-scan');if(!champ)return;
+    if(e.key==='Enter'){e.preventDefault();e.stopImmediatePropagation();const v=champ.value;champ.value='';recevoirCode(v);champ.focus();return;}
+    if(e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();e.stopImmediatePropagation();champ.focus();champ.value+=e.key;}
+  },true);
+})();
 
 // ══ NOTIFICATIONS SYSTÈME ══
 // Prévient l'administrateur même quand l'application n'est pas au premier plan.
