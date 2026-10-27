@@ -2338,6 +2338,9 @@ const ROLE_PERMS={
   caissier:['caisse','factures','produits','produits_edit','ia','transfert'],
 };
 
+// Appareil neuf = aucun compte enregistré localement. Il ne connaît alors que les
+// comptes d'usine: les vrais comptes doivent être chargés depuis Firebase AVANT la connexion.
+const _APPAREIL_NEUF=(()=>{try{return !localStorage.getItem('mn5_users');}catch(e){return false;}})();
 let DB={
   produits:LS('produits')||[],
   clients:LS('clients')||[
@@ -2534,6 +2537,52 @@ function majEtatLogin(){
   else {el.innerHTML='📴 Hors ligne';el.style.color='var(--red)';}
 }
 setInterval(()=>{try{if(document.getElementById('login-screen')?.offsetParent!==null)majEtatLogin();}catch(e){}},3000);
+
+// ── Comptes chargés dès l'écran de connexion ──
+// Avant, les comptes n'étaient récupérés qu'APRÈS une connexion réussie: sur un nouvel
+// appareil, les vrais codes étaient donc refusés (l'appareil ne connaissait que les
+// comptes d'usine). Lecture seule: rien n'est envoyé vers Firebase ici.
+let _comptesCharges=false,_comptesEnCours=false;
+function _fusionComptesCloud(liste){
+  if(!Array.isArray(liste)||!liste.length)return 0;
+  liste=liste.filter(u=>u&&u.id);
+  if(_APPAREIL_NEUF&&!LS('comptes_cloud_ok')){
+    // Appareil neuf: on remplace les comptes d'usine par les vrais comptes
+    DB.users=liste;
+  } else {
+    const merged=liste.map(cu=>{
+      const lu=(DB.users||[]).find(u=>u.id===cu.id);
+      if(!lu)return cu;
+      const luUsine=lu.pwd&&String(lu.pwd).length<20&&!lu._updated;
+      if(luUsine)return cu;                                   // compte d'usine local: le cloud gagne
+      return (lu._updated||0)>=(cu._updated||0)?lu:cu;        // sinon le plus récent gagne
+    });
+    (DB.users||[]).forEach(lu=>{if(!merged.find(u=>u.id===lu.id))merged.push(lu);});
+    DB.users=merged;
+  }
+  SS('users',DB.users);SS('comptes_cloud_ok',Date.now());
+  return liste.length;
+}
+async function prechargerComptesLogin(){
+  if(_comptesEnCours||_comptesCharges)return;
+  if(typeof firebase==='undefined'||!navigator.onLine)return;
+  _comptesEnCours=true;
+  try{
+    if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
+    if(!firebase.auth().currentUser)await firebase.auth().signInAnonymously();
+    const snap=await firebase.database().ref('negoce_users').once('value');
+    const data=snap.val();
+    const n=_fusionComptesCloud(data&&data.users);
+    _comptesCharges=true;
+    const el=document.getElementById('login-etat');
+    if(el&&n){el.innerHTML='👥 Comptes à jour';el.style.color='var(--green)';}
+    try{if(typeof initLogin==='function')initLogin();}catch(e){}
+  }catch(e){
+    console.error('Chargement des comptes:',e);
+  }finally{_comptesEnCours=false;}
+}
+setTimeout(()=>{try{prechargerComptesLogin();}catch(e){}},300);
+window.addEventListener('online',()=>{try{prechargerComptesLogin();}catch(e){}});
 
 // ── Connexion automatique dès que le code secret tapé correspond ──
 // Ne compte jamais une frappe en cours comme un échec : aucune tentative n'est
@@ -2824,6 +2873,16 @@ async function doLogin(){
       userFound.pwd=await hashPwd(pwd);
       save();
     }
+  }
+  if(!u&&_APPAREIL_NEUF&&!_comptesCharges&&!LS('comptes_cloud_ok')){
+    // Nouvel appareil: les vrais comptes ne sont pas encore arrivés. Ce n'est pas
+    // un mauvais code: on ne compte pas d'échec et on explique quoi faire.
+    soundErr();
+    toast(navigator.onLine
+      ?'⏳ Nouvel appareil : chargement de vos comptes… réessayez dans quelques secondes'
+      :'📶 Nouvel appareil : connectez-vous à internet une première fois pour charger vos comptes','err');
+    try{prechargerComptesLogin();}catch(e){}
+    return;
   }
   if(!u){
     soundErr();
@@ -7448,7 +7507,7 @@ function initFirebase(){
       console.warn('Firebase SDK non chargé — mode hors ligne');
       updateSyncUI('offline');return;
     }
-    fbApp=firebase.initializeApp(FIREBASE_CONFIG);
+    fbApp=firebase.apps&&firebase.apps.length?firebase.app():firebase.initializeApp(FIREBASE_CONFIG);
     fbDB=firebase.database();
     fbInitialized=true;
     // Authentification anonyme automatique — requis par les règles de sécurité Firebase
