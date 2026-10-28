@@ -504,7 +504,7 @@ function chargerProduit(id){
   document.getElementById('f-desc').value=p.desc||'';
   document.getElementById('f-alerte').value=p.alerte||1;
   document.getElementById('f-unite').value=p.unite||'pièce';
-  document.getElementById('photo-prev').innerHTML=p.photo?'<img src="'+p.photo+'">':'📦';
+  document.getElementById('photo-prev').innerHTML=p.photo?'<img src="'+esc(p.photo)+'">':'📦';
   photoActuelle=p.photo||'';
   document.getElementById('stock-zone').style.display='none';
   document.getElementById('ajout-stock-zone').style.display='block';
