@@ -2491,7 +2491,24 @@ function startAutoSave(){if(autoSaveTimer)clearInterval(autoSaveTimer);autoSaveT
 // 10096.900826446281 s'affichait "10 096.900 826 446 281" (décimales découpées par 3).
 const _fmtBase=n=>{let num=Math.round(Number(n||0));if(!isFinite(num)||Object.is(num,-0))num=0;return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g,' ');};
 let fmt=n=>_fmtBase(n)+' FCFA';
-const today=()=>new Date().toISOString().slice(0,10);
+// ══ HEURE FIABLE ══
+// L'heure ne dépend plus du réglage de chaque téléphone: on corrige avec l'écart mesuré
+// par rapport au serveur Firebase (un appareil mal réglé enregistrait ses ventes avec
+// des heures d'écart). Et tout s'affiche à l'heure de Dakar, quel que soit le fuseau
+// réglé sur l'appareil.
+function maintenant(){return new Date(Date.now()+(window._decalageServeur||0));}
+(function(){
+  const TZ='Africa/Dakar';
+  ['toLocaleString','toLocaleDateString','toLocaleTimeString'].forEach(m=>{
+    const orig=Date.prototype[m];
+    Date.prototype[m]=function(loc,opt){
+      if(opt&&opt.timeZone)return orig.call(this,loc,opt);
+      try{return orig.call(this,loc,Object.assign({},opt||{},{timeZone:TZ}));}
+      catch(e){return orig.call(this,loc,opt);}   // ancien navigateur sans fuseaux
+    };
+  });
+})();
+const today=()=>maintenant().toISOString().slice(0,10);
 const getBName=b=>DB.settings[b]?.nom||b;
 const isAdmin=()=>['admin','superviseur'].includes(session.user?.role);
 const hasPerm=p=>session.user?.perms?.includes(p)||false;
@@ -2769,7 +2786,7 @@ function logMouvement(produitId,produitNom,type,qte,boutique,details=''){
   if(!DB.mouvements)DB.mouvements=[];
   DB.mouvements.unshift({
     id:'MV'+Date.now().toString(36).toUpperCase().slice(-6),
-    date:new Date().toISOString(),
+    date:maintenant().toISOString(),
     produitId,produitNom,type,qte,boutique,
     user:session.user?.nom||'?',details
   });
@@ -2823,7 +2840,7 @@ async function logConnexion(user,statut){
   const paysConnu=pays==='—'||historiqueUser.some(c=>c.pays===pays);
   const estNouveau=statut==='succes'&&historiqueUser.length>0&&(!appareilConnu||!paysConnu);
   const entry={
-    date:new Date().toISOString(),
+    date:maintenant().toISOString(),
     userId:user.id,
     userNom:user.nom,
     role:user.role,
@@ -2884,7 +2901,7 @@ function logAction(action,details='',acteur=null){
   if(!DB.logs)DB.logs=[];
   const u=session.user;
   DB.logs.unshift({
-    date:new Date().toISOString(),
+    date:maintenant().toISOString(),
     user:acteur?acteur.nom:u.nom,
     userId:acteur?acteur.id:u.id,
     role:acteur?(acteur.role||'inconnu'):u.role,
@@ -2971,7 +2988,7 @@ async function doLogin(){
       window._alertesSecuriteEnAttente=window._alertesSecuriteEnAttente||[];
       window._alertesSecuriteEnAttente.push({type:'verrouillage',userId:id,
         userNom:userFound?userFound.nom:id,role:userFound?userFound.role:'inconnu',
-        appareil:detecterAppareil(),date:new Date().toISOString()});
+        appareil:detecterAppareil(),date:maintenant().toISOString()});
       toast('🔒 5 échecs — Compte verrouillé 5 minutes','err');
       return;
     }
@@ -3487,7 +3504,7 @@ function validerVente(){
   // ID unique: préfixe utilisateur + timestamp pour éviter collisions entre appareils
   const _fid='F'+session.user.id.replace(/[^A-Z0-9]/g,'').substring(0,3)+Date.now().toString(36).toUpperCase().slice(-5);
   DB.nextIds.f++;
-  const fac={id:_fid,boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:cart.map(i=>({id:i.id,nom:String(i.nom),prix:Number(i.prix),achat:Number(i.achat||0),qty:Number(i.qty),unite:String(i.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,acompteVerse:mode==='acompte'?acompteVerse:0,soldeAcompte:mode==='acompte'?soldeAcompte:0,date:new Date().toISOString()};
+  const fac={id:_fid,boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:cart.map(i=>({id:i.id,nom:String(i.nom),prix:Number(i.prix),achat:Number(i.achat||0),qty:Number(i.qty),unite:String(i.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,acompteVerse:mode==='acompte'?acompteVerse:0,soldeAcompte:mode==='acompte'?soldeAcompte:0,date:maintenant().toISOString()};
   if(!fbConnected)fac._offline=true; // vente hors-ligne: à renvoyer dès le retour du réseau
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;
     // Points fidélité: 1 point par 1000 FCFA
@@ -4042,7 +4059,7 @@ function nfValider(){
   DB.nextIds.f++;
     // Utiliser la date saisie si fournie, sinon maintenant
   const nfDateVal=document.getElementById('nf-date')?.value;
-  const nfDate=nfDateVal?new Date(nfDateVal+'T'+new Date().toTimeString().slice(0,8)).toISOString():new Date().toISOString();
+  const nfDate=nfDateVal?new Date(nfDateVal+'T'+new Date().toTimeString().slice(0,8)).toISOString():maintenant().toISOString();
   const fac={id:_fid,boutique:session.boutique,caisse:session.caisse,vendeur:session.user.nom,userId:session.user.id,_author:session.user.id,client:client?.nom||'Anonyme',clientId:cid||null,items:nfLignes.map(l=>({id:l.id,nom:String(l.nom),prix:Number(l.prix),achat:Number(l.achat||0),qty:Number(l.qty),unite:String(l.unite||'pièce')})),sousTotal:sub,remise:r,total,mode,date:nfDate};
   if(!fbConnected)fac._offline=true; // vente hors-ligne: à renvoyer dès le retour du réseau
   DB.factures.push(fac);if(client){client.achats=(client.achats||0)+1;client.total=(client.total||0)+total;
@@ -4059,7 +4076,7 @@ function saveDevis(){
   const cid=document.getElementById('md-cl').value;const c=DB.clients.find(x=>x.id===cid);
   const arts=document.getElementById('md-arts').value.trim().split('\n').filter(Boolean).map(l=>{const p=l.split(';');return{nom:p[0]?.trim(),qty:parseInt(p[1])||1,prix:parseInt(p[2])||0};});
   const total=arts.reduce((s,a)=>s+a.qty*a.prix,0);
-  const d={id:'DV'+Date.now().toString(36).toUpperCase().slice(-6),client:c?.nom||'Anonyme',clientId:cid||null,articles:arts,total,validite:parseInt(document.getElementById('md-val').value)||30,notes:document.getElementById('md-notes').value,statut:'en_attente',date:new Date().toISOString()};
+  const d={id:'DV'+Date.now().toString(36).toUpperCase().slice(-6),client:c?.nom||'Anonyme',clientId:cid||null,articles:arts,total,validite:parseInt(document.getElementById('md-val').value)||30,notes:document.getElementById('md-notes').value,statut:'en_attente',date:maintenant().toISOString()};
   DB.devis.push(d);save();closeModal('modal-devis');renderDevis();toast('Devis créé ✅','ok');
 }
 function renderDevis(){
@@ -4119,7 +4136,7 @@ function saveRetour(){
     return;
   }
   if(p){applyStockDelta(p.id,session.boutique==='B1'?'s1':'s2',qty);logMouvement(p.id,p.nom,'retour',qty,session.boutique,'Retour facture '+factId);}
-  const r={id:'RT'+Date.now().toString(36).toUpperCase().slice(-6),factRef:factId,client:c?.nom||fact.client||'Anonyme',produit:p?.nom||'Inconnu',qty,montant:parseFloat(document.getElementById('mr-mont').value)||0,motif:document.getElementById('mr-motif').value,date:new Date().toISOString()};
+  const r={id:'RT'+Date.now().toString(36).toUpperCase().slice(-6),factRef:factId,client:c?.nom||fact.client||'Anonyme',produit:p?.nom||'Inconnu',qty,montant:parseFloat(document.getElementById('mr-mont').value)||0,motif:document.getElementById('mr-motif').value,date:maintenant().toISOString()};
   DB.retours.push(r);
   logAction&&logAction('Retour produit',r.produit+' x'+qty+' — Facture '+factId);
   save();closeModal('modal-retour');renderRetours();toast('Retour enregistré ✅','ok');
@@ -4457,12 +4474,12 @@ function creerCommande(){
   const total=lignes.reduce((s,l)=>s+l.total,0);
   const cmd={
     id:'CMD'+Date.now().toString(36).toUpperCase().slice(-6),
-    date:new Date().toISOString(),
+    date:maintenant().toISOString(),
     statut:'a_commander',
     boutique:session.boutique,
     auteur:session.user?.nom||'?',
     lignes,total,
-    historique:[{statut:'a_commander',date:new Date().toISOString(),par:session.user?.nom||'?'}]
+    historique:[{statut:'a_commander',date:maintenant().toISOString(),par:session.user?.nom||'?'}]
   };
   if(!DB.commandes)DB.commandes=[];
   DB.commandes.unshift(cmd);
@@ -4525,7 +4542,7 @@ function avancerCommande(id){
   }
   cmd.statut=nouveau;
   cmd.historique=cmd.historique||[];
-  cmd.historique.push({statut:nouveau,date:new Date().toISOString(),par:session.user?.nom||'?'});
+  cmd.historique.push({statut:nouveau,date:maintenant().toISOString(),par:session.user?.nom||'?'});
   save();
   logAction&&logAction('Commande '+STATUTS_CMD[nouveau].lib,id);
   toast(STATUTS_CMD[nouveau].ic+' '+id+' → '+STATUTS_CMD[nouveau].lib,'ok');
@@ -4718,13 +4735,13 @@ function creerCommandeLibre(){
   const total=lignes.reduce((s,l)=>s+l.total,0);
   const cmd={
     id:'CMD'+Date.now().toString(36).toUpperCase().slice(-6),
-    date:new Date().toISOString(),statut:'a_commander',
+    date:maintenant().toISOString(),statut:'a_commander',
     boutique:session.boutique,auteur:session.user?.nom||'?',
     manuelle:true,
     lignes:lignes.map(l=>({id:l.id,nom:l.nom,qte:l.qte,achat:l.achat,total:l.total,
                            fournId:'',fournNom:'—',nouveau:!l.connu})),
     total,
-    historique:[{statut:'a_commander',date:new Date().toISOString(),par:session.user?.nom||'?'}]
+    historique:[{statut:'a_commander',date:maintenant().toISOString(),par:session.user?.nom||'?'}]
   };
   if(!DB.commandes)DB.commandes=[];
   DB.commandes.unshift(cmd);
@@ -5554,7 +5571,7 @@ function appliquerResultatVocal(r,texte,resultEl,todayISO){
 
 async function traiterNoteVocale(texte){
   const resultEl=document.getElementById('ia-voice-result');
-  const todayISO=new Date().toISOString();
+  const todayISO=maintenant().toISOString();
 
   // 1) ANALYSE LOCALE GRATUITE — aucun appel payant, fonctionne hors connexion
   const local=analyseVocaleLocale(texte);
@@ -6054,7 +6071,7 @@ function setPeriodePerf(per){
     if(per==='perso'){
       const d1=document.getElementById('perf-d1'),d2=document.getElementById('perf-d2');
       if(d1&&!d1.value){const d=new Date();d.setDate(d.getDate()-7);d1.value=d.toISOString().slice(0,10);}
-      if(d2&&!d2.value)d2.value=new Date().toISOString().slice(0,10);
+      if(d2&&!d2.value)d2.value=maintenant().toISOString().slice(0,10);
     }
   }
   renderPerf();
@@ -6298,8 +6315,8 @@ function renderInventaire(){
 }
 
 // ══ DÉPENSES ══
-function saveDep(){const lib=document.getElementById('dep-lib').value.trim();const mont=parseFloat(document.getElementById('dep-mont').value);if(!lib||isNaN(mont)){soundErr();toast('Libellé et montant obligatoires','err');return;}const d={id:'DEP'+Date.now().toString(36).toUpperCase().slice(-6),lib,cat:document.getElementById('dep-cat').value,montant:mont,boutique:document.getElementById('dep-b').value,par:document.getElementById('dep-par').value,date:new Date().toISOString()};DB.depenses.push(d);save();closeModal('modal-dep');renderDepenses();['dep-lib','dep-mont','dep-par'].forEach(i=>document.getElementById(i).value='');toast('Dépense enregistrée ✅','ok');}
-function renderDepenses(){const q=(document.getElementById('srch-dep')?.value||'').toLowerCase();const curM=new Date().toISOString().slice(0,7);const list=[...DB.depenses].reverse().filter(d=>!q||d.lib.toLowerCase().includes(q));const tM=DB.depenses.filter(d=>d.date.startsWith(curM)).reduce((s,d)=>s+d.montant,0);const caM=DB.factures.filter(f=>f.date.startsWith(curM)).reduce((s,f)=>s+f.total,0);const benM=DB.factures.filter(f=>f.date.startsWith(curM)).reduce((s,f)=>s+f.items.reduce((ss,i)=>ss+(i.prix-(i.achat||0))*i.qty,0),0)-tM;const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};set('dep-mois',fmt(tM));set('dep-ca',fmt(caM));set('dep-ben',fmt(benM));document.getElementById('tb-dep').innerHTML=list.length?list.map(d=>`<tr><td><b>${escapeHtml(d.lib)}</b></td><td><span class="badge bo">${escapeHtml(d.cat)}</span></td><td class="mono" style="color:var(--red);font-weight:700">${fmt(d.montant)}</td><td>${d.boutique==='general'?'Général':getBName(d.boutique)}</td><td style="font-size:10px;">${escapeHtml(d.par)||'—'}</td><td style="font-size:10px;">${new Date(d.date).toLocaleDateString('fr-FR')}</td><td><button class="btn btn-red btn-xs" onclick="delDep('${d.id}')">🗑</button></td></tr>`).join(''):`<tr><td colspan="7" class="empty"><div class="ei">💸</div>Aucune dépense</td></tr>`;}
+function saveDep(){const lib=document.getElementById('dep-lib').value.trim();const mont=parseFloat(document.getElementById('dep-mont').value);if(!lib||isNaN(mont)){soundErr();toast('Libellé et montant obligatoires','err');return;}const d={id:'DEP'+Date.now().toString(36).toUpperCase().slice(-6),lib,cat:document.getElementById('dep-cat').value,montant:mont,boutique:document.getElementById('dep-b').value,par:document.getElementById('dep-par').value,date:maintenant().toISOString()};DB.depenses.push(d);save();closeModal('modal-dep');renderDepenses();['dep-lib','dep-mont','dep-par'].forEach(i=>document.getElementById(i).value='');toast('Dépense enregistrée ✅','ok');}
+function renderDepenses(){const q=(document.getElementById('srch-dep')?.value||'').toLowerCase();const curM=maintenant().toISOString().slice(0,7);const list=[...DB.depenses].reverse().filter(d=>!q||d.lib.toLowerCase().includes(q));const tM=DB.depenses.filter(d=>d.date.startsWith(curM)).reduce((s,d)=>s+d.montant,0);const caM=DB.factures.filter(f=>f.date.startsWith(curM)).reduce((s,f)=>s+f.total,0);const benM=DB.factures.filter(f=>f.date.startsWith(curM)).reduce((s,f)=>s+f.items.reduce((ss,i)=>ss+(i.prix-(i.achat||0))*i.qty,0),0)-tM;const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};set('dep-mois',fmt(tM));set('dep-ca',fmt(caM));set('dep-ben',fmt(benM));document.getElementById('tb-dep').innerHTML=list.length?list.map(d=>`<tr><td><b>${escapeHtml(d.lib)}</b></td><td><span class="badge bo">${escapeHtml(d.cat)}</span></td><td class="mono" style="color:var(--red);font-weight:700">${fmt(d.montant)}</td><td>${d.boutique==='general'?'Général':getBName(d.boutique)}</td><td style="font-size:10px;">${escapeHtml(d.par)||'—'}</td><td style="font-size:10px;">${new Date(d.date).toLocaleDateString('fr-FR')}</td><td><button class="btn btn-red btn-xs" onclick="delDep('${d.id}')">🗑</button></td></tr>`).join(''):`<tr><td colspan="7" class="empty"><div class="ei">💸</div>Aucune dépense</td></tr>`;}
 function delDep(id){const d=DB.depenses.find(x=>x.id===id);safeDelete('cette dépense',()=>{DB.depenses=DB.depenses.filter(x=>x.id!==id);logAction&&logAction('Suppression dépense',d?.lib||id);save();renderDepenses();});}
 
 // ══ UTILISATEURS & RÔLES ══
@@ -6803,7 +6820,7 @@ async function iaCreerTache(){
   const input=document.getElementById('ia-tache-input')?.value.trim();
   if(!input){soundErr();toast('Décrivez la tâche','err');return;}
   iaLoading('ia-tache-result');
-  const todayISO=new Date().toISOString();
+  const todayISO=maintenant().toISOString();
   await callIA(`Date actuelle: ${todayISO}\nExtrait une tâche/rappel de ce texte: "${input}"\nJSON UNIQUEMENT: {"titre":"texte court","date":"YYYY-MM-DDTHH:mm:00","priorite":"normale|haute|basse","commentaire":"confirmation courte"}`,
     txt=>{
       try{
@@ -6868,12 +6885,12 @@ async function askIA(){
   await callIA(`${buildContext()}\nQuestion: ${q}`,r=>{result.innerHTML=`<div class="ia-panel"><div class="ia-title">🤖 Réponse</div><div class="ia-msg">${r.replace(/\n/g,'<br>')}</div></div>`;},e=>{result.innerHTML=`<div class="empty">❌ ${e}</div>`;});}
 
 // ══ EXPORT / IMPORT ══
-function exportJSON(){SS('lastBackup',Date.now());const _st={...DB.settings};delete _st.apiKey;const data=JSON.stringify({produits:DB.produits,clients:DB.clients,fournisseurs:DB.fournisseurs,factures:DB.factures,devis:DB.devis,retours:DB.retours,salaires:DB.salaires,depenses:DB.depenses,caisses:DB.caisses,settings:_st,exported:new Date().toISOString()},null,2);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=`MonNegoce_${today()}.json`;a.click();toast('Export téléchargé ✅','ok');}
+function exportJSON(){SS('lastBackup',Date.now());const _st={...DB.settings};delete _st.apiKey;const data=JSON.stringify({produits:DB.produits,clients:DB.clients,fournisseurs:DB.fournisseurs,factures:DB.factures,devis:DB.devis,retours:DB.retours,salaires:DB.salaires,depenses:DB.depenses,caisses:DB.caisses,settings:_st,exported:maintenant().toISOString()},null,2);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=`MonNegoce_${today()}.json`;a.click();toast('Export téléchargé ✅','ok');}
 function exportFullBackup(){
   SS('lastBackup',Date.now());
   // Exclure les mots de passe hachés de la sauvegarde visible, mais garder le reste
   const backup={
-    exportDate:new Date().toISOString(),
+    exportDate:maintenant().toISOString(),
     appNom:DB.settings?.appNom||'Mon Négoce',
     produits:DB.produits,
     clients:DB.clients,
@@ -7341,7 +7358,7 @@ function sendChatMsgPopup(){
   CHAT_MESSAGES[CHAT_POPUP_ROOM].push({
     id:'M'+Date.now(),userId:session.user?.id||'anon',
     userName:session.user?.nom||session.user?.id||'Anonyme',
-    text,time:new Date().toISOString(),read:false
+    text,time:maintenant().toISOString(),read:false
   });
   input.value='';saveChat();renderChatPopupMessages();renderChatPopupRooms();
 }
@@ -7413,7 +7430,7 @@ function sendChatMsg(){
   CHAT_MESSAGES[CHAT_CURRENT_ROOM].push({
     id:'M'+Date.now(),userId:session.user?.id||'anon',
     userName:session.user?.nom||session.user?.id||'Anonyme',
-    text,time:new Date().toISOString(),read:false
+    text,time:maintenant().toISOString(),read:false
   });
   input.value='';saveChat();renderChatMessages(CHAT_CURRENT_ROOM);renderChatRooms();
 }
@@ -7621,6 +7638,17 @@ function initFirebase(){
         _fbAuthReadyCallbacks.forEach(cb=>cb());
         _fbAuthReadyCallbacks=[];
       }
+      fbDB.ref('.info/serverTimeOffset').on('value',sn=>{
+        const d=Number(sn.val())||0;
+        window._decalageServeur=d;
+        if(Math.abs(d)>2*60*1000&&!window._alerteHeureVue){
+          window._alerteHeureVue=true;
+          const min=Math.round(Math.abs(d)/60000),hh=Math.floor(min/60),mm=min%60;
+          const txt=(hh?hh+' h '+String(mm).padStart(2,'0'):min+' min');
+          setTimeout(()=>{try{toast('⏰ L\'heure de cet appareil est fausse de '+txt+'. Les ventes sont enregistrées à la bonne heure, mais réglez « heure automatique » dans les paramètres du téléphone.','err');}catch(e){}},2500);
+          try{logAction&&logAction('Sécurité','Horloge de l\'appareil décalée de '+txt+' ('+(d>0?'en retard':'en avance')+')');}catch(e){}
+        }
+      });
       fbDB.ref('.info/connected').on('value',snap=>{
         const wasConnected=fbConnected;
         fbConnected=snap.val()===true;
@@ -8735,7 +8763,7 @@ function enregistrerBrouillon(){
     items:cart.map(i=>({id:i.id,nom:String(i.nom),prix:Number(i.prix),
       achat:Number(i.achat||0),qty:Number(i.qty),unite:String(i.unite||'pièce')})),
     sousTotal:sub,remise:r,total,
-    date:new Date().toISOString(),note:''
+    date:maintenant().toISOString(),note:''
   };
   if(!DB.brouillons)DB.brouillons=[];
   DB.brouillons.unshift(b);
@@ -8792,7 +8820,7 @@ function validerBrouillon(id){
     _author:session.user?.id||b.userId,
     client:b.client,clientId:b.clientId,items:b.items,
     sousTotal:b.sousTotal,remise:b.remise,total:b.total,mode,
-    date:new Date().toISOString(),
+    date:maintenant().toISOString(),
     _depuisBrouillon:b.id,_prepareLe:b.date};
   if(!fbConnected)fac._offline=true;
 
@@ -9060,7 +9088,7 @@ function _empreinteProduits(v){
 // Compatibilité: les caisses encore en ancienne version ne lisent que l'ancienne liste.
 // On la met à jour au plus une fois par heure, et seulement jusqu'à la date de fin.
 async function _compatAnciennesVersions(myFactures,userId){
-  if(new Date().toISOString().slice(0,10)>FIN_COMPAT_ANCIENNES_VERSIONS)return;
+  if(maintenant().toISOString().slice(0,10)>FIN_COMPAT_ANCIENNES_VERSIONS)return;
   if(!LS('fact_compat_attente'))return;
   if(Date.now()-(Number(LS('fact_compat_der'))||0)<60*60*1000)return;
   SS('fact_compat_der',Date.now());
@@ -10505,9 +10533,9 @@ function openExportModal(){openModal('modal-export');}
 const cwConf={fmt24:true,showSec:true,showDate:true,showWeather:true,ville:'Louga',panelOpen:false};
 let cwWeather=null,cwTimer=null;
 async function fetchWeather(ville){try{const r=await fetch(`https://wttr.in/${encodeURIComponent(ville)}?format=j1`);const d=await r.json();const cur=d.current_condition[0];const desc=cur.weatherDesc[0].value;const temp=cur.temp_C;const icons={'Sunny':'☀️','Clear':'🌙','Partly':'⛅','Cloud':'☁️','Mist':'🌫️','Fog':'🌫️','rain':'🌧️','Thunder':'⛈️','Snow':'🌨️','Drizzle':'🌦️'};const icon=Object.entries(icons).find(([k])=>desc.toLowerCase().includes(k.toLowerCase()))?.[1]||'🌡️';cwWeather={temp,desc,icon};}catch(e){cwWeather={temp:'--',desc:'—',icon:'🌡️'};}renderClock();}
-function renderClock(){const el=document.getElementById('topbar-clock');if(!el)return;const now=new Date();const h=now.getHours(),m=now.getMinutes(),s=now.getSeconds();let timeStr;if(cwConf.fmt24){timeStr=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}${cwConf.showSec?':'+String(s).padStart(2,'0'):''}`;}else{const h12=h%12||12;const ap=h<12?'AM':'PM';timeStr=`${h12}:${String(m).padStart(2,'0')}${cwConf.showSec?':'+String(s).padStart(2,'0'):''} ${ap}`;}
+function renderClock(){const el=document.getElementById('topbar-clock');if(!el)return;const now=maintenant();const h=now.getUTCHours(),m=now.getUTCMinutes(),s=now.getUTCSeconds();let timeStr;if(cwConf.fmt24){timeStr=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}${cwConf.showSec?':'+String(s).padStart(2,'0'):''}`;}else{const h12=h%12||12;const ap=h<12?'AM':'PM';timeStr=`${h12}:${String(m).padStart(2,'0')}${cwConf.showSec?':'+String(s).padStart(2,'0'):''} ${ap}`;}
 const days=['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'],months=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
-const dateStr=`${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+const dateStr=`${days[now.getUTCDay()]} ${now.getUTCDate()} ${months[now.getUTCMonth()]} ${now.getUTCFullYear()}`;
 const wHTML=cwConf.showWeather&&cwWeather?`<div class="cw-sep"></div><div style="display:flex;flex-direction:column;align-items:center;gap:1px;"><div class="cw-icon">${cwWeather.icon}</div><div class="cw-temp">${cwWeather.temp}°C</div><div style="font-size:8px;color:rgba(16,185,129,.7);">${cwConf.ville}</div></div>`:'';
 const pHTML=cwConf.panelOpen?`<div class="clock-panel" onclick="event.stopPropagation()"><h4>⚙️ Horloge & Météo</h4>
   <div class="cp-row"><label>Format</label><div class="cp-toggle"><button class="cp-btn ${cwConf.fmt24?'on':''}" onclick="cwSet('fmt24',true)">24h</button><button class="cp-btn ${!cwConf.fmt24?'on':''}" onclick="cwSet('fmt24',false)">12h</button></div></div>
