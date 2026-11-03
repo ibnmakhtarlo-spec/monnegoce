@@ -100,6 +100,18 @@ textarea{resize:vertical;min-height:80px;}
 </head>
 <body>
 
+<!-- CONNEXION: mêmes comptes et codes que Mon Négoce -->
+<div id="login-overlay" style="position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--surf);border:1px solid var(--border);border-radius:14px;padding:20px;max-width:360px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.08);">
+    <div style="font-size:16px;font-weight:800;margin-bottom:3px;">📦 Ajout Rapide Produits</div>
+    <div class="hint" style="margin-bottom:13px;">Connectez-vous avec votre compte Mon Négoce.</div>
+    <div class="fg"><label>Identifiant</label><input id="lg-id" autocapitalize="characters" autocomplete="username" placeholder="ADM01"></div>
+    <div class="fg"><label>Code secret</label><input id="lg-pwd" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" onkeydown="if(event.key==='Enter')connexionAjout()"></div>
+    <button class="btn btn-gold" style="width:100%" onclick="connexionAjout()">🔓 Se connecter</button>
+    <div id="lg-etat" class="hint" style="margin-top:10px;text-align:center;">⏳ Chargement des comptes…</div>
+  </div>
+</div>
+
 <div class="topbar">
   <h1>📦 <span>Ajout Rapide</span> Produits</h1>
   <div style="display:flex;align-items:center;gap:8px;">
@@ -306,7 +318,7 @@ textarea{resize:vertical;min-height:80px;}
     </div>
     <div class="fg">
       <label>Qui ajoute / modifie les produits</label>
-      <input id="regl-identifiant" placeholder="Votre identifiant ou prénom">
+      <input id="regl-identifiant" placeholder="Votre identifiant ou prénom" readonly style="opacity:.75;">
       <div class="hint">
         Apparaît dans le Journal d'audit de l'application principale, à chaque
         produit ajouté ou modifié depuis cet appareil.
@@ -361,6 +373,7 @@ fbDB=firebase.database();
 firebase.auth().signInAnonymously().catch(e=>toast('⚠️ Connexion échouée : '+e.message,'err'));
 firebase.auth().onAuthStateChanged(u=>{
   if(!u)return;
+  chargerComptesAjout();
   fbDB.ref('.info/connected').on('value',snap=>{
     fbConnected=snap.val()===true;
     const el=document.getElementById('etat-conn');
@@ -371,9 +384,15 @@ firebase.auth().onAuthStateChanged(u=>{
 });
 
 let stockCache={};
+// Ne lire que ce qui sert (produits et fournisseurs): le paquet complet contient aussi
+// paramètres, logos, devis, dépenses... inutiles ici et lourds à télécharger.
+async function lireCatalogueCloud(){
+  const [p,f]=await Promise.all([fbDB.ref('negoce/shared/data/produits').once('value'),fbDB.ref('negoce/shared/data/fournisseurs').once('value')]);
+  return {val:()=>({produits:p.val(),fournisseurs:f.val()})};
+}
 async function chargerCatalogue(){
   try{
-    const snap=await fbDB.ref('negoce/shared/data').once('value');
+    const snap=await lireCatalogueCloud();
     const d=snap.val()||{};
     produitsCache=Array.isArray(d.produits)?d.produits:Object.values(d.produits||{});
     fournisseursCache=Array.isArray(d.fournisseurs)?d.fournisseurs:Object.values(d.fournisseurs||{});
@@ -393,12 +412,82 @@ async function chargerCatalogue(){
 }
 
 // ── Identifiant (traçabilité, pas un mot de passe) — géré depuis les Réglages ──
-function changerIdentifiant(){ouvrirReglages();}
+function changerIdentifiant(){if(confirm('Se déconnecter ?'))deconnexionAjout();}
+
+// ══ CONNEXION ══
+// Avant, l'app n'avait aucun code: n'importe qui ouvrant son adresse pouvait créer,
+// modifier ou supprimer des produits et changer le stock. Maintenant: mêmes comptes
+// et codes que Mon Négoce, réservés à l'admin, au superviseur et aux comptes
+// autorisés à modifier les produits.
+let comptesAjout=null,sessionAjout=null;
+const TENT_AJOUT='mn_ajout_tentatives';
+function lgEtat(t){const el=document.getElementById('lg-etat');if(el)el.textContent=t;}
+async function hashCodeAjout(pwd){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('mn_salt_'+pwd));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function chargerComptesAjout(){
+  try{
+    const d=(await fbDB.ref('negoce_users').once('value')).val();
+    comptesAjout=(d&&Array.isArray(d.users))?d.users:Object.values((d&&d.users)||{});
+    lgEtat('Entrez votre identifiant et votre code');
+  }catch(e){lgEtat('⚠️ Comptes indisponibles : '+e.message);}
+}
+function peutGererProduits(u){
+  return !!u&&u.actif!==false&&(u.role==='admin'||u.role==='superviseur'||(u.perms||[]).includes('produits_edit'));
+}
+async function connexionAjout(){
+  const id=(document.getElementById('lg-id').value||'').trim().toUpperCase();
+  const pwd=document.getElementById('lg-pwd').value||'';
+  if(!id||!pwd){toast('Identifiant et code requis','err');return;}
+  if(!comptesAjout){toast('⏳ Comptes en cours de chargement… vérifiez internet','err');return;}
+  let tent={};try{tent=JSON.parse(localStorage.getItem(TENT_AJOUT)||'{}')||{};}catch(e){}
+  const t=tent[id]||{n:0,jusqua:0};
+  if(t.jusqua>Date.now()){toast('🔒 Compte verrouillé, réessayez dans '+Math.ceil((t.jusqua-Date.now())/60000)+' min','err');return;}
+  const u=comptesAjout.find(x=>x&&x.id===id);
+  let ok=false;
+  if(u&&u.pwd)ok=String(u.pwd).length<20?pwd===u.pwd:(await hashCodeAjout(pwd))===u.pwd;
+  if(!ok||u.actif===false){
+    t.n++;if(t.n>=5){t.jusqua=Date.now()+5*60*1000;t.n=0;}
+    tent[id]=t;try{localStorage.setItem(TENT_AJOUT,JSON.stringify(tent));}catch(e){}
+    toast(t.jusqua>Date.now()?'🔒 5 erreurs — compte verrouillé 5 minutes':'Identifiant ou code incorrect','err');
+    return;
+  }
+  if(!peutGererProduits(u)){toast('⛔ Ce compte n\'est pas autorisé à gérer les produits','err');return;}
+  delete tent[id];try{localStorage.setItem(TENT_AJOUT,JSON.stringify(tent));}catch(e){}
+  sessionAjout={id:u.id,nom:u.nom,t:Date.now()};
+  try{sessionStorage.setItem('mn_ajout_session',JSON.stringify(sessionAjout));}catch(e){}
+  localStorage.setItem('mn_ajout_id',(u.nom||u.id)+' ('+u.id+')');
+  majBadgeId();
+  document.getElementById('lg-pwd').value='';
+  document.getElementById('login-overlay').style.display='none';
+  toast('✅ Bienvenue '+(u.nom||u.id),'ok');
+}
+function deconnexionAjout(){
+  sessionAjout=null;
+  try{sessionStorage.removeItem('mn_ajout_session');}catch(e){}
+  document.getElementById('login-overlay').style.display='flex';
+  setTimeout(()=>document.getElementById('lg-id')?.focus(),80);
+}
+// Reprise de la session dans le même onglet (moins de 30 min d'inactivité)
+(function(){
+  try{
+    const s=JSON.parse(sessionStorage.getItem('mn_ajout_session')||'null');
+    if(s&&Date.now()-s.t<30*60*1000){sessionAjout=s;document.getElementById('login-overlay').style.display='none';}
+  }catch(e){}
+})();
+// Verrouillage automatique après 30 minutes sans activité
+let _activiteAjout=Date.now();
+['click','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,()=>{
+  _activiteAjout=Date.now();
+  if(sessionAjout){sessionAjout.t=_activiteAjout;try{sessionStorage.setItem('mn_ajout_session',JSON.stringify(sessionAjout));}catch(e){}}
+},{passive:true}));
+setInterval(()=>{if(sessionAjout&&Date.now()-_activiteAjout>30*60*1000){deconnexionAjout();toast('🔒 Verrouillé après 30 min sans activité','info');}},60000);
 function majBadgeId(){
   document.getElementById('id-badge').textContent='👤 '+(localStorage.getItem('mn_ajout_id')||'Définir');
 }
 majBadgeId();
-if(!localStorage.getItem('mn_ajout_id'))setTimeout(ouvrirReglages,400);
+// (l'identifiant vient désormais de la connexion)
 
 // ── Utilitaires ──
 function esc(s){
@@ -788,7 +877,7 @@ async function enregistrerProduit(){
   try{
     // Relire le catalogue au dernier moment pour ne pas écraser une modification
     // faite entre-temps par quelqu'un d'autre.
-    const snap=await fbDB.ref('negoce/shared/data').once('value');
+    const snap=await lireCatalogueCloud();
     const d=snap.val()||{};
     let liste=Array.isArray(d.produits)?d.produits:Object.values(d.produits||{});
 
@@ -844,7 +933,7 @@ async function enregistrerProduit(){
     if(idEdition){
       afficherAnnulation('✅ Produit modifié : '+nom,async()=>{
         try{
-          const s2=await fbDB.ref('negoce/shared/data').once('value');
+          const s2=await lireCatalogueCloud();
           const d2=s2.val()||{};
           let l2=Array.isArray(d2.produits)?d2.produits:Object.values(d2.produits||{});
           const idx2=l2.findIndex(p=>p&&p.id===id);
@@ -859,7 +948,7 @@ async function enregistrerProduit(){
     }else{
       afficherAnnulation('✅ Produit créé : '+nom,async()=>{
         try{
-          const s2=await fbDB.ref('negoce/shared/data').once('value');
+          const s2=await lireCatalogueCloud();
           const d2=s2.val()||{};
           let l2=Array.isArray(d2.produits)?d2.produits:Object.values(d2.produits||{});
           l2=l2.filter(p=>!(p&&p.id===id));
@@ -890,7 +979,7 @@ async function supprimerProduit(){
   const nom=p?p.nom:'ce produit';
   if(!confirm('🗑️ Supprimer "'+nom+'" du catalogue ?\\n\\nVous pourrez annuler juste après si besoin.'))return;
   try{
-    const snap=await fbDB.ref('negoce/shared/data').once('value');
+    const snap=await lireCatalogueCloud();
     const d=snap.val()||{};
     let liste=Array.isArray(d.produits)?d.produits:Object.values(d.produits||{});
     const ancienneFiche=liste.find(x=>x&&x.id===id);
@@ -910,7 +999,7 @@ async function supprimerProduit(){
 
     afficherAnnulation('🗑️ Produit supprimé : '+nom,async()=>{
       try{
-        const s2=await fbDB.ref('negoce/shared/data').once('value');
+        const s2=await lireCatalogueCloud();
         const d2=s2.val()||{};
         let l2=Array.isArray(d2.produits)?d2.produits:Object.values(d2.produits||{});
         if(ancienneFiche&&!l2.find(x=>x&&x.id===id))l2.push(ancienneFiche);
@@ -1039,7 +1128,7 @@ async function validerFacture(){
   zone.innerHTML='<div class="hint">⏳ Mise à jour du stock...</div>';
 
   try{
-    const snap=await fbDB.ref('negoce/shared/data').once('value');
+    const snap=await lireCatalogueCloud();
     const d=snap.val()||{};
     let liste=Array.isArray(d.produits)?d.produits:Object.values(d.produits||{});
     let nbNouveaux=0;

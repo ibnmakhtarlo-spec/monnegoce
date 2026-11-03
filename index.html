@@ -2499,12 +2499,30 @@ let fmt=n=>_fmtBase(n)+' FCFA';
 function maintenant(){return new Date(Date.now()+(window._decalageServeur||0));}
 (function(){
   const TZ='Africa/Dakar';
+  // Les formateurs sont gardés en mémoire: en créer un à chaque date affichée
+  // ralentissait fortement les longues listes (mouvements, dépenses...).
+  const cache=new Map();
+  const DATE=['weekday','era','year','month','day','dateStyle'],HEURE=['hour','minute','second','dayPeriod','timeStyle','fractionalSecondDigits'];
+  const a=(o,l)=>l.some(k=>o[k]!==undefined);
   ['toLocaleString','toLocaleDateString','toLocaleTimeString'].forEach(m=>{
     const orig=Date.prototype[m];
     Date.prototype[m]=function(loc,opt){
       if(opt&&opt.timeZone)return orig.call(this,loc,opt);
-      try{return orig.call(this,loc,Object.assign({},opt||{},{timeZone:TZ}));}
-      catch(e){return orig.call(this,loc,opt);}   // ancien navigateur sans fuseaux
+      try{
+        const o=Object.assign({},opt||{},{timeZone:TZ});
+        // Mêmes valeurs par défaut que les fonctions d'origine
+        const d=a(o,DATE),h=a(o,HEURE);
+        if(m==='toLocaleDateString'&&!d)Object.assign(o,{year:'numeric',month:'numeric',day:'numeric'});
+        else if(m==='toLocaleTimeString'&&!h)Object.assign(o,{hour:'numeric',minute:'numeric',second:'numeric'});
+        else if(m==='toLocaleString'&&!d&&!h)Object.assign(o,{year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',second:'numeric'});
+        const cle=(loc||'')+'|'+JSON.stringify(o);
+        let f=cache.get(cle);
+        if(!f){f=new Intl.DateTimeFormat(loc,o);cache.set(cle,f);}
+        return f.format(this);
+      }catch(e){
+        try{return orig.call(this,loc,Object.assign({},opt||{},{timeZone:TZ}));}
+        catch(e2){return orig.call(this,loc,opt);}   // date invalide ou ancien navigateur
+      }
     };
   });
 })();
@@ -9263,6 +9281,11 @@ function pushToFirebase(){
             parId[p.id]=(tLocal>=tCloud)?p:cp;
           });
           produitsFusionnes=Object.values(parId);
+          // Ne JAMAIS effacer une photo du cloud: cet appareil ne renvoie pas les photos
+          // stockées en interne (trop lourdes), donc on garde celle que le cloud a déjà
+          // (ex: photo ajoutée avec l'app Ajout Produits).
+          const photoCloud={};listeCloud.forEach(p=>{if(p&&p.id&&p.photo)photoCloud[p.id]=p.photo;});
+          produitsFusionnes.forEach(p=>{if(p&&!p.photo&&photoCloud[p.id])p.photo=photoCloud[p.id];});
         }
       }catch(e){console.error('Fusion catalogue:',e);}
       // Isolé + nettoyé: une seule valeur "undefined" (dépense, devis, paramètre...) faisait
