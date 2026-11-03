@@ -142,6 +142,23 @@ tbody tr:hover{background:var(--surf2);}
 .bg{background:rgba(16,185,129,.15);color:var(--green);} .br{background:rgba(239,68,68,.15);color:var(--red);}
 .by{background:rgba(240,165,0,.15);color:var(--gold);} .bb{background:rgba(59,130,246,.12);color:var(--blue);}
 .bo{background:rgba(249,115,22,.12);color:var(--orange);} .bgr{background:var(--surf2);color:var(--text2);}
+/* Rapport du jour */
+.rap-grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:9px;margin-bottom:9px;}
+.rap-bout{background:var(--surf2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;border-top:4px solid var(--orange);}
+.rap-bout.rap-B2{border-top-color:var(--blue);}
+.rap-titre{font-weight:900;font-size:13px;margin-bottom:6px;}
+.rap-B1 .rap-titre{color:var(--orange);} .rap-B2 .rap-titre{color:var(--blue);}
+.rap-ligne{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0;border-bottom:1px dashed var(--border);}
+.rap-ligne:last-child{border-bottom:none;}
+.rap-net b{color:var(--green);font-size:13px;}
+.rap-evol{font-size:10px;color:var(--text2);margin:-1px 0 3px;}
+.rap-total{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:6px 10px;align-items:center;background:var(--goldf);border:1px solid rgba(240,165,0,.35);border-radius:10px;padding:10px 12px;margin-bottom:9px;font-size:12px;}
+.rap-total b{font-size:15px;color:var(--gold);}
+.rap-bloc{background:var(--surf2);border:1px solid var(--border2);border-radius:10px;padding:9px 12px;margin-bottom:8px;}
+.rap-st{font-weight:800;font-size:12px;margin-bottom:5px;}
+.rap-vide{font-size:11px;color:var(--text2);}
+.rap-alerte{border-color:rgba(239,68,68,.45);background:rgba(239,68,68,.06);}
+.rap-al{font-size:11.5px;padding:3px 0;border-bottom:1px dashed var(--border);}
 /* Fiche client intelligente (caisse) */
 .pos-cl-fiche{padding:6px 10px;border-bottom:1px solid var(--border);font-size:10.5px;line-height:1.6;color:var(--text);background:var(--surf2);}
 .fc-chip{display:inline-block;background:var(--goldf);color:var(--gold);border:1px solid rgba(240,165,0,.35);border-radius:10px;padding:0 7px;margin:1px 2px;cursor:pointer;font-weight:700;}
@@ -1396,6 +1413,22 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <button class="btn btn-gold" style="margin-top:8px;" onclick="saveSettingsGen()">💾 Enregistrer</button>
     </div>
     <div class="setting-card">
+      <h4>📊 Rapport du soir & alertes en caisse</h4>
+      <div class="fgrid">
+        <div class="fg"><label>Heure du rapport (0–23)</label><input type="number" id="ra-heure" min="0" max="23"></div>
+        <div class="fg"><label>Alerte si remise ≥ (%)</label><input type="number" id="ra-remise" min="1" max="100"></div>
+        <div class="fg"><label>Ouverture (heure)</label><input type="number" id="ra-ouv" min="0" max="23"></div>
+        <div class="fg"><label>Fermeture (heure)</label><input type="number" id="ra-ferm" min="1" max="24"></div>
+        <div class="fg"><label>Alerte si écart de caisse > (FCFA)</label><input type="number" id="ra-ecart" min="0"></div>
+        <div class="fg" style="display:flex;align-items:center;gap:7px;"><input type="checkbox" id="ra-actives" style="width:auto;"><label for="ra-actives" style="margin:0;">Alertes en caisse activées</label></div>
+      </div>
+      <div style="font-size:10px;color:var(--text2);margin:4px 0 8px;">Alertes envoyées à l'administrateur : remise forte, prix baissé, vente à perte, vente hors horaires, facture supprimée ou modifiée, paniers vidés à répétition, écart de caisse à la clôture.</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;">
+        <button class="btn btn-gold" onclick="sauverReglagesAlertes()">💾 Enregistrer</button>
+        <button class="btn btn-ghost" onclick="ouvrirRapport()">📊 Voir le rapport du jour</button>
+      </div>
+    </div>
+    <div class="setting-card">
       <h4>💾 Sauvegarde & Export</h4>
       <div style="display:flex;gap:7px;flex-wrap:wrap;">
         <button class="btn btn-gold btn-sm" onclick="openExportModal()">📦 Export & Import avancé</button>
@@ -1416,6 +1449,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
       </div>
       <div style="margin-left:auto;text-align:right;">
         <div id="accueil-sync-status" style="font-size:10px;color:var(--text2);margin-bottom:4px;"></div>
+        <button class="btn btn-purple btn-sm" id="btn-rapport" onclick="ouvrirRapport()" style="display:none;">📊 Rapport du jour</button>
         <button class="btn btn-gold btn-sm" onclick="nav('caisse')">🛒 Ouvrir la caisse</button>
       </div>
     </div>
@@ -2130,6 +2164,22 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <button class="btn btn-gold" id="rec-valider" onclick="validerReception()">✅ Valider la réception</button>
     </div>
     <div style="font-size:9.5px;color:var(--text2);margin-top:6px;">Chaque scan ajoute 1 article. La réception en cours est gardée si l'app se ferme.</div>
+  </div>
+</div>
+
+<!-- RAPPORT DU JOUR -->
+<div class="overlay" id="modal-rapport">
+  <div class="modal lg">
+    <div class="mtitle"><span id="rap-titre">📊 Rapport du jour</span><span class="mclose" onclick="closeModal('modal-rapport')">✕</span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+      <button class="btn btn-ghost btn-sm" onclick="rapportJourRelatif(0)">Aujourd'hui</button>
+      <button class="btn btn-ghost btn-sm" onclick="rapportJourRelatif(-1)">Hier</button>
+      <input type="date" id="rap-jour" onchange="ouvrirRapport(this.value)" style="background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:12px;border-radius:7px;padding:5px;outline:none;">
+      <span style="flex:1"></span>
+      <button class="btn btn-green btn-sm" onclick="partagerRapportWhatsApp()">📲 WhatsApp</button>
+      <button class="btn btn-ghost btn-sm" onclick="copierRapport()">📋 Copier</button>
+    </div>
+    <div id="rap-contenu"></div>
   </div>
 </div>
 
@@ -3047,6 +3097,7 @@ function startApp(){
     document.querySelectorAll('.admin-stat').forEach(el=>el.style.display='flex');
     const th=document.getElementById('th-achat');if(th)th.style.display='';
     const iab=document.getElementById('ia-btn');if(iab)iab.style.display='flex';
+    const rpb=document.getElementById('btn-rapport');if(rpb)rpb.style.display='';
   } else {
     // Superviseur/vendeur/caissier: tout est masqué par défaut, applyNavPerms() décide ensuite
     document.body.classList.remove('role-admin');
@@ -3088,6 +3139,7 @@ function startApp(){
     onFbAuthReady(()=>setTimeout(()=>{try{nettoyerProduitsDemo();}catch(e){}},1500));
     onFbAuthReady(()=>setTimeout(()=>{try{diffuserAlertesSecuriteEnAttente();}catch(e){}},600));
     if(session.user?.role==='admin')onFbAuthReady(()=>setTimeout(()=>{try{ecouterAlertesSecurite();}catch(e){}},900));
+    if(session.user?.role==='admin')setTimeout(()=>{try{surveillerRapportDuSoir();}catch(e){}},3000);
   },800);
 }
 
@@ -3107,14 +3159,17 @@ function diffuserAlertesSecuriteEnAttente(){
 function ecouterAlertesSecurite(){
   if(!fbDB||window._alertesSecuriteEcouteActive)return;
   window._alertesSecuriteEcouteActive=true;
+  const vues=new Set();
   fbDB.ref('negoce/alertes_securite').limitToLast(20).on('child_added',snap=>{
     const a=snap.val();if(!a)return;
+    if(snap.key){if(vues.has(snap.key))return;vues.add(snap.key);}   // jamais deux fois la même alerte
     if(new Date(a.date).getTime()<_appLoadTime)return; // alerte déjà connue avant ce chargement
     if(a.userId===session.user?.id&&a.type==='nouveau_appareil')return; // ma propre connexion
-    const libelle=a.type==='verrouillage'
+    const libelle=a.type==='suspect'?String(a.message||'Geste suspect en caisse')
+      :a.type==='verrouillage'
       ?'🔒 '+(a.userNom||a.userId)+' verrouillé après 5 échecs ('+(a.appareil||'?')+')'
       :'🚨 '+(a.userNom||a.userId)+' connecté depuis un nouvel appareil ('+(a.appareil||'?')+', '+(a.pays||'?')+')';
-    addNotif('Sécurité — autre appareil',libelle,'err');
+    addNotif(a.type==='suspect'?'⚠️ Geste suspect en caisse':'Sécurité — autre appareil',libelle,'err');
     try{soundErr&&soundErr();}catch(e){}
     try{notifier('🚨 Alerte sécurité — Mon Négoce',libelle);}catch(e){}
   });
@@ -3297,6 +3352,7 @@ function fermerMenu(){
 
 function nav(page){
   assainirDB();
+  if(page==='parametres')setTimeout(()=>{try{chargerReglagesAlertes();}catch(e){}},0);
   // Sécurité: pages strictement admin, bloquées même via appel direct (console, etc.)
   const adminStrictPages=['comparaison','previsions','connexions','audit'];
   if(adminStrictPages.includes(page)&&session.user?.role!=='admin'){
@@ -3423,7 +3479,7 @@ function addCart(id){
 }
 function changeQty(id,d){const i=cart.find(x=>x.id===id);if(!i)return;i.qty+=d;if(i.qty<=0)cart=cart.filter(x=>x.id!==id);else if(i.qty>i.ms){i.qty=i.ms;toast('Stock max','err');}renderCart();}
 function updateCartPrix(id,val){const i=cart.find(x=>x.id===id);if(!i)return;const p=parseFloat(val);if(!isNaN(p)&&p>=0){i.prix=p;calcCart();}}
-function clearCart(){cart=[];clearPOSClientSel();document.getElementById('btn-voir-fact').style.display='none';renderCart();}
+function clearCart(){try{noterPanierVide(cart.reduce((s,i)=>s+(Number(i.qty)||0),0),cart.reduce((s,i)=>s+(Number(i.prix)||0)*(Number(i.qty)||0),0));}catch(e){}cart=[];clearPOSClientSel();document.getElementById('btn-voir-fact').style.display='none';renderCart();}
 function renderCart(){
   const body=document.getElementById('pan-body');if(!body)return;
   body.innerHTML=cart.length?cart.map(i=>`<div class="pi" style="${(!i.achat||i.achat===0)?'border-left:3px solid var(--red);':''}">${(!i.achat||i.achat===0)?'<div style="font-size:9px;color:var(--red);font-weight:800;padding:1px 6px;">⚠️ Prix achat = 0</div>':''}<div class="piinfo"><div class="piname">${i.nom}</div><div style="font-size:9px;color:var(--text2);display:flex;align-items:center;gap:2px;"><input class="prix-edit" type="number" value="${i.prix}" min="0" onchange="updateCartPrix('${i.id}',this.value)"> FCFA</div></div><div class="piqty"><div class="qb" onclick="changeQty('${i.id}',-1)">−</div><span style="font-size:10px;font-weight:700;min-width:14px;text-align:center">${i.qty}</span><div class="qb" onclick="changeQty('${i.id}',1)">+</div></div><div class="pitot">${fmt(i.prix*i.qty)}</div></div>`).join(''):`<div class="empty"><div class="ei">🛒</div>Panier vide</div>`;
@@ -3530,6 +3586,7 @@ function validerVente(){
     client.points=(client.points||0)+newPoints;
     if(newPoints>0)toast('🎁 '+client.nom+' gagne '+newPoints+' point(s) fidélité !','info');}
   logAction('Vente','Facture '+fac.id+' — '+fmt(total)+' — '+mode);
+  try{controlerVenteSuspecte(fac,r);}catch(e){console.error('contrôle vente:',e);}
   window._stocksPushTime=Date.now();save();currentFact=JSON.parse(JSON.stringify(fac));lastFactId=fac.id;cart=[];document.getElementById('p-rem').value='0';const pr=document.getElementById('pos-recu');if(pr)pr.value='';const pa=document.getElementById('pos-acompte');if(pa)pa.value='';calcMonnaie();calcAcompte();clearPOSClientSel();
   soundOk();playBarakalLah();renderCart();renderGrid();
   const btnF=document.getElementById('btn-voir-fact');btnF.style.display='block';btnF.textContent=`🧾 Facture ${fac.id}`;
@@ -3662,6 +3719,7 @@ async function confirmDelFact(){
   marquerFactureSupprimee(id,admin.nom,_fSupp);
   save();closeModal('modal-del-fact');renderFactures();
   logAction&&logAction('Suppression facture',id+' (validé par '+admin.nom+')');
+  try{alerteSuspecte('suppression','🗑 Facture '+id+' supprimée ('+fmt(_fSupp?.total||0)+', '+(_fSupp?.client||'?')+') par '+(session.user?.nom||'?')+' avec le code de '+admin.nom,{factureId:id,montant:_fSupp?.total||0});}catch(e){}
   toast(`Facture supprimée (validé par ${admin.nom}) ✅`,'ok');
 }
 
@@ -3751,6 +3809,7 @@ async function confirmEditFact(){
   save();
   logAction&&logAction('Modification facture',
     id+' par '+admin.nom+' — total '+fmt(avant.total)+' → '+fmt(f.total));
+  try{if(f.total<avant.total||session.user?.role!=='admin')alerteSuspecte('modification','✏️ Facture '+id+' modifiée par '+(session.user?.nom||'?')+' (code de '+admin.nom+') — '+fmt(avant.total)+' → '+fmt(f.total),{factureId:id,montant:avant.total-f.total});}catch(e){}
   closeModal('modal-edit-fact');
   renderFactures();
   toast(`✅ Facture ${id} modifiée — nouveau total ${fmt(f.total)}`,'ok');
@@ -6441,6 +6500,12 @@ function cloturerCaisse(caisseId){
   const fond=c.fond||0;
   const totalEspeces=byMode['especes']||0;
   const fondFinal=fond+totalEspeces;
+  // Espèces réellement comptées: permet de repérer un écart de caisse
+  let compte=null;
+  try{
+    const t=prompt('💵 Espèces comptées dans '+c.nom+' ?\n(Attendu : '+fmt(fondFinal)+')\n\nLaissez vide pour ignorer.','');
+    if(t!==null&&String(t).trim()!==''){const v=Number(String(t).replace(/\s/g,'').replace(',','.'));if(isFinite(v))compte=v;}
+  }catch(e){}
   const cloture={
     id:'CLT'+Date.now().toString(36).toUpperCase().slice(-6),
     date:todayStr,
@@ -6451,8 +6516,16 @@ function cloturerCaisse(caisseId){
     vendeur:session.user?.nom,
     nbVentes:ventesJour.length,
     ca,ben,byMode,fond,fondFinal,
-    ecart:fondFinal-fond
+    ecart:fondFinal-fond,
+    especesComptees:compte,
+    ecartCaisse:compte===null?null:compte-fondFinal
   };
+  if(compte!==null){
+    const ec=compte-fondFinal;
+    toast(ec===0?'✅ Caisse juste':(ec<0?'⚠️ Il manque '+fmt(-ec)+' dans la caisse':'ℹ️ '+fmt(ec)+' de trop dans la caisse'),ec<0?'err':'info');
+    if(Math.abs(ec)>reglagesAlertes().ecartMax)
+      alerteSuspecte('ecart_caisse',(ec<0?'💰 Il manque ':'💰 Excédent de ')+fmt(Math.abs(ec))+' à la clôture de '+c.nom+' ('+(session.user?.nom||'?')+') — attendu '+fmt(fondFinal)+', compté '+fmt(compte),{montant:ec});
+  }
   if(!DB.clotures)DB.clotures=[];
   DB.clotures.unshift(cloture);
   logAction('Clôture caisse',c.nom+' — CA: '+fmt(ca));
@@ -7686,6 +7759,7 @@ function initFirebase(){
             pushToFirebase();
             pushUsersToFirebase();
             flushPendingStockOps();
+            try{diffuserAlertesSecuriteEnAttente();}catch(e){}
           }
         } else toast('📴 Hors ligne — données locales','warn');
       });
@@ -8590,6 +8664,215 @@ function fermerReception(){recStopCamera();closeModal('modal-reception');}
   },true);
 })();
 
+// ══ ALERTES « GESTES SUSPECTS » EN CAISSE ══
+// Envoyées en temps réel à l'administrateur (même canal que les alertes de sécurité)
+// et gardées dans le journal. Les gestes de l'administrateur lui-même ne sont que notés.
+function reglagesAlertes(){
+  const a=(DB.settings&&DB.settings.alertes)||{};
+  return {remiseMax:Number(a.remiseMax)||15,ouverture:a.ouverture!=null?Number(a.ouverture):8,
+    fermeture:a.fermeture!=null?Number(a.fermeture):22,ecartMax:Number(a.ecartMax)||2000,
+    rapportHeure:a.rapportHeure!=null?Number(a.rapportHeure):20,actives:a.actives!==false};
+}
+function alerteSuspecte(sorte,message,extra){
+  try{logAction&&logAction('Alerte',message);}catch(e){}
+  if(!reglagesAlertes().actives)return;
+  if(session.user?.role==='admin')return;   // l'admin voit déjà ce qu'il fait lui-même
+  const a=Object.assign({type:'suspect',sorte,message,userId:session.user?.id||'?',userNom:session.user?.nom||'?',
+    boutique:session.boutique||'',caisse:session.caisse||'',date:maintenant().toISOString()},extra||{});
+  if(fbDB&&fbConnected){fbDB.ref('negoce/alertes_securite').push(sansUndefined(a)).catch(()=>{
+    window._alertesSecuriteEnAttente=window._alertesSecuriteEnAttente||[];window._alertesSecuriteEnAttente.push(a);});}
+  else{window._alertesSecuriteEnAttente=window._alertesSecuriteEnAttente||[];window._alertesSecuriteEnAttente.push(a);}
+}
+// Contrôle d'une vente qui vient d'être validée
+function controlerVenteSuspecte(fac,remisePct){
+  const R=reglagesAlertes();
+  const qui=session.user?.nom||'?',ou=(DB.settings[session.boutique]?.nom||session.boutique);
+  // 1. Remise forte
+  if(remisePct>=R.remiseMax)
+    alerteSuspecte('remise','💸 Remise de '+remisePct+'% par '+qui+' ('+ou+') — facture '+fac.id+' : '+fmt(fac.total),{factureId:fac.id,montant:fac.total});
+  // 2. Prix baissé à la main dans le panier
+  const baisses=[];
+  (fac.items||[]).forEach(i=>{
+    const p=(DB.produits||[]).find(x=>x.id===i.id);
+    if(p&&Number(i.prix)<Number(p.prix))baisses.push(i.nom+' '+fmt(i.prix)+' au lieu de '+fmt(p.prix)+(i.qty>1?' ×'+i.qty:''));
+  });
+  if(baisses.length){
+    const manque=(fac.items||[]).reduce((s,i)=>{const p=(DB.produits||[]).find(x=>x.id===i.id);return s+(p&&Number(i.prix)<Number(p.prix)?(p.prix-i.prix)*i.qty:0);},0);
+    alerteSuspecte('prix_baisse','✂️ Prix baissé par '+qui+' ('+ou+') — '+baisses.slice(0,3).join(', ')+' — manque '+fmt(manque),{factureId:fac.id,montant:manque});
+  }
+  // 3. Vente à perte
+  const cout=(fac.items||[]).reduce((s,i)=>s+(Number(i.achat)||0)*(Number(i.qty)||0),0);
+  if(cout>0&&fac.total<cout)
+    alerteSuspecte('perte','🔻 Vente à perte par '+qui+' ('+ou+') — facture '+fac.id+' : '+fmt(fac.total)+' pour un coût de '+fmt(cout),{factureId:fac.id,montant:cout-fac.total});
+  // 4. Vente en dehors des heures d'ouverture (heure de Dakar)
+  const h=maintenant().getUTCHours();
+  if(h<R.ouverture||h>=R.fermeture)
+    alerteSuspecte('horaire','🌙 Vente à '+maintenant().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})+' (hors horaires) par '+qui+' ('+ou+') — '+fmt(fac.total),{factureId:fac.id,montant:fac.total});
+}
+// Paniers vidés: alerte à partir de 3 dans la journée pour une même personne
+function noterPanierVide(nbArticles,montant){
+  if(!nbArticles)return;
+  const cle='paniers_vides_'+today()+'_'+(session.user?.id||'?');
+  const n=(Number(LS(cle))||0)+1;SS(cle,n);
+  try{logAction&&logAction('Panier vidé',nbArticles+' article(s), '+fmt(montant));}catch(e){}
+  if(n===3||n===6||n===10)
+    alerteSuspecte('panier_vide','🗑 '+n+' paniers vidés aujourd\'hui par '+(session.user?.nom||'?')+' (dernier : '+fmt(montant)+')',{montant});
+}
+
+// ══ RAPPORT DU SOIR ══
+function _rapDansJour(d,jour){return typeof d==='string'&&d.slice(0,10)===jour;}
+async function construireRapport(jour){
+  const R=reglagesAlertes();
+  const facts=(DB.factures||[]).filter(f=>f&&_rapDansJour(f.date,jour));
+  const deps=(DB.depenses||[]).filter(d=>d&&_rapDansJour(d.date,jour));
+  const j7=new Date(new Date(jour+'T12:00:00Z').getTime()-7*86400000).toISOString().slice(0,10);
+  const facts7=(DB.factures||[]).filter(f=>f&&_rapDansJour(f.date,j7));
+  const cout=f=>(f.items||[]).reduce((s,i)=>s+(Number(i.achat)||0)*(Number(i.qty)||0),0);
+  const bout=['B1','B2'].map(b=>{
+    const fb=facts.filter(f=>f.boutique===b);
+    const ca=fb.reduce((s,f)=>s+(Number(f.total)||0),0);
+    const ben=fb.reduce((s,f)=>s+(Number(f.total)||0)-cout(f),0);
+    const dep=deps.filter(d=>d.boutique===b).reduce((s,d)=>s+(Number(d.montant)||0),0);
+    const ca7=facts7.filter(f=>f.boutique===b).reduce((s,f)=>s+(Number(f.total)||0),0);
+    const rupt=(DB.produits||[]).filter(p=>(Number(b==='B1'?p.s1:p.s2)||0)<=0).length;
+    return {b,nom:DB.settings[b]?.nom||b,nb:fb.length,ca,ben,dep,net:ben-dep,ca7,rupt};
+  });
+  const depGen=deps.filter(d=>d.boutique!=='B1'&&d.boutique!=='B2').reduce((s,d)=>s+(Number(d.montant)||0),0);
+  const tot={nb:0,ca:0,ben:0,dep:depGen,ca7:0};
+  bout.forEach(x=>{tot.nb+=x.nb;tot.ca+=x.ca;tot.ben+=x.ben;tot.dep+=x.dep;tot.ca7+=x.ca7;});
+  tot.net=tot.ben-tot.dep;
+  const modes={};facts.forEach(f=>{modes[f.mode||'?']=(modes[f.mode||'?']||0)+(Number(f.total)||0);});
+  const vendeurs={};facts.forEach(f=>{const v=f.vendeur||'?';(vendeurs[v]=vendeurs[v]||{nb:0,ca:0});vendeurs[v].nb++;vendeurs[v].ca+=Number(f.total)||0;});
+  const qte={};facts.forEach(f=>(f.items||[]).forEach(i=>{qte[i.nom]=(qte[i.nom]||0)+(Number(i.qty)||0);}));
+  const top=Object.entries(qte).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const creditsJour=facts.reduce((s,f)=>s+(f.mode==='credit'?(Number(f.total)||0):(f.mode==='acompte'?(Number(f.soldeAcompte)||0):0)),0);
+  // Dettes clients des deux boutiques (lues dans le cloud si possible)
+  let dettes=0,nbDebiteurs=0;
+  try{
+    let listes=[DB.clients||[]];
+    if(fbDB&&fbConnected){
+      const [c1,c2]=await Promise.all([fbDB.ref('negoce/clients/B1').once('value'),fbDB.ref('negoce/clients/B2').once('value')]);
+      listes=[_versListe(c1.val()),_versListe(c2.val())];
+    }
+    listes.forEach(l=>l.forEach(c=>{if(c&&(Number(c.credit)||0)>0){dettes+=Number(c.credit);nbDebiteurs++;}}));
+  }catch(e){}
+  // Alertes du jour
+  let alertes=[];
+  try{
+    if(fbDB&&fbConnected){
+      const v=(await fbDB.ref('negoce/alertes_securite').limitToLast(150).once('value')).val()||{};
+      alertes=Object.values(v).filter(a=>a&&_rapDansJour(a.date,jour)&&a.type==='suspect');
+    }
+  }catch(e){}
+  const stockFaible=(DB.produits||[]).filter(p=>{const t=(Number(p.s1)||0)+(Number(p.s2)||0);return t>0&&t<=(Number(p.alerte)||1);}).length;
+  return {jour,bout,tot,modes,vendeurs,top,creditsJour,dettes,nbDebiteurs,alertes,stockFaible,R};
+}
+function _rapEvol(a,b){if(!b)return '';const p=Math.round((a-b)/b*100);return ' ('+(p>=0?'▲ +':'▼ ')+p+'% vs sem. dernière)';}
+function _rapJourLisible(j){return new Date(j+'T12:00:00Z').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});}
+function rapportTexte(r){
+  const L=[];
+  L.push('📊 *RAPPORT DU '+_rapJourLisible(r.jour).toUpperCase()+'*');
+  L.push('');
+  r.bout.forEach(x=>{
+    L.push('🏪 *'+x.nom+'* — '+x.nb+' vente'+(x.nb>1?'s':''));
+    L.push('   Ventes : '+fmt(x.ca)+_rapEvol(x.ca,x.ca7));
+    L.push('   Bénéfice : '+fmt(x.ben)+' · Dépenses : '+fmt(x.dep)+' · Net : '+fmt(x.net));
+  });
+  L.push('');
+  L.push('💰 *TOTAL* : '+fmt(r.tot.ca)+' · bénéfice net '+fmt(r.tot.net));
+  if(Object.keys(r.modes).length)L.push('💳 '+Object.entries(r.modes).sort((a,b)=>b[1]-a[1]).map(([m,v])=>m+' '+fmt(v)).join(' · '));
+  if(r.top.length)L.push('🏆 Top : '+r.top.map(([n,q])=>n+' ('+q+')').join(', '));
+  const vs=Object.entries(r.vendeurs).sort((a,b)=>b[1].ca-a[1].ca);
+  if(vs.length)L.push('👤 '+vs.map(([n,v])=>n+' '+fmt(v.ca)+' ('+v.nb+')').join(' · '));
+  L.push('📝 Crédits accordés : '+fmt(r.creditsJour)+' · Dettes clients : '+fmt(r.dettes)+' ('+r.nbDebiteurs+' clients)');
+  L.push('📦 Ruptures : '+r.bout.map(x=>x.nom.split(' ')[0]+' '+x.rupt).join(' · ')+' · stock faible : '+r.stockFaible);
+  L.push(r.alertes.length?'⚠️ '+r.alertes.length+' alerte'+(r.alertes.length>1?'s':'')+' en caisse :':'✅ Aucune alerte en caisse');
+  r.alertes.slice(0,8).forEach(a=>L.push('   • '+a.message));
+  return L.join('\n');
+}
+function rapportHTML(r){
+  const e=escapeHtml;
+  const carte=x=>`<div class="rap-bout rap-${x.b}"><div class="rap-titre">${e(x.nom)}</div>
+    <div class="rap-ligne"><span>Ventes (${x.nb})</span><b>${fmt(x.ca)}</b></div>
+    <div class="rap-evol">${e(_rapEvol(x.ca,x.ca7).replace(/^ \(|\)$/g,''))}</div>
+    <div class="rap-ligne"><span>Bénéfice</span><b>${fmt(x.ben)}</b></div>
+    <div class="rap-ligne"><span>Dépenses</span><b>${fmt(x.dep)}</b></div>
+    <div class="rap-ligne rap-net"><span>Net</span><b>${fmt(x.net)}</b></div>
+    <div class="rap-ligne"><span>Ruptures</span><b>${x.rupt}</b></div></div>`;
+  const vs=Object.entries(r.vendeurs).sort((a,b)=>b[1].ca-a[1].ca);
+  return `<div class="rap-grille">${r.bout.map(carte).join('')}</div>
+    <div class="rap-total"><span>Total du jour</span><b>${fmt(r.tot.ca)}</b><span>Bénéfice net</span><b>${fmt(r.tot.net)}</b></div>
+    <div class="rap-bloc"><div class="rap-st">💳 Paiements</div>${Object.entries(r.modes).sort((a,b)=>b[1]-a[1]).map(([m,v])=>`<div class="rap-ligne"><span>${payIcon(m,14)} ${e(m)}</span><b>${fmt(v)}</b></div>`).join('')||'<div class="rap-vide">Aucune vente</div>'}</div>
+    <div class="rap-bloc"><div class="rap-st">👤 Vendeurs</div>${vs.map(([n,v])=>`<div class="rap-ligne"><span>${e(n)} (${v.nb})</span><b>${fmt(v.ca)}</b></div>`).join('')||'<div class="rap-vide">—</div>'}</div>
+    <div class="rap-bloc"><div class="rap-st">🏆 Plus vendus</div>${r.top.map(([n,q])=>`<div class="rap-ligne"><span>${e(n)}</span><b>${q}</b></div>`).join('')||'<div class="rap-vide">—</div>'}</div>
+    <div class="rap-bloc"><div class="rap-st">📝 Crédits et dettes</div>
+      <div class="rap-ligne"><span>Crédits accordés aujourd'hui</span><b>${fmt(r.creditsJour)}</b></div>
+      <div class="rap-ligne"><span>Dettes clients (${r.nbDebiteurs})</span><b>${fmt(r.dettes)}</b></div>
+      <div class="rap-ligne"><span>Produits en stock faible</span><b>${r.stockFaible}</b></div></div>
+    <div class="rap-bloc ${r.alertes.length?'rap-alerte':''}"><div class="rap-st">${r.alertes.length?'⚠️ '+r.alertes.length+' alerte(s) en caisse':'✅ Aucune alerte en caisse'}</div>
+      ${r.alertes.slice(0,20).map(a=>`<div class="rap-al">${e(new Date(a.date).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}))} · ${e(a.message)}</div>`).join('')}</div>`;
+}
+let _rapportCourant=null;
+async function ouvrirRapport(jour){
+  jour=jour||today();
+  openModal('modal-rapport');
+  const z=document.getElementById('rap-contenu');
+  document.getElementById('rap-jour').value=jour;
+  if(z)z.innerHTML='<div class="empty">⏳ Préparation du rapport…</div>';
+  try{
+    _rapportCourant=await construireRapport(jour);
+    document.getElementById('rap-titre').textContent='📊 Rapport du '+_rapJourLisible(jour);
+    if(z)z.innerHTML=rapportHTML(_rapportCourant);
+    SS('rapport_vu',jour);
+  }catch(e){if(z)z.innerHTML='<div class="empty">❌ '+escapeHtml(e.message)+'</div>';}
+}
+function rapportJourRelatif(n){const d=new Date(maintenant().getTime()+n*86400000).toISOString().slice(0,10);ouvrirRapport(d);}
+function partagerRapportWhatsApp(){if(!_rapportCourant)return;window.open('https://wa.me/?text='+encodeURIComponent(rapportTexte(_rapportCourant)),'_blank');}
+function copierRapport(){
+  if(!_rapportCourant)return;
+  const t=rapportTexte(_rapportCourant);
+  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('📋 Rapport copié','ok'))
+    .catch(()=>{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('📋 Rapport copié','ok');}catch(e){}ta.remove();});
+}
+// Le soir à l'heure choisie: notification à l'admin; le matin: rapport de la veille s'il n'a pas été vu
+function surveillerRapportDuSoir(){
+  if(session.user?.role!=='admin'||window._rapportSurveille)return;
+  window._rapportSurveille=true;
+  const verifier=async()=>{
+    if(session.user?.role!=='admin')return;
+    const R=reglagesAlertes(),n=maintenant(),j=today();
+    if(n.getUTCHours()>=R.rapportHeure&&LS('rapport_notifie')!==j){
+      SS('rapport_notifie',j);
+      try{
+        const r=await construireRapport(j);
+        const court='Ventes '+fmt(r.tot.ca)+' · net '+fmt(r.tot.net)+(r.alertes.length?' · ⚠️ '+r.alertes.length+' alerte(s)':'');
+        addNotif('📊 Rapport du jour prêt',court,'info');
+        notifier('📊 Rapport du jour — Mon Négoce',court);
+        toast('📊 Rapport du jour prêt : '+court,'info');
+      }catch(e){}
+    }
+  };
+  // Matin: rapport d'hier pas encore consulté -> on l'ouvre une fois
+  setTimeout(()=>{
+    const hier=new Date(maintenant().getTime()-86400000).toISOString().slice(0,10);
+    if(maintenant().getUTCHours()<12&&LS('rapport_vu')!==hier&&LS('rapport_vu')!==today()&&(DB.factures||[]).some(f=>f&&_rapDansJour(f.date,hier)))
+      ouvrirRapport(hier);
+  },6000);
+  verifier();setInterval(verifier,60*1000);
+}
+function chargerReglagesAlertes(){
+  const R=reglagesAlertes();
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v;};
+  set('ra-heure',R.rapportHeure);set('ra-remise',R.remiseMax);set('ra-ouv',R.ouverture);set('ra-ferm',R.fermeture);set('ra-ecart',R.ecartMax);
+  const c=document.getElementById('ra-actives');if(c)c.checked=R.actives;
+}
+function sauverReglagesAlertes(){
+  const n=(id,min,max,def)=>{const v=Number(document.getElementById(id)?.value);return isFinite(v)&&v>=min&&v<=max?v:def;};
+  DB.settings.alertes={rapportHeure:n('ra-heure',0,23,20),remiseMax:n('ra-remise',1,100,15),ouverture:n('ra-ouv',0,23,8),
+    fermeture:n('ra-ferm',1,24,22),ecartMax:n('ra-ecart',0,10000000,2000),actives:!!document.getElementById('ra-actives')?.checked};
+  save();toast('✅ Réglages du rapport et des alertes enregistrés','ok');
+}
+
 // ══ NOTIFICATIONS SYSTÈME ══
 // Prévient l'administrateur même quand l'application n'est pas au premier plan.
 function demanderNotifications(){
@@ -8637,7 +8920,7 @@ function installerRaccourcis(){
       // Entrée = encaisser, Suppr = vider le panier, + = mettre en attente
       if(e.key==='Enter'&&cart.length){e.preventDefault();validerVente();return;}
       if(e.key==='Delete'&&cart.length){e.preventDefault();
-        if(confirm('Vider le panier ?')){cart=[];renderCart();renderGrid();}return;}
+        if(confirm('Vider le panier ?')){try{noterPanierVide(cart.reduce((x,i)=>x+(Number(i.qty)||0),0),cart.reduce((x,i)=>x+(Number(i.prix)||0)*(Number(i.qty)||0),0));}catch(e){}cart=[];renderCart();renderGrid();}return;}
       if(e.key==='+'&&cart.length){e.preventDefault();enregistrerBrouillon();return;}
     }
     // / = aller à la recherche
