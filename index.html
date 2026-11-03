@@ -2328,6 +2328,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <div class="scan-outils">
         <button class="btn btn-ghost btn-sm" id="scan-torche" style="display:none;" onclick="scanTorche()" title="Allumer / éteindre le flash">🔦 Flash</button>
         <button class="btn btn-ghost btn-sm" onclick="scanChangerCamera()" title="Caméra avant / arrière">🔄 Caméra</button>
+        <button class="btn btn-ghost btn-sm" id="scan-bip" onclick="basculerBipsScan()" title="Activer / couper les bips">🔊 Bip</button>
         <button class="btn btn-ghost btn-sm" onclick="document.getElementById('scan-fichier').click()" title="Lire le code sur une photo">🖼️ Photo</button>
         <input type="file" id="scan-fichier" accept="image/*" style="display:none;" onchange="scanDepuisPhoto(this)">
         <label class="scan-rafale" id="scan-rafale-wrap"><input type="checkbox" id="scan-rafale" onchange="scanMajMode()"> 🛒 Ajout direct au panier</label>
@@ -2398,7 +2399,20 @@ canvas.chart-canvas{display:block;width:100%!important;}
 <script>
 // ══ AUDIO ══
 let AC;try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){AC=null;}
-function pt(f,d,t='sine',v=.3){if(!AC)return;try{const o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.type=t;o.frequency.value=f;g.gain.setValueAtTime(v,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+d);o.start();o.stop(AC.currentTime+d);}catch(e){}}
+function _reveillerSon(){try{if(AC&&(AC.state==='suspended'||AC.state==='interrupted'))AC.resume();}catch(e){}}
+['pointerdown','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,_reveillerSon,{passive:true,capture:true}));
+function pt(f,d,t='sine',v=.3,retard=0){if(!AC)return;_reveillerSon();try{const o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.type=t;o.frequency.value=f;const t0=AC.currentTime+retard;g.gain.setValueAtTime(0.0001,AC.currentTime);g.gain.setValueAtTime(v,t0);g.gain.exponentialRampToValueAtTime(.001,t0+d);o.start(t0);o.stop(t0+d+.02);}catch(e){}}
+// ── Bips du lecteur (comme une vraie caisse) ──
+// ok = un bip aigu court · inconnu = deux bips graves · refus (stock) = buzz grave
+function bipsScanActifs(){const v=LS('scan_bip');return v===null?true:!!v;}
+function bipScan(type){
+  if(!bipsScanActifs())return;
+  if(type==='ok'){pt(2400,.09,'square',.12);}
+  else if(type==='inconnu'){pt(520,.11,'square',.16);pt(520,.11,'square',.16,.16);}
+  else if(type==='refus'){pt(170,.35,'sawtooth',.25);}
+}
+function basculerBipsScan(){const on=!bipsScanActifs();SS('scan_bip',on);majBoutonBip();if(on)bipScan('ok');toast(on?'🔊 Bips du lecteur activés':'🔇 Bips du lecteur coupés','info');}
+function majBoutonBip(){const b=document.getElementById('scan-bip');if(b)b.textContent=bipsScanActifs()?'🔊 Bip':'🔇 Bip';}
 function soundOk(){pt(523,.1,'sine',.4);setTimeout(()=>pt(659,.1,'sine',.4),100);setTimeout(()=>pt(784,.3,'sine',.4),200);}
 function soundErr(){pt(200,.3,'sawtooth',.3);}
 function soundDoublon(){pt(300,.15,'square',.3);setTimeout(()=>pt(300,.15,'square',.3),180);}
@@ -8564,10 +8578,10 @@ function recevoirCode(code){
     const l=_recLignes.find(x=>x.id===r.p.id);
     if(l)l.qte++;
     else _recLignes.unshift({id:r.p.id,qte:1,achat:r.p.achat||0});
-    try{soundOk();}catch(e){}
+    bipScan('ok');
     _recInconnu=null;
   } else {
-    try{soundErr();}catch(e){}
+    bipScan('inconnu');
     _recInconnu={code,choix:r.plusieurs||null};
   }
   _recSauver();
@@ -9024,7 +9038,7 @@ function scanVersPanier(code,opts){
   const champ=opts.sansFocus?null:document.getElementById('pos-scan');
   const p=_trouverParCode(code);
   if(!p){
-    soundErr&&soundErr();
+    bipScan('inconnu');
     // Code inconnu à la douchette: ouvrir le lecteur pour le rattacher ou créer le produit
     if(!opts.sansFocus&&!document.getElementById('modal-scanner')?.classList.contains('open')){
       openScanner({camera:false,rafale:true});
@@ -9037,7 +9051,7 @@ function scanVersPanier(code,opts){
   }
   const dispo=stockDisponible(p,session.boutique);
   if(dispo<=0){
-    soundErr&&soundErr();
+    bipScan('refus');
     toast('⛔ '+p.nom+' — stock épuisé'+(qteReservee(p.id,session.boutique)?' (réservé en attente)':''),'err');
     if(champ){champ.value='';champ.focus();}
     return false;
@@ -9046,7 +9060,7 @@ function scanVersPanier(code,opts){
   const ligne=cart.find(i=>i.id===p.id);
   const dejaAuPanier=ligne?ligne.qty:0;
   if(dejaAuPanier+1>dispo){
-    soundErr&&soundErr();
+    bipScan('refus');
     toast('⛔ '+p.nom+' — seulement '+dispo+' disponible(s)','err');
     if(champ){champ.value='';champ.focus();}
     return false;
@@ -9054,7 +9068,7 @@ function scanVersPanier(code,opts){
   if(ligne)ligne.qty++;
   else cart.push({id:p.id,nom:p.nom,prix:Number(p.prix)||0,achat:Number(p.achat)||0,
                   qty:1,unite:p.unite||'pièce'});
-  soundOk&&soundOk();
+  bipScan('ok');
   toast('🛒 '+p.nom+' ×'+(ligne?ligne.qty:1),'ok');
   try{renderCart();}catch(e){}
   if(champ){champ.value='';champ.focus();}
@@ -10481,7 +10495,7 @@ function associerCodeProduit(p,code,boutique){
   if(!p||!code)return false;
   if(code.length>64||!/^[0-9A-Za-z\-_.\/]{3,}$/.test(code)){toast('⚠️ Ce contenu n\'est pas un code-barres : non enregistré','warn');return false;}
   const autre=(DB.produits||[]).find(x=>x&&x.id!==p.id&&_codesProduit(x).some(k=>_variantesCode(k).includes(code)));
-  if(autre){soundErr&&soundErr();toast('⚠️ Ce code appartient déjà à « '+autre.nom+' »','err');return false;}
+  if(autre){bipScan('refus');toast('⚠️ Ce code appartient déjà à « '+autre.nom+' »','err');return false;}
   if(_codesProduit(p).includes(code))return true;
   if(!p.codeBarre)p.codeBarre=code;
   else{p.codesAlt=Array.isArray(p.codesAlt)?p.codesAlt.filter(Boolean):[];p.codesAlt.push(code);}
@@ -10507,7 +10521,7 @@ function openScanner(opts){
   if(raf){raf.checked=!_scanCible&&_peutVendre()&&(opts.rafale!=null?!!opts.rafale:enCaisse);}
   const wrapRaf=document.getElementById('scan-rafale-wrap');if(wrapRaf)wrapRaf.style.display=(_scanCible||!_peutVendre())?'none':'';
   document.getElementById('scan-titre').textContent=_scanCible?'📷 Scanner le code du produit':'📷 Lecteur codes-barres & QR';
-  _scanSession=[];_scanInconnu=null;renderScanSession();
+  _scanSession=[];_scanInconnu=null;renderScanSession();majBoutonBip();_reveillerSon();
   const m=document.getElementById('barcode-manual');if(m)m.value='';
   const res=document.getElementById('scanner-result');res.style.display='none';res.innerHTML='';
   if(opts.camera===false){
@@ -10564,7 +10578,7 @@ async function scanDepuisPhoto(input){
   try{
     const code=await lireCodeDansImage(f);
     if(code)scanTraiter(code,'photo');
-    else{soundErr&&soundErr();scanStatut('❌ Aucun code lisible sur la photo — rapprochez-vous et évitez les reflets');}
+    else{bipScan('inconnu');scanStatut('❌ Aucun code lisible sur la photo — rapprochez-vous et évitez les reflets');}
   }catch(e){scanStatut('❌ Lecture impossible : '+(e.message||e));}
 }
 function closeScanner(){
@@ -10587,16 +10601,16 @@ function scanTraiter(brut,source){
     const champ=document.getElementById(_scanCible);
     const r=trouverProduitScan(code);
     const eid=document.getElementById('mp-id')?.value||'';
-    if(r.p&&r.via==='code'&&r.p.id!==eid){soundErr&&soundErr();_vibrer([80,60,80]);_scanFlash(false);
+    if(r.p&&r.via==='code'&&r.p.id!==eid){bipScan('refus');_vibrer([80,60,80]);_scanFlash(false);
       scanStatut('⚠️ Ce code appartient déjà à « '+r.p.nom+' »');return;}
     if(champ){champ.value=code;champ.dispatchEvent(new Event('input'));}
-    soundOk&&soundOk();_vibrer(60);
+    bipScan('ok');_vibrer(60);
     toast('📷 Code lu : '+code,'ok');
     closeScanner();return;
   }
   const r=trouverProduitScan(code);
   _scanFlash(!!r.p);
-  if(!r.p){scanAfficherInconnu(r);soundErr&&soundErr();_vibrer([80,60,80]);return;}
+  if(!r.p){scanAfficherInconnu(r);bipScan('inconnu');_vibrer([80,60,80]);return;}
   const raf=document.getElementById('scan-rafale');
   if(raf&&raf.checked&&_peutVendre()){
     const ok=scanVersPanier(r.p.id,{sansFocus:true});
@@ -10604,7 +10618,7 @@ function scanTraiter(brut,source){
     else _vibrer([80,60,80]);
     scanAfficherFiche(r.p,r,ok?'ajoute':'refuse');
   } else {
-    soundOk&&soundOk();_vibrer(60);
+    bipScan('ok');_vibrer(60);
     scanAfficherFiche(r.p,r,'');
   }
 }
