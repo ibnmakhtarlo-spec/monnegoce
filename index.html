@@ -233,6 +233,10 @@ tbody tr:hover{background:var(--surf2);}
 .piinfo{flex:1;}
 .piname{font-size:11px;font-weight:700;}
 .piqty{display:flex;align-items:center;gap:3px;}
+.qte-edit{width:38px;background:var(--surf3);border:1px solid var(--border2);border-radius:4px;padding:2px 3px;color:var(--text);font-family:var(--mono);font-size:11px;font-weight:800;text-align:center;outline:none;-moz-appearance:textfield;}
+.qte-edit::-webkit-outer-spin-button,.qte-edit::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.pos-mult{background:rgba(245,158,11,.15);border:1px solid var(--gold);color:var(--gold);border-radius:7px;padding:6px 9px;font-size:12px;margin-bottom:7px;}
+.qte-edit:focus{border-color:var(--gold);}
 .qb{background:var(--surf3);border:1px solid var(--border2);color:var(--text);width:19px;height:19px;border-radius:4px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;}
 .qb:hover{border-color:var(--gold);color:var(--gold);}
 .pitot{font-size:11px;font-weight:700;color:var(--gold);min-width:65px;text-align:right;font-family:var(--mono);}
@@ -744,10 +748,10 @@ canvas.chart-canvas{display:block;width:100%!important;}
     <div class="pos-layout">
       <div class="pos-left">
         <div style="display:flex;gap:6px;align-items:stretch;">
-          <input class="srch" style="flex:1;min-width:0" placeholder="🔍 Produit, référence, code-barres..." id="pos-srch" oninput="renderGridDiffere()">
+          <input class="srch" style="flex:1;min-width:0" placeholder="🔍 Produit, référence, code-barres..." id="pos-srch" oninput="renderGridDiffere()" onkeydown="posSrchEntree(event)" title="Astuce : tapez 5* puis touchez un produit pour en ajouter 5">
           <button class="btn btn-purple pos-voix-btn" id="pos-voix-btn" onclick="dicterVente()" title="Dicter la vente : « 2 câbles type C et une pochette pour Moussa, en Wave »">🎤</button>
         </div>
-        <div class="pos-prods"><div class="pgrid" id="pos-grid"></div></div>
+        <div class="pos-prods"><div id="pos-info"></div><div class="pgrid" id="pos-grid"></div></div>
       </div>
       <div class="pos-right">
         <div class="panwrap">
@@ -3523,7 +3527,8 @@ function renderGridDiffere(){
 const POS_MAX_AFFICHE=0;   // 0 = aucune limite, tous les produits sont affichés
 function renderGrid(){
   assainirDB();
-  const qBrut=(document.getElementById('pos-srch')?.value||'');
+  const _mult=_multPOS();
+  const qBrut=_mult?_mult.reste:(document.getElementById('pos-srch')?.value||'');
   const q=_norm(qBrut);
   const mots=q.split(' ').filter(Boolean);
   // Recherche par mots, insensible aux accents, sur nom + référence + code-barres
@@ -3534,7 +3539,7 @@ function renderGrid(){
   });
   // Ordre du catalogue conservé, comme avant: pas de tri, pas de limite.
   const info=document.getElementById('pos-info');
-  if(info)info.innerHTML='';
+  if(info)info.innerHTML=_mult?`<div class="pos-mult">✖️ Quantité <b>${_mult.n}</b> — touchez un produit pour l'ajouter ${_mult.n} fois</div>`:'';
   const stk=p=>session.boutique==='B1'?p.s1:p.s2;
   document.getElementById('pos-grid').innerHTML=list.length
     ?list.map(p=>`<div class="pbtn ${stk(p)<=0?'oos':''}" onclick="addCart('${p.id}')">
@@ -3546,20 +3551,62 @@ function renderGrid(){
 function addCart(id){
   const p=DB.produits.find(x=>x.id===id);if(!p)return;
   const ms=session.boutique==='B1'?p.s1:p.s2;const ex=cart.find(x=>x.id===id);
-  if(ex){if(ex.qty>=ms){soundErr();toast('Stock insuffisant','err');return;}ex.qty++;}
-  else{
-    if(ms<=0){soundErr();toast('Rupture de stock','err');return;}
-    if((p.achat||0)===0){toast('⚠️ Prix d\'achat non défini pour '+p.nom,'info');}
-    cart.push({id:p.id,nom:p.nom,prix:p.prix,achat:p.achat||0,unite:p.unite,qty:1,ms,_achatZero:(!p.achat||p.achat===0)});
+  // Quantité tapée avant (« 5* ») : ajoute 5 d'un coup
+  const mult=_multPOS();let n=mult?mult.n:1;
+  const deja=ex?ex.qty:0;
+  if(deja+n>ms){
+    if(deja>=ms||ms<=0){soundErr();toast(ms<=0?'Rupture de stock':'Stock insuffisant','err');return;}
+    soundErr();toast('⛔ Seulement '+ms+' en stock : '+(ms-deja)+' ajouté(s)','err');n=ms-deja;
   }
+  if(ex){ex.qty+=n;}
+  else{
+    if((p.achat||0)===0){toast('⚠️ Prix d\'achat non défini pour '+p.nom,'info');}
+    cart.push({id:p.id,nom:p.nom,prix:p.prix,achat:p.achat||0,unite:p.unite,qty:n,ms,_achatZero:(!p.achat||p.achat===0)});
+  }
+  if(mult){const s=document.getElementById('pos-srch');if(s){s.value='';}renderGrid();toast('🛒 '+p.nom+' ×'+n,'ok');}
   document.getElementById('btn-voir-fact').style.display='none';pt(660,.08,'sine',.25);renderCart();
+}
+// Quantité tapée directement dans le panier
+function _maxPanier(id){
+  const p=DB.produits.find(x=>x.id===id);if(!p)return Infinity;
+  try{return Math.max(0,stockDisponible(p,session.boutique));}catch(e){return Number(session.boutique==='B1'?p.s1:p.s2)||0;}
+}
+function setQty(id,val){
+  const i=cart.find(x=>x.id===id);if(!i)return;
+  let n=parseInt(String(val).replace(/\s/g,''),10);
+  if(isNaN(n)){renderCart();return;}
+  if(n<=0){cart=cart.filter(x=>x.id!==id);toast('🗑️ '+i.nom+' retiré du panier','info');renderCart();try{renderGrid();}catch(e){}return;}
+  const max=_maxPanier(id);
+  if(n>max){soundErr();toast('⛔ '+i.nom+' : seulement '+max+' en stock','err');n=max;}
+  if(n<=0){cart=cart.filter(x=>x.id!==id);renderCart();return;}
+  i.qty=n;i.ms=max;
+  renderCart();
+}
+// « 5* » ou « 5x » avant un produit = ajouter 5 d'un coup
+function _multPOS(){
+  const v=document.getElementById('pos-srch')?.value||'';
+  const m=v.match(/^\s*(\d{1,4})\s*[*x×X]\s*(.*)$/);
+  return m&&+m[1]>0?{n:+m[1],reste:m[2]}:null;
+}
+function posSrchEntree(e){
+  if(e.key!=='Enter')return;
+  const m=_multPOS();if(!m||!m.reste.trim())return;
+  e.preventDefault();
+  let p=null;try{p=trouverProduitScan(m.reste).p;}catch(x){}
+  if(!p){
+    const n=_norm(m.reste);const mots=n.split(' ').filter(Boolean);
+    const l=DB.produits.filter(x=>{const c=_norm((x.nom||'')+' '+(x.ref||'')+' '+(x.codeBarre||''));return mots.every(w=>c.includes(w));});
+    if(l.length===1)p=l[0];
+    else{soundErr();toast(l.length?'Plusieurs produits : touchez le bon dans la liste':'Aucun produit trouvé','err');return;}
+  }
+  addCart(p.id);
 }
 function changeQty(id,d){const i=cart.find(x=>x.id===id);if(!i)return;i.qty+=d;if(i.qty<=0)cart=cart.filter(x=>x.id!==id);else if(i.qty>i.ms){i.qty=i.ms;toast('Stock max','err');}renderCart();}
 function updateCartPrix(id,val){const i=cart.find(x=>x.id===id);if(!i)return;const p=parseFloat(val);if(!isNaN(p)&&p>=0){i.prix=p;calcCart();}}
 function clearCart(){try{noterPanierVide(cart.reduce((s,i)=>s+(Number(i.qty)||0),0),cart.reduce((s,i)=>s+(Number(i.prix)||0)*(Number(i.qty)||0),0));}catch(e){}cart=[];clearPOSClientSel();document.getElementById('btn-voir-fact').style.display='none';renderCart();}
 function renderCart(){
   const body=document.getElementById('pan-body');if(!body)return;
-  body.innerHTML=cart.length?cart.map(i=>`<div class="pi" style="${(!i.achat||i.achat===0)?'border-left:3px solid var(--red);':''}">${(!i.achat||i.achat===0)?'<div style="font-size:9px;color:var(--red);font-weight:800;padding:1px 6px;">⚠️ Prix achat = 0</div>':''}<div class="piinfo"><div class="piname">${i.nom}</div><div style="font-size:9px;color:var(--text2);display:flex;align-items:center;gap:2px;"><input class="prix-edit" type="number" value="${i.prix}" min="0" onchange="updateCartPrix('${i.id}',this.value)"> FCFA</div></div><div class="piqty"><div class="qb" onclick="changeQty('${i.id}',-1)">−</div><span style="font-size:10px;font-weight:700;min-width:14px;text-align:center">${i.qty}</span><div class="qb" onclick="changeQty('${i.id}',1)">+</div></div><div class="pitot">${fmt(i.prix*i.qty)}</div></div>`).join(''):`<div class="empty"><div class="ei">🛒</div>Panier vide</div>`;
+  body.innerHTML=cart.length?cart.map(i=>`<div class="pi" style="${(!i.achat||i.achat===0)?'border-left:3px solid var(--red);':''}">${(!i.achat||i.achat===0)?'<div style="font-size:9px;color:var(--red);font-weight:800;padding:1px 6px;">⚠️ Prix achat = 0</div>':''}<div class="piinfo"><div class="piname">${i.nom}</div><div style="font-size:9px;color:var(--text2);display:flex;align-items:center;gap:2px;"><input class="prix-edit" type="number" value="${i.prix}" min="0" onchange="updateCartPrix('${i.id}',this.value)"> FCFA</div></div><div class="piqty"><div class="qb" onclick="changeQty('${i.id}',-1)">−</div><input class="qte-edit" type="number" inputmode="numeric" min="0" step="1" value="${i.qty}" title="Tapez la quantité" onfocus="this.select()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" onchange="setQty('${i.id}',this.value)"><div class="qb" onclick="changeQty('${i.id}',1)">+</div></div><div class="pitot">${fmt(i.prix*i.qty)}</div></div>`).join(''):`<div class="empty"><div class="ei">🛒</div>Panier vide</div>`;
   calcCart();
 }
 function calcCart(){
