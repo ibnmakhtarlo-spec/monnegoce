@@ -810,6 +810,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
             <button class="btn btn-gold" style="width:100%;padding:9px;margin-top:7px;font-size:13px;" onclick="validerVente()">✅ Valider & Encaisser</button>
             <button class="btn btn-ghost" style="width:100%;padding:8px;margin-top:5px;font-size:12px;" onclick="enregistrerBrouillon()">📋 Mettre en attente (pas encore payé)</button>
             <button class="btn btn-ghost" id="btn-voir-fact" style="width:100%;padding:6px;margin-top:4px;font-size:12px;display:none;" onclick="openFactDetail(lastFactId)">🧾 Voir / Imprimer Facture</button>
+            <button class="btn btn-gold" id="btn-ticket" style="width:100%;padding:6px;margin-top:4px;font-size:12px;display:none;" onclick="imprimerTicket(lastFactId)">🖨️ Imprimer le ticket</button>
           </div>
         </div>
       </div>
@@ -1450,6 +1451,22 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <button class="btn btn-gold" style="margin-top:8px;" onclick="saveSettingsGen()">💾 Enregistrer</button>
     </div>
     <div class="setting-card">
+      <h4>🖨️ Ticket de caisse (imprimante thermique)</h4>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Réglé pour <b>cet appareil</b> : chaque caisse peut avoir son imprimante.</div>
+      <div class="fgrid">
+        <div class="fg"><label>Format du papier</label><select id="tk-format"><option value="80">Rouleau 80 mm</option><option value="58">Rouleau 58 mm</option><option value="a4">Feuille A4 (facture classique)</option></select></div>
+        <div class="fg"><label>Décalage gauche/droite (mm)</label><input type="number" id="tk-marge" step="0.5" min="-4" max="4" value="0"></div>
+        <div class="fg full"><label>Message en bas du ticket</label><input id="tk-message" maxlength="120" placeholder="Merci pour votre achat !"></div>
+      </div>
+      <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin:4px 0;"><input type="checkbox" id="tk-auto"> Imprimer le ticket automatiquement après chaque vente</label>
+      <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin:4px 0;"><input type="checkbox" id="tk-logo"> Logo de la boutique en haut</label>
+      <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin:4px 0;"><input type="checkbox" id="tk-lettres"> Montant en lettres</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+        <button class="btn btn-gold" onclick="sauverReglagesTicket()">💾 Enregistrer</button>
+        <button class="btn btn-ghost" onclick="ticketEssai()">🧾 Imprimer un ticket d'essai</button>
+      </div>
+    </div>
+    <div class="setting-card">
       <h4>📊 Rapport du soir & alertes en caisse</h4>
       <div class="fgrid">
         <div class="fg"><label>Heure du rapport (0–23)</label><input type="number" id="ra-heure" min="0" max="23"></div>
@@ -1797,6 +1814,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <button class="btn btn-blue btn-sm" onclick="genererFacturePDF()">⬇️ PDF</button>
       <button class="btn btn-green btn-sm" onclick="ouvrirPartageFacture(currentFact&&currentFact.id)">📤 Envoyer au client</button>
       <button class="wabtn" onclick="waShare()">📲 WhatsApp</button>
+      <button class="btn btn-ghost btn-sm" onclick="currentFact&&imprimerTicket(currentFact.id)">🧾 Ticket</button>
       <button class="btn btn-gold" onclick="printFact()">🖨 Imprimer</button>
     </div>
   </div>
@@ -2267,8 +2285,8 @@ canvas.chart-canvas{display:block;width:100%!important;}
 <!-- REÇU THERMIQUE MODAL -->
 <div class="overlay" id="modal-thermal">
   <div class="modal sm">
-    <div class="mtitle"><span>🖨️ Reçu Thermique (80mm)</span><span class="mclose" onclick="closeModal('modal-thermal')">✕</span></div>
-    <div id="thermal-content" style="background:#fff;border-radius:7px;padding:11px;overflow-y:auto;max-height:400px;"></div>
+    <div class="mtitle"><span id="thermal-titre">🖨️ Ticket de caisse</span><span class="mclose" onclick="closeModal('modal-thermal')">✕</span></div>
+    <div id="thermal-content" style="background:#fff;border-radius:7px;padding:11px;overflow-y:auto;max-height:60vh;"></div>
     <div class="mfooter">
       <button class="btn btn-ghost" onclick="closeModal('modal-thermal')">Fermer</button>
       <button class="btn btn-gold" onclick="printThermal()">🖨️ Imprimer</button>
@@ -3433,7 +3451,7 @@ function fermerMenu(){
 
 function nav(page){
   assainirDB();
-  if(page==='parametres')setTimeout(()=>{try{chargerReglagesAlertes();}catch(e){}},0);
+  if(page==='parametres')setTimeout(()=>{try{chargerReglagesAlertes();}catch(e){}try{chargerReglagesTicket();}catch(e){}},0);
   // Sécurité: pages strictement admin, bloquées même via appel direct (console, etc.)
   const adminStrictPages=['comparaison','previsions','connexions','audit'];
   if(adminStrictPages.includes(page)&&session.user?.role!=='admin'){
@@ -3564,7 +3582,7 @@ function addCart(id){
     cart.push({id:p.id,nom:p.nom,prix:p.prix,achat:p.achat||0,unite:p.unite,qty:n,ms,_achatZero:(!p.achat||p.achat===0)});
   }
   if(mult){const s=document.getElementById('pos-srch');if(s){s.value='';}renderGrid();toast('🛒 '+p.nom+' ×'+n,'ok');}
-  document.getElementById('btn-voir-fact').style.display='none';pt(660,.08,'sine',.25);renderCart();
+  document.getElementById('btn-voir-fact').style.display='none';const _bt=document.getElementById('btn-ticket');if(_bt)_bt.style.display='none';pt(660,.08,'sine',.25);renderCart();
 }
 // Quantité tapée directement dans le panier
 function _maxPanier(id){
@@ -3709,11 +3727,15 @@ function validerVente(){
     const newPoints=Math.floor(total/1000);
     client.points=(client.points||0)+newPoints;
     if(newPoints>0)toast('🎁 '+client.nom+' gagne '+newPoints+' point(s) fidélité !','info');}
+  // Montant reçu en espèces: pour afficher la monnaie rendue sur le ticket
+  if(mode==='especes'){const _r=parseFloat(document.getElementById('pos-recu')?.value)||0;if(_r>0)fac.recu=_r;}
   logAction('Vente','Facture '+fac.id+' — '+fmt(total)+' — '+mode);
   try{controlerVenteSuspecte(fac,r);}catch(e){console.error('contrôle vente:',e);}
   window._stocksPushTime=Date.now();save();currentFact=JSON.parse(JSON.stringify(fac));lastFactId=fac.id;cart=[];document.getElementById('p-rem').value='0';const pr=document.getElementById('pos-recu');if(pr)pr.value='';const pa=document.getElementById('pos-acompte');if(pa)pa.value='';calcMonnaie();calcAcompte();clearPOSClientSel();
   soundOk();playBarakalLah();renderCart();renderGrid();
   const btnF=document.getElementById('btn-voir-fact');btnF.style.display='block';btnF.textContent=`🧾 Facture ${fac.id}`;
+  const btnT=document.getElementById('btn-ticket');if(btnT){btnT.style.display='block';}
+  try{if(reglagesTicket().auto)setTimeout(()=>imprimerTicket(fac.id),300);}catch(e){}
   toast(`✅ ${fac.id} — ${fmt(total)} · Barakal lah 🤲`,'ok');
 }
 
@@ -11200,8 +11222,131 @@ function renderChartsForDash(){
   },50);
 }
 
-// ══ REÇU THERMIQUE ══
+// ══ TICKET DE CAISSE (imprimante thermique 80 mm / 58 mm) ══
+// Réglage propre à chaque appareil (chaque caisse a sa propre imprimante).
+function reglagesTicket(){
+  const d={format:'80',auto:false,lettres:true,logo:true,message:'Merci pour votre achat !',marge:0};
+  return Object.assign(d,LS('ticket_cfg')||{});
+}
+function _tEsc(v){return escapeHtml(String(v==null?'':v));}
+// Construit le ticket (HTML) pour une facture
+function ticketHTML(f,cfg){
+  cfg=cfg||reglagesTicket();
+  const s=DB.settings[f.boutique]||{};
+  const items=(f.items||[]).map(i=>({nom:String(i.nom||'?'),prix:Number(i.prix)||0,qty:Number(i.qty)||0}));
+  const sub=items.reduce((t,i)=>t+i.prix*i.qty,0);
+  const remPct=Number(f.remise)||0, remise=Math.round(sub*remPct/100);
+  const total=Number(f.total)||Math.round(sub-remise);
+  const nbArt=items.reduce((t,i)=>t+i.qty,0);
+  const L=(g,d,cls)=>`<div class="l${cls?' '+cls:''}"><span>${g}</span><span>${d}</span></div>`;
+  const modes={especes:'Espèces',wave:'Wave',orange:'Orange Money',mobile:'Mobile Money',carte:'Carte',credit:'Crédit',acompte:'Acompte'};
+  const dt=new Date(f.date);
+  let h='';
+  if(cfg.logo&&isImgLogo(s.logo))h+=`<div class="c"><img class="logo" src="${s.logo}" alt=""></div>`;
+  h+=`<div class="c nom">${_tEsc((s.nom||getBName(f.boutique)||'Mon Négoce').toUpperCase())}</div>`;
+  if(s.adr)h+=`<div class="c p">${_tEsc(s.adr)}</div>`;
+  if(s.tel)h+=`<div class="c p">Tél : ${_tEsc(s.tel)}</div>`;
+  h+='<div class="sep"></div>';
+  h+=L('Ticket',_tEsc(f.id));
+  h+=L('Date',dt.toLocaleDateString('fr-FR')+' '+dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}));
+  h+=L('Caissier',_tEsc(f.vendeur||'—'));
+  if(f.client&&f.client!=='Anonyme')h+=L('Client',_tEsc(f.client));
+  h+='<div class="sep"></div>';
+  items.forEach(i=>{
+    h+=`<div class="art">${_tEsc(i.nom)}</div>`;
+    h+=L(`&nbsp;&nbsp;${i.qty} x ${_fmtBase(i.prix)}`,_fmtBase(i.prix*i.qty));
+  });
+  h+='<div class="sep"></div>';
+  h+=L(nbArt+' article'+(nbArt>1?'s':''),'');
+  if(remPct>0){h+=L('Sous-total',_fmtBase(sub));h+=L('Remise '+remPct+'%','-'+_fmtBase(remise));}
+  h+=L('TOTAL',_fmtBase(total)+' F','tot');
+  h+=L('Paiement',_tEsc(modes[f.mode]||f.mode||''));
+  if(f.mode==='especes'&&Number(f.recu)>0){h+=L('Reçu',_fmtBase(f.recu));h+=L('Monnaie rendue',_fmtBase(Math.max(0,Number(f.recu)-total)));}
+  if(f.mode==='acompte'){h+=L('Acompte versé',_fmtBase(f.acompteVerse||0));h+=L('Reste à payer',_fmtBase(Math.max(0,total-(Number(f.acompteVerse)||0))),'b');}
+  if(f.mode==='credit')h+=L('Reste à payer',_fmtBase(total),'b');
+  if(cfg.lettres){try{const m=montantEnLettres(total);h+=`<div class="p let">${_tEsc(m.charAt(0).toUpperCase()+m.slice(1))}${/franc/i.test(m)?'':' francs CFA'}</div>`;}catch(e){}}
+  h+='<div class="sep"></div>';
+  if(cfg.message)h+=`<div class="c msg">${_tEsc(cfg.message)}</div>`;
+  const legal=[s.ninea?'NINEA '+s.ninea:'',s.rc?'RC '+s.rc:''].filter(Boolean).join(' · ');
+  if(legal)h+=`<div class="c p">${_tEsc(legal)}</div>`;
+  return h;
+}
+function _ticketCSS(cfg){
+  // Zone imprimable réelle : 72 mm sur rouleau 80, 48 mm sur rouleau 58
+  const l=cfg.format==='58'?48:72, pap=cfg.format==='58'?58:80;
+  const fs=cfg.format==='58'?8.5:10;
+  return `@page{size:${pap}mm auto;margin:0}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#fff;color:#000}
+  body{width:${pap}mm;padding:2mm ${((pap-l)/2+(Number(cfg.marge)||0)).toFixed(1)}mm 4mm;font-family:Arial,Helvetica,sans-serif;font-size:${fs}pt;line-height:1.25;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .t{width:${l}mm}
+  .c{text-align:center}.nom{font-size:${fs+3}pt;font-weight:900;letter-spacing:.5px;margin:1mm 0}
+  .p{font-size:${fs-1.5}pt}.logo{max-width:60%;max-height:18mm;filter:grayscale(1) contrast(1.4);margin-bottom:1mm}
+  .sep{border-top:1px dashed #000;margin:1.6mm 0}
+  .l{display:flex;justify-content:space-between;gap:2mm}.l span:last-child{text-align:right;white-space:nowrap}
+  .art{font-weight:700;margin-top:.8mm;word-break:break-word}
+  .tot{font-size:${fs+4}pt;font-weight:900;border-top:2px solid #000;border-bottom:2px solid #000;padding:1mm 0;margin:1.2mm 0}
+  .b{font-weight:900}.let{font-style:italic;margin-top:1mm}.msg{font-weight:700;margin:1mm 0}`;
+}
+// Imprime le ticket d'une facture (sans toucher au reste de la page)
+function imprimerTicket(factId,format){
+  const f=DB.factures.find(x=>x.id===factId)||(currentFact&&currentFact.id===factId?currentFact:null);
+  if(!f){toast('Facture introuvable','err');return;}
+  const cfg=reglagesTicket();if(format)cfg.format=format;
+  if(cfg.format==='a4'){const ancien=currentFact;currentFact=JSON.parse(JSON.stringify(f));printFact();currentFact=ancien;return;}
+  const doc=`<!doctype html><html><head><meta charset="utf-8"><title>Ticket ${_tEsc(f.id)}</title><style>${_ticketCSS(cfg)}</style></head><body><div class="t">${ticketHTML(f,cfg)}</div></body></html>`;
+  let fr=document.getElementById('ticket-frame');if(fr)fr.remove();
+  fr=document.createElement('iframe');fr.id='ticket-frame';
+  fr.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+  document.body.appendChild(fr);
+  const d=fr.contentWindow.document;d.open();d.write(doc);d.close();
+  const lancer=()=>{try{fr.contentWindow.focus();fr.contentWindow.print();}catch(e){toast('Impression impossible sur cet appareil','err');}try{window.focus();}catch(e){}};
+  // Attendre le logo avant d'imprimer
+  const img=d.querySelector('img');
+  let fait=false;const go=()=>{if(fait)return;fait=true;lancer();};
+  if(img&&!img.complete){img.onload=img.onerror=()=>setTimeout(go,50);setTimeout(go,1500);}
+  else setTimeout(go,250);
+}
+// Aperçu (fenêtre « Reçu thermique »)
 function openThermalReceipt(factId){
+  const f=DB.factures.find(x=>x.id===factId);if(!f)return;
+  const cfg=reglagesTicket();
+  window._ticketApercuId=factId;
+  const larg=cfg.format==='58'?220:290;
+  document.getElementById('thermal-titre').textContent='🖨️ Ticket de caisse ('+(cfg.format==='a4'?'A4':cfg.format+' mm')+')';
+  document.getElementById('thermal-content').innerHTML=`<style>#thermal-content .tk{width:${larg}px;margin:0 auto;color:#000;font-family:Arial,sans-serif;font-size:12px;line-height:1.3}
+   #thermal-content .tk .c{text-align:center}#thermal-content .tk .nom{font-size:15px;font-weight:900}#thermal-content .tk .p{font-size:10px}
+   #thermal-content .tk .logo{max-width:60%;max-height:60px;filter:grayscale(1)}#thermal-content .tk .sep{border-top:1px dashed #000;margin:6px 0}
+   #thermal-content .tk .l{display:flex;justify-content:space-between;gap:8px}#thermal-content .tk .art{font-weight:700;margin-top:3px}
+   #thermal-content .tk .tot{font-size:16px;font-weight:900;border-top:2px solid #000;border-bottom:2px solid #000;padding:3px 0;margin:4px 0}
+   #thermal-content .tk .b{font-weight:900}#thermal-content .tk .let{font-style:italic}#thermal-content .tk .msg{font-weight:700}</style>
+   <div class="tk">${ticketHTML(f,cfg)}</div>`;
+  openModal('modal-thermal');
+}
+function printThermal(){if(window._ticketApercuId)imprimerTicket(window._ticketApercuId);}
+function chargerReglagesTicket(){
+  const c=reglagesTicket();
+  const set=(id,v)=>{const el=document.getElementById(id);if(!el)return;if(el.type==='checkbox')el.checked=!!v;else el.value=v;};
+  set('tk-format',c.format);set('tk-auto',c.auto);set('tk-lettres',c.lettres);set('tk-logo',c.logo);set('tk-message',c.message);set('tk-marge',c.marge);
+}
+function sauverReglagesTicket(){
+  const g=id=>document.getElementById(id);
+  SS('ticket_cfg',{format:g('tk-format').value,auto:g('tk-auto').checked,lettres:g('tk-lettres').checked,logo:g('tk-logo').checked,
+    message:String(g('tk-message').value||'').slice(0,120),marge:Math.max(-4,Math.min(4,parseFloat(g('tk-marge').value)||0))});
+  toast('🖨️ Réglages du ticket enregistrés sur cet appareil','ok');
+}
+// Ticket d'essai, pour régler l'imprimante sans faire de vente
+function ticketEssai(){
+  sauverReglagesTicket();
+  const b=session.boutique||'B1';
+  const essai={id:'ESSAI',boutique:b,vendeur:session.user?.nom||'',client:'Client test',date:maintenant().toISOString(),
+    items:[{nom:'Chargeur rapide 25W USB-C',prix:5000,qty:2},{nom:'Écouteurs Bluetooth',prix:7500,qty:1}],remise:0,total:17500,mode:'especes',recu:20000};
+  DB.factures.push(essai);
+  try{imprimerTicket('ESSAI');}finally{const k=DB.factures.indexOf(essai);if(k>=0)DB.factures.splice(k,1);}
+}
+
+// (ancienne version du reçu, remplacée ci-dessus)
+function _ancienRecuThermique(factId){
   const f=DB.factures.find(x=>x.id===factId);if(!f)return;
   const s=DB.settings[f.boutique]||{};
   const line='─'.repeat(32);
@@ -11234,7 +11379,7 @@ function openThermalReceipt(factId){
   document.getElementById('thermal-content').innerHTML=html;
   openModal('modal-thermal');
 }
-function printThermal(){
+function _ancienPrintThermal(){
   const content=document.getElementById('thermal-content').innerHTML;
   document.getElementById('print-area').innerHTML=`<style>@page{size:80mm auto;margin:2mm;}body{font-family:'Courier New',monospace;font-size:11px;}</style>${content}`;
   window.print();
