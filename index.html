@@ -4030,55 +4030,197 @@ function pdfLogo(doc,logo,x,y,maxH,goldColor){
   }
   doc.setFontSize(maxH*1.6);doc.setTextColor(...goldColor);doc.text(logo||'',x,y);
 }
+// ══ FACTURE A4 — mise en page claire et professionnelle (fond blanc) ══
+// Couleur de la boutique : Rahma = orange, Rayane = bleu
+function _couleurBoutique(b){return b==='B2'?[37,99,235]:[234,118,0];}
+function _melange(c,t){return c.map(v=>Math.round(v*t+255*(1-t)));}   // teinte claire
+const _MODES_FACT={especes:'Espèces',wave:'Wave',orange:'Orange Money',mobile:'Mobile Money',carte:'Carte bancaire',credit:'Crédit',acompte:'Acompte'};
+// Logo dans un cadre, proportions respectées (ne déborde plus sur le nom)
+function pdfLogoCadre(doc,logo,x,y,maxW,maxH){
+  if(!isImgLogo(logo))return 0;
+  try{
+    const p=doc.getImageProperties(logo);
+    const r=Math.min(maxW/p.width,maxH/p.height);
+    const w=p.width*r,h=p.height*r;
+    const typ=(p.fileType||(/^data:image\/png/i.test(logo)?'PNG':'JPEG')).toUpperCase();
+    doc.addImage(logo,typ,x,y+(maxH-h)/2,w,h);
+    return w;
+  }catch(e){console.error('logo PDF:',e);return 0;}
+}
 async function buildPDFBytes(f){
-  const s=DB.settings[f.boutique]||{};const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-  const W=210,H=297,gold=[240,165,0],dark=[10,14,26],gray=[120,130,150],lg=[240,242,246],white=[255,255,255],red=[239,68,68];
-  doc.setFillColor(...dark);doc.rect(0,0,W,50,'F');
-  pdfLogo(doc,s.logo,14,29,15,gold);
-  doc.setFontSize(16);doc.setFont('helvetica','bold');doc.setTextColor(...gold);doc.text((s.nom||'MON NÉGOCE').toUpperCase(),45,21);
-  doc.setFontSize(7.5);doc.setFont('helvetica','normal');doc.setTextColor(...lg);
-  let iy=27;if(s.adr){doc.text(s.adr,45,iy);iy+=4;}if(s.tel){doc.text('Tél: '+s.tel,45,iy);iy+=4;}if(s.ninea){doc.text('NINEA: '+s.ninea,45,iy);iy+=4;}if(s.rc){doc.text('RC: '+s.rc,45,iy);}
-  doc.setFillColor(...gold);doc.roundedRect(140,12,58,14,3,3,'F');doc.setFontSize(13);doc.setFont('helvetica','bold');doc.setTextColor(...dark);doc.text('FACTURE',169,21,{align:'center'});doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text(f.id,169,27,{align:'center'});
-  doc.setDrawColor(...gold);doc.setLineWidth(0.8);doc.line(0,50,W,50);
-  doc.setFillColor(...lg);doc.roundedRect(10,55,88,32,3,3,'F');doc.roundedRect(112,55,88,32,3,3,'F');
-  doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.setTextColor(...gold);doc.text('FACTURE INFO',14,62);
-  doc.setFont('helvetica','normal');doc.setTextColor(60,60,70);
-  doc.text('N° :',14,69);doc.setFont('helvetica','bold');doc.text(f.id,34,69);doc.setFont('helvetica','normal');
-  const _d=new Date(f.date);
-  doc.text('Date :',14,75);doc.text(_d.toLocaleDateString('fr-FR')+' à '+_d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),34,75);
-  doc.text('Vendeur :',14,81);doc.text(f.vendeur||'—',34,81);
-  doc.text('Paiement :',14,87);doc.setFont('helvetica','bold');doc.setTextColor(...gold);doc.text(f.mode.toUpperCase(),34,87);
-  doc.setFont('helvetica','bold');doc.setTextColor(...gold);doc.text('CLIENT',116,62);
-  doc.setFont('helvetica','normal');doc.setTextColor(60,60,70);
-  doc.text('Nom :',116,69);doc.setFont('helvetica','bold');doc.text(f.client,132,69);doc.setFont('helvetica','normal');
-  const cli=DB.clients.find(c=>c.id===f.clientId);if(cli?.tel){doc.text('Tél :',116,75);doc.text(cli.tel,132,75);}
-  let y=97;doc.setFillColor(...dark);doc.rect(10,y,190,9,'F');doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(...gold);
-  doc.text('PRODUIT',14,y+6);doc.text('QTÉ',118,y+6);doc.text('P.U.',133,y+6);doc.text('TOTAL',173,y+6,{align:'right'});y+=9;
-  f.items.forEach((item,idx)=>{
-    doc.setFillColor(...(idx%2===0?white:[248,249,252]));doc.rect(10,y,190,8,'F');doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(40,40,55);
-    doc.text(item.nom.substring(0,44),14,y+5.5);doc.text(`${item.qty} ${item.unite}`,118,y+5.5);doc.text(_fmtBase(item.prix)+' FCFA',133,y+5.5);
-    doc.setFont('helvetica','bold');doc.text(_fmtBase(item.prix*item.qty)+' FCFA',197,y+5.5,{align:'right'});y+=8;
+  const s=DB.settings[f.boutique]||{};const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210,H=297,M=14;
+  const acc=_couleurBoutique(f.boutique),accClair=_melange(acc,.10),accTrait=_melange(acc,.35);
+  const encre=[31,41,55],gris=[107,114,128],grisClair=[229,231,235],fond=[249,250,251];
+  const items=(f.items||[]).map(i=>({nom:String(i.nom||'?'),qty:Number(i.qty)||0,prix:Number(i.prix)||0,unite:String(i.unite||'')}));
+  const sousTotal=Number(f.sousTotal)||items.reduce((t,i)=>t+i.prix*i.qty,0);
+  const remPct=Number(f.remise)||0,remise=Math.round(sousTotal*remPct/100);
+  const total=Number(f.total)||sousTotal-remise;
+  const d=new Date(f.date);
+  const dateTxt=d.toLocaleDateString('fr-FR')+' à '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const txt=(t,x,y,o)=>doc.text(String(t==null?'':t),x,y,o);
+  const police=(taille,style,coul)=>{doc.setFontSize(taille);doc.setFont('helvetica',style||'normal');doc.setTextColor(...(coul||encre));};
+
+  // Bandeau fin de couleur en haut
+  doc.setFillColor(...acc);doc.rect(0,0,W,3,'F');
+
+  // ── En-tête : logo + boutique à gauche, FACTURE à droite ──
+  const lw=pdfLogoCadre(doc,s.logo,M,10,42,24);
+  const xi=lw?M+lw+6:M;
+  police(15,'bold',encre);txt((s.nom||getBName(f.boutique)||'Mon Négoce').toUpperCase(),xi,17);
+  police(8.5,'normal',gris);
+  let iy=22.5;
+  const infos=[s.adr,s.tel?'Tél : '+s.tel:'',s.ninea?'NINEA : '+s.ninea:'',s.rc?'RC : '+s.rc:''].filter(Boolean);
+  infos.forEach(l=>{doc.splitTextToSize(l,118-xi+M).forEach(ll=>{txt(ll,xi,iy);iy+=4.2;});});
+  police(24,'bold',acc);txt('FACTURE',W-M,19,{align:'right'});
+  police(9,'normal',gris);txt('N°',W-M-doc.getTextWidth(f.id)-8.5,26);
+  police(9,'bold',encre);txt(f.id,W-M,26,{align:'right'});
+  police(9,'normal',gris);txt(dateTxt,W-M,31,{align:'right'});
+
+  let y=Math.max(iy,36)+3;
+  doc.setDrawColor(...grisClair);doc.setLineWidth(.3);doc.line(M,y,W-M,y);y+=6;
+
+  // ── Blocs client / détails ──
+  const bw=(W-2*M-8)/2,bh=27;
+  [[M,'FACTURÉ À'],[M+bw+8,'DÉTAILS']].forEach(([x,t])=>{
+    doc.setFillColor(...fond);doc.setDrawColor(...grisClair);doc.roundedRect(x,y,bw,bh,2,2,'FD');
+    doc.setFillColor(...acc);doc.rect(x,y+3,1.2,bh-6,'F');
+    police(7.5,'bold',acc);txt(t,x+5,y+6.5);
   });
-  doc.setDrawColor(...gold);doc.setLineWidth(0.3);doc.rect(10,97,190,y-97);y+=8;
-  doc.setFillColor(...lg);doc.roundedRect(110,y,90,f.remise>0?28:20,3,3,'F');
-  doc.setFontSize(8.5);doc.setFont('helvetica','normal');doc.setTextColor(...gray);
-  doc.text('Sous-total :',114,y+7);doc.setTextColor(40,40,55);doc.text(_fmtBase(f.sousTotal)+' FCFA',197,y+7,{align:'right'});
-  if(f.remise>0){doc.setTextColor(...gray);doc.text(`Remise (-${f.remise}%) :`,114,y+14);doc.setTextColor(...red);doc.text('-'+_fmtBase(f.sousTotal*f.remise/100)+' FCFA',197,y+14,{align:'right'});y+=7;}
-  const tY=y+(f.remise>0?14:12);doc.setFillColor(...gold);doc.roundedRect(110,tY,90,12,2,2,'F');doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(...dark);
-  doc.text('TOTAL :',114,tY+8);doc.text(_fmtBase(f.total)+' FCFA',197,tY+8,{align:'right'});
-  // Montant en toutes lettres (valeur légale sur une facture)
-  const lettres=montantEnLettres(f.total);
-  doc.setFontSize(7.5);doc.setFont('helvetica','italic');doc.setTextColor(60,60,70);
-  doc.text('Arrêtée la présente facture à la somme de :',14,tY+6);
-  doc.setFont('helvetica','bold');doc.setFontSize(8);
-  const lignesLettres=doc.splitTextToSize(lettres.charAt(0).toUpperCase()+lettres.slice(1),92);
-  lignesLettres.forEach((ln,i)=>doc.text(ln,14,tY+11.5+i*4));
-  const fY=H-25;doc.setDrawColor(...gold);doc.setLineWidth(0.5);doc.line(10,fY,W-10,fY);
-  doc.setFontSize(7);doc.setFont('helvetica','italic');doc.setTextColor(...gray);
-  doc.text('Merci pour votre confiance !',W/2,fY+6,{align:'center'});
-  doc.text((s.nom||'Mon Négoce')+(s.adr?' · '+s.adr:'')+(s.tel?' · Tél: '+s.tel:''),W/2,fY+11,{align:'center'});
-  doc.setFontSize(6);doc.setFont('helvetica','normal');doc.text(`Généré le ${new Date().toLocaleString('fr-FR')}`,W/2,fY+16,{align:'center'});
+  const cli=DB.clients.find(c=>c.id===f.clientId);
+  police(11,'bold',encre);txt(doc.splitTextToSize(f.client||'Client',bw-10)[0],M+5,y+13);
+  police(8.5,'normal',gris);
+  let cy=y+18.5;
+  if(cli?.tel){txt('Tél : '+cli.tel,M+5,cy);cy+=4.5;}
+  if(cli?.adr||cli?.adresse){txt(doc.splitTextToSize(cli.adr||cli.adresse,bw-10)[0],M+5,cy);}
+  const xd=M+bw+8+5,xv=xd+24;
+  const det=[['Date',d.toLocaleDateString('fr-FR')],['Vendeur',f.vendeur||'—'],['Paiement',_MODES_FACT[f.mode]||String(f.mode||'').toUpperCase()]];
+  det.forEach(([k,v],i)=>{police(8.5,'normal',gris);txt(k,xd,y+13+i*5);police(8.5,'bold',encre);txt(doc.splitTextToSize(String(v),bw-30)[0],xv,y+13+i*5);});
+  y+=bh+9;
+
+  // ── Tableau des articles ──
+  const cQ=128,cPU=160,cT=W-M;
+  const entete=()=>{
+    doc.setFillColor(...accClair);doc.rect(M,y,W-2*M,9,'F');
+    doc.setDrawColor(...acc);doc.setLineWidth(.6);doc.line(M,y+9,W-M,y+9);
+    police(8,'bold',acc);
+    txt('DÉSIGNATION',M+3,y+6);txt('QTÉ',cQ,y+6,{align:'center'});txt('PRIX UNIT.',cPU,y+6,{align:'right'});txt('MONTANT',cT-3,y+6,{align:'right'});
+    y+=9;
+  };
+  entete();
+  items.forEach((it,idx)=>{
+    const lignes=doc.splitTextToSize(it.nom,cQ-M-18);
+    const hl=Math.max(9,4+lignes.length*4.4);
+    if(y+hl>H-48){doc.addPage();doc.setFillColor(...acc);doc.rect(0,0,W,3,'F');y=14;entete();}
+    if(idx%2===1){doc.setFillColor(...fond);doc.rect(M,y,W-2*M,hl,'F');}
+    police(9,'normal',encre);lignes.forEach((l,k)=>txt(l,M+3,y+6+k*4.4));
+    police(9,'normal',gris);txt(String(it.qty)+(it.unite&&it.unite!=='pièce'?' '+it.unite:''),cQ,y+6,{align:'center'});
+    txt(_fmtBase(it.prix),cPU,y+6,{align:'right'});
+    police(9,'bold',encre);txt(_fmtBase(it.prix*it.qty),cT-3,y+6,{align:'right'});
+    y+=hl;doc.setDrawColor(...grisClair);doc.setLineWidth(.2);doc.line(M,y,W-M,y);
+  });
+  police(7.5,'italic',gris);txt('Montants en FCFA',M+3,y+5);
+  y+=9;
+  if(y>H-70){doc.addPage();doc.setFillColor(...acc);doc.rect(0,0,W,3,'F');y=16;}
+
+  // ── Totaux (à droite) ──
+  const tx=118,tw=W-M-tx;
+  const ligneT=(k,v,coul)=>{police(9,'normal',gris);txt(k,tx+3,y+5);police(9,'bold',coul||encre);txt(v,W-M-3,y+5,{align:'right'});y+=7;};
+  const yTot0=y;
+  ligneT('Sous-total',_fmtBase(sousTotal)+' FCFA');
+  if(remPct>0)ligneT('Remise ('+remPct+' %)','- '+_fmtBase(remise)+' FCFA',[220,38,38]);
+  doc.setFillColor(...acc);doc.roundedRect(tx,y+1,tw,12,2,2,'F');
+  police(11,'bold',[255,255,255]);txt('TOTAL',tx+4,y+9);txt(_fmtBase(total)+' FCFA',W-M-4,y+9,{align:'right'});
+  y+=16;
+  if(f.mode==='acompte'){const av=Number(f.acompteVerse)||0;ligneT('Acompte versé',_fmtBase(av)+' FCFA',[22,163,74]);ligneT('Reste à payer',_fmtBase(Math.max(0,total-av))+' FCFA',[220,38,38]);}
+  else if(f.mode==='credit')ligneT('Reste à payer',_fmtBase(total)+' FCFA',[220,38,38]);
+  else if(f.mode==='especes'&&Number(f.recu)>0){ligneT('Montant reçu',_fmtBase(f.recu)+' FCFA');ligneT('Monnaie rendue',_fmtBase(Math.max(0,f.recu-total))+' FCFA');}
+  else ligneT('Statut','Payée',[22,163,74]);
+
+  // ── Montant en lettres (à gauche des totaux) ──
+  let ly=yTot0+2;
+  police(8,'normal',gris);txt('Arrêtée la présente facture à la somme de :',M,ly+3);
+  const lettres=montantEnLettres(total);
+  police(9.5,'bold',encre);
+  doc.splitTextToSize(lettres.charAt(0).toUpperCase()+lettres.slice(1),tx-M-8).forEach((l,i)=>txt(l,M,ly+9+i*4.6));
+
+  // ── Pied de page ──
+  const pages=doc.getNumberOfPages();
+  for(let p=1;p<=pages;p++){
+    doc.setPage(p);
+    const fy=H-20;
+    doc.setDrawColor(...accTrait);doc.setLineWidth(.4);doc.line(M,fy,W-M,fy);
+    police(9,'bold',acc);txt('Merci pour votre confiance !',W/2,fy+6,{align:'center'});
+    police(7.5,'normal',gris);
+    txt([s.nom||'',s.adr||'',s.tel?'Tél : '+s.tel:''].filter(Boolean).join('  ·  '),W/2,fy+10.5,{align:'center'});
+    const leg=[s.ninea?'NINEA : '+s.ninea:'',s.rc?'RC : '+s.rc:''].filter(Boolean).join('  ·  ');
+    if(leg)txt(leg,W/2,fy+14.5,{align:'center'});
+    if(pages>1){police(7,'normal',gris);txt('Page '+p+' / '+pages,W-M,fy+14.5,{align:'right'});}
+  }
   return doc.output('arraybuffer');
+}
+// Impression A4 : même présentation que le PDF (fond blanc)
+function factureHTML(f){
+  const s=DB.settings[f.boutique]||{};
+  const c=_couleurBoutique(f.boutique),acc=`rgb(${c})`,clair=`rgb(${_melange(c,.10)})`;
+  const e=v=>escapeHtml(String(v==null?'':v));
+  const items=(f.items||[]).map(i=>({nom:i.nom,qty:Number(i.qty)||0,prix:Number(i.prix)||0,unite:i.unite||''}));
+  const sous=Number(f.sousTotal)||items.reduce((t,i)=>t+i.prix*i.qty,0);
+  const remPct=Number(f.remise)||0,rem=Math.round(sous*remPct/100),total=Number(f.total)||sous-rem;
+  const d=new Date(f.date);const cli=DB.clients.find(x=>x.id===f.clientId);
+  const lettres=montantEnLettres(total);
+  let extra='';
+  if(f.mode==='acompte'){const av=Number(f.acompteVerse)||0;extra=`<tr><td>Acompte versé</td><td style="color:#16a34a">${_fmtBase(av)} FCFA</td></tr><tr><td>Reste à payer</td><td style="color:#dc2626">${_fmtBase(Math.max(0,total-av))} FCFA</td></tr>`;}
+  else if(f.mode==='credit')extra=`<tr><td>Reste à payer</td><td style="color:#dc2626">${_fmtBase(total)} FCFA</td></tr>`;
+  else if(f.mode==='especes'&&Number(f.recu)>0)extra=`<tr><td>Montant reçu</td><td>${_fmtBase(f.recu)} FCFA</td></tr><tr><td>Monnaie rendue</td><td>${_fmtBase(Math.max(0,f.recu-total))} FCFA</td></tr>`;
+  else extra=`<tr><td>Statut</td><td style="color:#16a34a">Payée</td></tr>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Facture ${e(f.id)}</title><style>
+  @page{size:A4;margin:12mm}*{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,Helvetica,sans-serif;color:#1f2937;font-size:10pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .bar{height:4px;background:${acc};margin-bottom:6mm}
+  .hd{display:flex;justify-content:space-between;align-items:flex-start;gap:8mm}
+  .bq{display:flex;gap:5mm;align-items:center}.bq img{max-width:42mm;max-height:24mm;object-fit:contain}
+  .bq h1{font-size:15pt;letter-spacing:.3px}.bq p{color:#6b7280;font-size:8.5pt;line-height:1.45}
+  .ft{text-align:right}.ft h2{color:${acc};font-size:24pt;letter-spacing:1px}.ft p{color:#6b7280;font-size:9pt}.ft b{color:#1f2937}
+  hr{border:0;border-top:1px solid #e5e7eb;margin:5mm 0}
+  .blocs{display:flex;gap:8mm}.bl{flex:1;background:#f9fafb;border:1px solid #e5e7eb;border-left:3px solid ${acc};border-radius:2mm;padding:3mm 4mm}
+  .bl h3{color:${acc};font-size:7.5pt;letter-spacing:.5px;margin-bottom:2mm}.bl .n{font-size:11pt;font-weight:700}
+  .bl table td{padding:.6mm 0;font-size:8.5pt}.bl table td:first-child{color:#6b7280;width:22mm}.bl table td:last-child{font-weight:700}
+  table.it{width:100%;border-collapse:collapse;margin-top:7mm}
+  .it th{background:${clair};color:${acc};font-size:8pt;text-align:left;padding:2.5mm 3mm;border-bottom:2px solid ${acc}}
+  .it td{padding:2.3mm 3mm;border-bottom:1px solid #e5e7eb}.it tr:nth-child(even) td{background:#f9fafb}
+  .r,.it th.r{text-align:right}.c,.it th.c{text-align:center}.g{color:#6b7280}.b{font-weight:700}
+  .bas{display:flex;justify-content:space-between;gap:10mm;margin-top:6mm;page-break-inside:avoid}
+  .let{flex:1;font-size:8.5pt;color:#6b7280}.let b{display:block;color:#1f2937;font-size:9.5pt;margin-top:1.5mm}
+  .tot{width:80mm}.tot table{width:100%;border-collapse:collapse}.tot td{padding:1.5mm 3mm;font-size:9pt}.tot td:first-child{color:#6b7280}.tot td:last-child{text-align:right;font-weight:700}
+  .gt{background:${acc};color:#fff;border-radius:2mm;display:flex;justify-content:space-between;padding:3mm 4mm;font-weight:900;font-size:11.5pt;margin:1.5mm 0}
+  .pied{margin-top:12mm;border-top:1px solid ${acc};padding-top:3mm;text-align:center;color:#6b7280;font-size:7.5pt;line-height:1.6}
+  .pied b{color:${acc};font-size:9pt}
+  </style></head><body><div class="bar"></div>
+  <div class="hd"><div class="bq">${isImgLogo(s.logo)?`<img src="${s.logo}" alt="">`:''}<div><h1>${e((s.nom||getBName(f.boutique)||'').toUpperCase())}</h1><p>${[s.adr,s.tel?'Tél : '+s.tel:'',s.ninea?'NINEA : '+s.ninea:'',s.rc?'RC : '+s.rc:''].filter(Boolean).map(e).join('<br>')}</p></div></div>
+  <div class="ft"><h2>FACTURE</h2><p>N° <b>${e(f.id)}</b></p><p>${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</p></div></div>
+  <hr><div class="blocs"><div class="bl"><h3>FACTURÉ À</h3><div class="n">${e(f.client||'Client')}</div>${cli?.tel?`<div class="g" style="font-size:8.5pt;margin-top:1mm">Tél : ${e(cli.tel)}</div>`:''}</div>
+  <div class="bl"><h3>DÉTAILS</h3><table><tr><td>Date</td><td>${d.toLocaleDateString('fr-FR')}</td></tr><tr><td>Vendeur</td><td>${e(f.vendeur||'—')}</td></tr><tr><td>Paiement</td><td>${e(_MODES_FACT[f.mode]||f.mode||'')}</td></tr></table></div></div>
+  <table class="it"><thead><tr><th>DÉSIGNATION</th><th class="c">QTÉ</th><th class="r">PRIX UNIT.</th><th class="r">MONTANT</th></tr></thead><tbody>
+  ${items.map(i=>`<tr><td>${e(i.nom)}</td><td class="c g">${i.qty}${i.unite&&i.unite!=='pièce'?' '+e(i.unite):''}</td><td class="r g">${_fmtBase(i.prix)}</td><td class="r b">${_fmtBase(i.prix*i.qty)}</td></tr>`).join('')}
+  </tbody></table><div class="g" style="font-size:7.5pt;font-style:italic;margin-top:1.5mm">Montants en FCFA</div>
+  <div class="bas"><div class="let">Arrêtée la présente facture à la somme de :<b>${e(lettres.charAt(0).toUpperCase()+lettres.slice(1))}</b></div>
+  <div class="tot"><table><tr><td>Sous-total</td><td>${_fmtBase(sous)} FCFA</td></tr>${remPct>0?`<tr><td>Remise (${remPct} %)</td><td style="color:#dc2626">- ${_fmtBase(rem)} FCFA</td></tr>`:''}</table>
+  <div class="gt"><span>TOTAL</span><span>${_fmtBase(total)} FCFA</span></div><table>${extra}</table></div></div>
+  <div class="pied"><b>Merci pour votre confiance !</b><br>${[s.nom,s.adr,s.tel?'Tél : '+s.tel:''].filter(Boolean).map(e).join('  ·  ')}${(s.ninea||s.rc)?'<br>'+[s.ninea?'NINEA : '+e(s.ninea):'',s.rc?'RC : '+e(s.rc):''].filter(Boolean).join('  ·  '):''}</div>
+  </body></html>`;
+}
+function printFact(){
+  if(!currentFact)return;
+  let fr=document.getElementById('facture-frame');if(fr)fr.remove();
+  fr=document.createElement('iframe');fr.id='facture-frame';
+  fr.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+  document.body.appendChild(fr);
+  const d=fr.contentWindow.document;d.open();d.write(factureHTML(currentFact));d.close();
+  let fait=false;const go=()=>{if(fait)return;fait=true;try{fr.contentWindow.focus();fr.contentWindow.print();}catch(e){toast('Impression impossible','err');}try{window.focus();}catch(e){}};
+  const img=d.querySelector('img');
+  if(img&&!img.complete){img.onload=img.onerror=()=>setTimeout(go,50);setTimeout(go,1500);}else setTimeout(go,250);
 }
 async function genererRapportFinancierPDF(){
   const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
@@ -4220,7 +4362,7 @@ function openFactDetail(id){
 }
 function waShare(){if(currentFact)waShareId(currentFact.id);}
 function waShareId(id){const f=DB.factures.find(x=>x.id===id);const s=DB.settings[f.boutique]||{};const txt=encodeURIComponent(`🧾 *FACTURE ${f.id}*\n🏪 ${s.nom||getBName(f.boutique)}\n📅 ${new Date(f.date).toLocaleDateString('fr-FR')}\n👤 ${f.client}\n\n${f.items.map(i=>`• ${i.nom} x${i.qty} = ${fmt(i.prix*i.qty)}`).join('\n')}${f.remise>0?`\n🏷️ -${f.remise}%`:''}\n\n*💰 TOTAL: ${fmt(f.total)}*\n💳 ${f.mode}\n\nMerci 🙏`);window.open(`https://wa.me/?text=${txt}`,'_blank');}
-function printFact(){if(!currentFact)return;const f=currentFact;const s=DB.settings[f.boutique]||{};document.getElementById('print-area').innerHTML=`<div style="max-width:360px;margin:0 auto;font-family:sans-serif;padding:16px;"><div style="text-align:center;margin-bottom:14px;border-bottom:2px solid #000;padding-bottom:11px;"><div style="margin-bottom:6px;">${logoHTML(s.logo,54)}</div><h2>${escapeHtml(s.nom)||'Mon Négoce'}</h2>${s.adr?`<p style="font-size:10px;color:#666;">${escapeHtml(s.adr)}</p>`:''}</div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:9px;"><div><b>Facture:</b> ${f.id}<br><b>Date:</b> ${new Date(f.date).toLocaleString('fr-FR')}</div><div><b>Client:</b> ${escapeHtml(f.client)}<br><b>Mode:</b> ${f.mode}</div></div><table style="width:100%;font-size:11px;border-collapse:collapse;margin-bottom:9px;"><thead><tr style="border-bottom:2px solid #000;"><th style="text-align:left;padding:2px 0">Produit</th><th>Qté</th><th style="text-align:right">Total</th></tr></thead><tbody>${f.items.map(i=>`<tr style="border-bottom:1px solid #eee;"><td style="padding:2px 0">${escapeHtml(i.nom)}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right;font-weight:700">${_fmtBase(i.prix*i.qty)}</td></tr>`).join('')}</tbody></table>${f.remise>0?`<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;"><span>Remise -${f.remise}%</span><span>-${_fmtBase(f.sousTotal*f.remise/100)} FCFA</span></div>`:''}<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:900;border-top:2px solid #000;padding-top:6px;"><span>TOTAL</span><span>${_fmtBase(f.total)} FCFA</span></div><div style="font-size:10px;font-style:italic;margin-top:7px;padding-top:6px;border-top:1px dashed #999;">Arrêtée la présente facture à la somme de :<br><b style="font-style:normal;">${escapeHtml((m=>m.charAt(0).toUpperCase()+m.slice(1))(montantEnLettres(f.total)))}</b></div><p style="text-align:center;margin-top:12px;font-size:10px;color:#999;">Merci !</p></div>`;window.print();}
+function _ancienPrintFact(){if(!currentFact)return;const f=currentFact;const s=DB.settings[f.boutique]||{};document.getElementById('print-area').innerHTML=`<div style="max-width:360px;margin:0 auto;font-family:sans-serif;padding:16px;"><div style="text-align:center;margin-bottom:14px;border-bottom:2px solid #000;padding-bottom:11px;"><div style="margin-bottom:6px;">${logoHTML(s.logo,54)}</div><h2>${escapeHtml(s.nom)||'Mon Négoce'}</h2>${s.adr?`<p style="font-size:10px;color:#666;">${escapeHtml(s.adr)}</p>`:''}</div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:9px;"><div><b>Facture:</b> ${f.id}<br><b>Date:</b> ${new Date(f.date).toLocaleString('fr-FR')}</div><div><b>Client:</b> ${escapeHtml(f.client)}<br><b>Mode:</b> ${f.mode}</div></div><table style="width:100%;font-size:11px;border-collapse:collapse;margin-bottom:9px;"><thead><tr style="border-bottom:2px solid #000;"><th style="text-align:left;padding:2px 0">Produit</th><th>Qté</th><th style="text-align:right">Total</th></tr></thead><tbody>${f.items.map(i=>`<tr style="border-bottom:1px solid #eee;"><td style="padding:2px 0">${escapeHtml(i.nom)}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right;font-weight:700">${_fmtBase(i.prix*i.qty)}</td></tr>`).join('')}</tbody></table>${f.remise>0?`<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;"><span>Remise -${f.remise}%</span><span>-${_fmtBase(f.sousTotal*f.remise/100)} FCFA</span></div>`:''}<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:900;border-top:2px solid #000;padding-top:6px;"><span>TOTAL</span><span>${_fmtBase(f.total)} FCFA</span></div><div style="font-size:10px;font-style:italic;margin-top:7px;padding-top:6px;border-top:1px dashed #999;">Arrêtée la présente facture à la somme de :<br><b style="font-style:normal;">${escapeHtml((m=>m.charAt(0).toUpperCase()+m.slice(1))(montantEnLettres(f.total)))}</b></div><p style="text-align:center;margin-top:12px;font-size:10px;color:#999;">Merci !</p></div>`;window.print();}
 
 // ══ NOUVELLE FACTURE ══
 function openNouvelleFacture(){
