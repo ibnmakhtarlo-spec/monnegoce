@@ -1424,6 +1424,14 @@ canvas.chart-canvas{display:block;width:100%!important;}
           <div class="fg"><label>NINEA</label><input id="set-b1-ninea"></div>
           <div class="fg"><label>RC</label><input id="set-b1-rc"></div>
           <div class="fg"><label>Logo de la boutique</label><div id="set-b1-logo-prev" style="background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:9px;text-align:center;margin-bottom:6px;min-height:44px;display:flex;align-items:center;justify-content:center;"></div><input type="file" id="set-b1-logo-file" accept="image/*" style="display:none;" onchange="chargerLogo('B1',this)"><div style="display:flex;gap:6px;"><button class="btn btn-sm" style="flex:1;" onclick="document.getElementById('set-b1-logo-file').click()">🖼️ Changer l'image</button><button class="btn btn-sm" onclick="resetLogo('B1')" title="Revenir au logo par défaut">↩️</button></div><input id="set-b1-logo" type="hidden"></div>
+          <div class="fg"><label>🔏 Cachet sur les factures</label>
+            <select id="set-b1-cachet-mode" onchange="apercuCachet('B1')"><option value="auto">Cachet créé par le logiciel</option><option value="image">Mon vrai cachet (photo)</option><option value="aucun">Pas de cachet</option></select>
+            <div id="set-b1-cachet-prev" style="background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:8px;text-align:center;margin-top:6px;min-height:60px;display:flex;align-items:center;justify-content:center;"></div>
+            <input type="hidden" id="set-b1-cachet-img">
+            <input type="file" id="set-b1-cachet-file" accept="image/*" style="display:none" onchange="chargerCachet('B1',this)">
+            <button type="button" class="btn btn-ghost btn-sm" id="set-b1-cachet-imp" style="margin-top:6px;width:100%;display:none;" onclick="document.getElementById('set-b1-cachet-file').click()">📷 Importer la photo du cachet</button>
+            <div id="set-b1-cachet-sign-wrap" style="margin-top:6px;"><input id="set-b1-cachet-sign" placeholder="Signataire (ex : LA DIRECTION, LE GÉRANT)" maxlength="30" oninput="apercuCachet('B1')"></div>
+          </div>
           <button class="btn btn-gold" onclick="saveSettings('B1')">💾 Enregistrer</button>
         </div>
       </div>
@@ -1435,6 +1443,14 @@ canvas.chart-canvas{display:block;width:100%!important;}
           <div class="fg"><label>NINEA</label><input id="set-b2-ninea"></div>
           <div class="fg"><label>RC</label><input id="set-b2-rc"></div>
           <div class="fg"><label>Logo de la boutique</label><div id="set-b2-logo-prev" style="background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:9px;text-align:center;margin-bottom:6px;min-height:44px;display:flex;align-items:center;justify-content:center;"></div><input type="file" id="set-b2-logo-file" accept="image/*" style="display:none;" onchange="chargerLogo('B2',this)"><div style="display:flex;gap:6px;"><button class="btn btn-sm" style="flex:1;" onclick="document.getElementById('set-b2-logo-file').click()">🖼️ Changer l'image</button><button class="btn btn-sm" onclick="resetLogo('B2')" title="Revenir au logo par défaut">↩️</button></div><input id="set-b2-logo" type="hidden"></div>
+          <div class="fg"><label>🔏 Cachet sur les factures</label>
+            <select id="set-b2-cachet-mode" onchange="apercuCachet('B2')"><option value="auto">Cachet créé par le logiciel</option><option value="image">Mon vrai cachet (photo)</option><option value="aucun">Pas de cachet</option></select>
+            <div id="set-b2-cachet-prev" style="background:var(--surf2);border:1px solid var(--border2);border-radius:7px;padding:8px;text-align:center;margin-top:6px;min-height:60px;display:flex;align-items:center;justify-content:center;"></div>
+            <input type="hidden" id="set-b2-cachet-img">
+            <input type="file" id="set-b2-cachet-file" accept="image/*" style="display:none" onchange="chargerCachet('B2',this)">
+            <button type="button" class="btn btn-ghost btn-sm" id="set-b2-cachet-imp" style="margin-top:6px;width:100%;display:none;" onclick="document.getElementById('set-b2-cachet-file').click()">📷 Importer la photo du cachet</button>
+            <div id="set-b2-cachet-sign-wrap" style="margin-top:6px;"><input id="set-b2-cachet-sign" placeholder="Signataire (ex : LA DIRECTION, LE GÉRANT)" maxlength="30" oninput="apercuCachet('B2')"></div>
+          </div>
           <button class="btn btn-gold" onclick="saveSettings('B2')">💾 Enregistrer</button>
         </div>
       </div>
@@ -4030,6 +4046,137 @@ function pdfLogo(doc,logo,x,y,maxH,goldColor){
   }
   doc.setFontSize(maxH*1.6);doc.setTextColor(...goldColor);doc.text(logo||'',x,y);
 }
+// ══ CACHET SUR LES FACTURES ══
+// 3 choix par boutique : cachet créé automatiquement, photo du vrai cachet, ou aucun.
+function reglageCachet(b){
+  const c=(DB.settings[b]||{}).cachet||{};
+  return {mode:c.mode||'auto',img:c.img||'',signataire:c.signataire!=null?c.signataire:'LA DIRECTION'};
+}
+const _cacheCachet=new Map();
+// Texte posé le long d'un cercle (haut : sens horaire, bas : lisible de gauche à droite)
+function _texteArc(ctx,txt,cx,cy,r,centre,haut,maxAngle,taille,police){
+  let t=taille,chars=[...txt],w,esp,tot;
+  for(;t>14;t-=1){
+    ctx.font=police.replace('{t}',t);
+    w=chars.map(c=>ctx.measureText(c).width);esp=t*0.12;
+    tot=(w.reduce((a,b)=>a+b,0)+esp*(chars.length-1))/r;
+    if(tot<=maxAngle)break;
+  }
+  let a=haut?centre-tot/2:centre+tot/2;
+  chars.forEach((c,i)=>{
+    const da=w[i]/r,ac=haut?a+da/2:a-da/2;
+    ctx.save();ctx.translate(cx+r*Math.cos(ac),cy+r*Math.sin(ac));
+    ctx.rotate(haut?ac+Math.PI/2:ac-Math.PI/2);ctx.fillText(c,0,0);ctx.restore();
+    a=haut?a+da+esp/r:a-da-esp/r;
+  });
+}
+// Cachet rond, encre bleue, avec texture d'encre — renvoie une image PNG
+function cachetAuto(b,dateTxt){
+  const s=DB.settings[b]||{},cfg=reglageCachet(b);
+  const cle=[b,dateTxt,s.nom,s.tel,s.ninea,s.adr,cfg.signataire].join('|');
+  if(_cacheCachet.has(cle))return _cacheCachet.get(cle);
+  const N=600,cx=N/2,cy=N/2,cv=document.createElement('canvas');cv.width=cv.height=N;
+  const ctx=cv.getContext('2d');
+  const encre='rgb(28,58,140)';
+  ctx.translate(cx,cy);ctx.rotate(-0.13);ctx.translate(-cx,-cy);   // légèrement penché, comme à la main
+  ctx.strokeStyle=encre;ctx.fillStyle=encre;ctx.textAlign='center';ctx.textBaseline='middle';
+  const rond=(r,l)=>{ctx.lineWidth=l;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();};
+  rond(285,11);rond(262,3.5);rond(168,4);
+  const nom=String(s.nom||getBName(b)||'').toUpperCase();
+  _texteArc(ctx,nom,cx,cy,215,-Math.PI/2,true,Math.PI*0.86,50,'900 {t}px Arial, sans-serif');
+  const bas=s.ninea?'NINEA '+s.ninea:(s.tel?'TÉL '+s.tel:'SÉNÉGAL');
+  _texteArc(ctx,bas,cx,cy,215,Math.PI/2,false,Math.PI*0.62,36,'700 {t}px Arial, sans-serif');
+  // Étoiles de séparation à gauche et à droite
+  ctx.font='700 34px Arial';
+  [Math.PI*0.04+Math.PI,-Math.PI*0.04].forEach(a=>{ctx.fillText('★',cx+215*Math.cos(a),cy+215*Math.sin(a));});
+  // Centre : téléphone, date entre deux traits, signataire
+  const ajuste=(t,max,taille,poids)=>{let z=taille;do{ctx.font=`${poids} ${z}px Arial, sans-serif`;z--;}while(ctx.measureText(t).width>max&&z>12);};
+  if(s.tel){ajuste('Tél '+s.tel,290,30,700);ctx.fillText('Tél '+s.tel,cx,cy-82);}
+  ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(cx-140,cy-50);ctx.lineTo(cx+140,cy-50);ctx.moveTo(cx-140,cy+32);ctx.lineTo(cx+140,cy+32);ctx.stroke();
+  ajuste(dateTxt,270,50,900);ctx.fillText(dateTxt,cx,cy-8);
+  const sig=String(cfg.signataire||'').toUpperCase();
+  if(sig){ajuste(sig,270,28,700);ctx.fillText(sig,cx,cy+72);}
+  // Texture d'encre : quelques manques, comme un vrai tampon
+  const im=ctx.getImageData(0,0,N,N),d=im.data;let g=1234567;
+  const hasard=()=>{g=(g*1103515245+12345)&0x7fffffff;return g/0x7fffffff;};
+  for(let i=3;i<d.length;i+=4){if(d[i]){const r=hasard();d[i]=r<0.07?d[i]*0.15:r<0.25?d[i]*0.75:d[i]*0.95;}}
+  ctx.putImageData(im,0,0);
+  const url=cv.toDataURL('image/png');
+  _cacheCachet.set(cle,url);
+  return url;
+}
+// Image du cachet à mettre sur une facture (ou '' si aucun)
+function imageCachet(f){
+  const cfg=reglageCachet(f.boutique);
+  if(cfg.mode==='aucun')return '';
+  if(cfg.mode==='image'&&isImgLogo(cfg.img))return cfg.img;
+  try{return cachetAuto(f.boutique,new Date(f.date).toLocaleDateString('fr-FR'));}catch(e){console.error('cachet:',e);return '';}
+}
+// Photo du vrai cachet : le fond blanc devient transparent, on recadre, on allège
+function chargerCachet(b,input){
+  const file=input.files&&input.files[0];input.value='';if(!file)return;
+  if(file.size>8*1024*1024){toast('Image trop lourde (max 8 Mo)','err');return;}
+  const fr=new FileReader();
+  fr.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const r0=Math.min(1,900/Math.max(img.width,img.height));
+      const w=Math.round(img.width*r0),h=Math.round(img.height*r0);
+      const cv=document.createElement('canvas');cv.width=w;cv.height=h;const ctx=cv.getContext('2d');
+      ctx.drawImage(img,0,0,w,h);
+      const im=ctx.getImageData(0,0,w,h),d=im.data;
+      let x0=w,y0=h,x1=0,y1=0;
+      for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+        const i=(y*w+x)*4,lum=(d[i]+d[i+1]+d[i+2])/3;
+        // clair = papier → transparent ; foncé = encre → gardée (bord adouci)
+        const a=lum>200?0:lum>150?Math.round((200-lum)/50*255):255;
+        d[i+3]=Math.min(d[i+3],a);
+        if(d[i+3]>40){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+      }
+      ctx.putImageData(im,0,0);
+      if(x1<=x0||y1<=y0){toast('Aucun cachet visible sur la photo','err');return;}
+      const m=6;x0=Math.max(0,x0-m);y0=Math.max(0,y0-m);x1=Math.min(w-1,x1+m);y1=Math.min(h-1,y1+m);
+      const cw=x1-x0+1,ch=y1-y0+1,r1=Math.min(1,420/Math.max(cw,ch));
+      const out=document.createElement('canvas');out.width=Math.round(cw*r1);out.height=Math.round(ch*r1);
+      out.getContext('2d').drawImage(cv,x0,y0,cw,ch,0,0,out.width,out.height);
+      const data=out.toDataURL('image/png');
+      const n=b==='B1'?1:2;
+      document.getElementById(`set-b${n}-cachet-img`).value=data;
+      document.getElementById(`set-b${n}-cachet-mode`).value='image';
+      apercuCachet(b);
+      toast('Cachet importé — pensez à enregistrer','ok');
+    };
+    img.onerror=()=>toast('Image illisible','err');
+    img.src=e.target.result;
+  };
+  fr.readAsDataURL(file);
+}
+function apercuCachet(b){
+  const n=b==='B1'?1:2;
+  const mode=document.getElementById(`set-b${n}-cachet-mode`)?.value||'auto';
+  const img=document.getElementById(`set-b${n}-cachet-img`)?.value||'';
+  const sig=document.getElementById(`set-b${n}-cachet-sign`)?.value;
+  const pv=document.getElementById(`set-b${n}-cachet-prev`);if(!pv)return;
+  const imp=document.getElementById(`set-b${n}-cachet-imp`);if(imp)imp.style.display=mode==='image'?'':'none';
+  const sg=document.getElementById(`set-b${n}-cachet-sign-wrap`);if(sg)sg.style.display=mode==='aucun'?'none':'';
+  let src='';
+  if(mode==='auto'){
+    const anc=(DB.settings[b]||{}).cachet;DB.settings[b].cachet=Object.assign({},anc||{},{signataire:sig});
+    try{src=cachetAuto(b,maintenant().toLocaleDateString('fr-FR'));}finally{DB.settings[b].cachet=anc;}
+  } else if(mode==='image')src=img;
+  pv.innerHTML=mode==='aucun'?'<span style="color:var(--text2);font-size:11px;">Pas de cachet sur les factures</span>'
+    :src?`<img src="${src}" style="max-height:110px;max-width:100%;background:#fff;border-radius:6px;padding:4px;">`
+    :'<span style="color:var(--text2);font-size:11px;">Importez la photo de votre cachet (sur papier blanc, bien éclairé)</span>';
+}
+function chargerReglagesCachet(){
+  ['B1','B2'].forEach(b=>{
+    const n=b==='B1'?1:2,c=reglageCachet(b);
+    const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v;};
+    set(`set-b${n}-cachet-mode`,c.mode);set(`set-b${n}-cachet-img`,c.img);set(`set-b${n}-cachet-sign`,c.signataire);
+    apercuCachet(b);
+  });
+}
+
 // ══ FACTURE A4 — mise en page claire et professionnelle (fond blanc) ══
 // Couleur de la boutique : Rahma = orange, Rayane = bleu
 function _couleurBoutique(b){return b==='B2'?[37,99,235]:[234,118,0];}
@@ -4143,7 +4290,22 @@ async function buildPDFBytes(f){
   police(8,'normal',gris);txt('Arrêtée la présente facture à la somme de :',M,ly+3);
   const lettres=montantEnLettres(total);
   police(9.5,'bold',encre);
-  doc.splitTextToSize(lettres.charAt(0).toUpperCase()+lettres.slice(1),tx-M-8).forEach((l,i)=>txt(l,M,ly+9+i*4.6));
+  const _ll=doc.splitTextToSize(lettres.charAt(0).toUpperCase()+lettres.slice(1),tx-M-8);
+  _ll.forEach((l,i)=>txt(l,M,ly+9+i*4.6));
+
+  // ── Cachet et signature ──
+  const cachet=imageCachet(f);
+  if(cachet){
+    let cyS=ly+9+_ll.length*4.6+5;
+    if(cyS+44>H-24){doc.addPage();doc.setFillColor(...acc);doc.rect(0,0,W,3,'F');cyS=16;}
+    police(8,'normal',gris);txt('Cachet et signature',M,cyS);
+    try{
+      const p=doc.getImageProperties(cachet),k=Math.min(40/p.width,38/p.height);
+      doc.addImage(cachet,'PNG',M+4,cyS+2,p.width*k,p.height*k);
+      const sig=reglageCachet(f.boutique);
+      if(sig.mode==='image'&&sig.signataire){police(8,'bold',encre);txt(sig.signataire,M+4,cyS+2+p.height*k+4);}
+    }catch(e){console.error('cachet PDF:',e);}
+  }
 
   // ── Pied de page ──
   const pages=doc.getNumberOfPages();
@@ -4205,7 +4367,7 @@ function factureHTML(f){
   <table class="it"><thead><tr><th>DÉSIGNATION</th><th class="c">QTÉ</th><th class="r">PRIX UNIT.</th><th class="r">MONTANT</th></tr></thead><tbody>
   ${items.map(i=>`<tr><td>${e(i.nom)}</td><td class="c g">${i.qty}${i.unite&&i.unite!=='pièce'?' '+e(i.unite):''}</td><td class="r g">${_fmtBase(i.prix)}</td><td class="r b">${_fmtBase(i.prix*i.qty)}</td></tr>`).join('')}
   </tbody></table><div class="g" style="font-size:7.5pt;font-style:italic;margin-top:1.5mm">Montants en FCFA</div>
-  <div class="bas"><div class="let">Arrêtée la présente facture à la somme de :<b>${e(lettres.charAt(0).toUpperCase()+lettres.slice(1))}</b></div>
+  <div class="bas"><div class="let">Arrêtée la présente facture à la somme de :<b>${e(lettres.charAt(0).toUpperCase()+lettres.slice(1))}</b>${(()=>{const c=imageCachet(f);if(!c)return '';const cf=reglageCachet(f.boutique);return `<div style="margin-top:5mm">Cachet et signature</div><img src="${c}" style="width:40mm;max-height:38mm;object-fit:contain;margin:1mm 0 0 4mm;display:block">${cf.mode==='image'&&cf.signataire?`<b style="margin-left:4mm">${e(cf.signataire)}</b>`:''}`;})()}</div>
   <div class="tot"><table><tr><td>Sous-total</td><td>${_fmtBase(sous)} FCFA</td></tr>${remPct>0?`<tr><td>Remise (${remPct} %)</td><td style="color:#dc2626">- ${_fmtBase(rem)} FCFA</td></tr>`:''}</table>
   <div class="gt"><span>TOTAL</span><span>${_fmtBase(total)} FCFA</span></div><table>${extra}</table></div></div>
   <div class="pied"><b>Merci pour votre confiance !</b><br>${[s.nom,s.adr,s.tel?'Tél : '+s.tel:''].filter(Boolean).map(e).join('  ·  ')}${(s.ninea||s.rc)?'<br>'+[s.ninea?'NINEA : '+e(s.ninea):'',s.rc?'RC : '+e(s.rc):''].filter(Boolean).join('  ·  '):''}</div>
@@ -7113,6 +7275,7 @@ function loadSettings(){const s=DB.settings;const set=(id,v)=>{const el=document
     bn.textContent=ok?'✓ Activées':'Activer';bn.className='btn btn-sm '+(ok?'btn-green':'');}
   set('set-b2-nom',s.B2.nom);set('set-b2-adr',s.B2.adr);set('set-b2-tel',s.B2.tel);set('set-b2-ninea',s.B2.ninea);set('set-b2-rc',s.B2.rc);set('set-b2-logo',s.B2.logo);
   const pv2=document.getElementById('set-b2-logo-prev');if(pv2)pv2.innerHTML=logoHTML(s.B2.logo,40);
+  try{chargerReglagesCachet();}catch(e){console.error('cachet:',e);}
   set('set-app-nom',s.appNom);set('set-api-key',s.apiKey);
   setTheme(s.theme||'dark');
   setTimeout(renderThemePicker,50);
@@ -7164,6 +7327,10 @@ function saveSettings(b){
   maj('ninea',get(`set-b${n}-ninea`));
   maj('rc',get(`set-b${n}-rc`));
   maj('logo',get(`set-b${n}-logo`));
+  // Cachet
+  const cm=document.getElementById(`set-b${n}-cachet-mode`);
+  if(cm){s.cachet={mode:cm.value||'auto',img:get(`set-b${n}-cachet-img`),signataire:String(get(`set-b${n}-cachet-sign`)).slice(0,30)};
+    if(s.cachet.mode==='image'&&!s.cachet.img){s.cachet.mode='auto';toast('Pas de photo de cachet : cachet automatique utilisé','warn');}}
   if(!s.logo)s.logo=(b==='B1'?LOGO_B1:LOGO_B2);
   if(!s.nom)s.nom=(b==='B1'?'Rahma Telecom':'Rayane Telecom');
   save();buildBoutiqueSelects();
