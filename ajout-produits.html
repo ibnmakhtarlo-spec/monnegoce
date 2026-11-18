@@ -455,7 +455,7 @@ async function connexionAjout(){
   }
   if(!peutGererProduits(u)){toast('⛔ Ce compte n\'est pas autorisé à gérer les produits','err');return;}
   delete tent[id];try{localStorage.setItem(TENT_AJOUT,JSON.stringify(tent));}catch(e){}
-  sessionAjout={id:u.id,nom:u.nom,t:Date.now()};
+  sessionAjout={id:u.id,nom:u.nom,role:u.role||'',t:Date.now()};
   try{sessionStorage.setItem('mn_ajout_session',JSON.stringify(sessionAjout));}catch(e){}
   localStorage.setItem('mn_ajout_id',(u.nom||u.id)+' ('+u.id+')');
   majBadgeId();
@@ -685,6 +685,8 @@ function majMarge(){
   const achat=parseFloat(document.getElementById('f-achat').value)||0;
   const prix=parseFloat(document.getElementById('f-prix').value)||0;
   const el=document.getElementById('marge-info');
+  // Marge : administrateur uniquement
+  if(!sessionAjout||sessionAjout.role!=='admin'){el.textContent='';el.className='marge';return;}
   if(!achat||!prix){el.textContent='';el.className='marge';return;}
   const marge=prix-achat;
   const pct=Math.round(marge/prix*100);

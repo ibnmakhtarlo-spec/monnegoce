@@ -293,6 +293,13 @@ tbody tr:hover{background:var(--surf2);}
 .row{display:flex;gap:11px;align-items:flex-start;} .col{flex:1;}
 .mono{font-family:var(--mono);}
 .admin-stat{display:none!important;}
+body:not(.role-admin) .admin-bloc,body:not(.role-admin) .admin-opt{display:none!important;}
+body:not(.role-admin) #sec-inventaire table th:nth-child(7),body:not(.role-admin) #sec-inventaire table td:nth-child(7),
+body:not(.role-admin) #sec-inventaire table th:nth-child(8),body:not(.role-admin) #sec-inventaire table td:nth-child(8),
+body:not(.role-admin) #sec-inventaire table th:nth-child(9),body:not(.role-admin) #sec-inventaire table td:nth-child(9),
+body:not(.role-admin) #sec-inventaire table th:nth-child(11),body:not(.role-admin) #sec-inventaire table td:nth-child(11),
+body:not(.role-admin) #sec-inventaire table th:nth-child(12),body:not(.role-admin) #sec-inventaire table td:nth-child(12),
+body:not(.role-admin) #sec-inventaire table th:nth-child(14),body:not(.role-admin) #sec-inventaire table td:nth-child(14){display:none!important;}
 .role-admin .admin-stat{display:flex!important;}
 .print-area{display:none;}
 /* ══════════════════════════════════════════════════════════
@@ -1165,7 +1172,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="sec" id="sec-inventaire">
     <div class="kgrid" style="grid-template-columns:repeat(5,1fr);margin-bottom:13px;">
       <div class="kpi g"><div class="klabel">Valeur stock (vente)</div><div class="kval" id="inv-val-v">0</div></div>
-      <div class="kpi bl"><div class="klabel">Valeur stock (achat)</div><div class="kval" id="inv-val-a">0</div></div>
+      <div class="kpi bl admin-stat"><div class="klabel">Valeur stock (achat)</div><div class="kval" id="inv-val-a">0</div></div>
       <div class="kpi gr admin-stat"><div class="klabel">Bénéfice potentiel</div><div class="kval" id="inv-ben-pot">0</div></div>
       <div class="kpi pu admin-stat"><div class="klabel">Bénéfice réalisé</div><div class="kval" id="inv-ben-real">0</div></div>
       <div class="kpi rd"><div class="klabel">Ruptures</div><div class="kval" id="inv-rupture">0</div></div>
@@ -1174,7 +1181,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <h3>📊 Résumé Global</h3>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px;">
         <div class="mini-kpi"><div class="mk-label">CA Total</div><div class="mk-val mk-g" id="inv-ca">0</div></div>
-        <div class="mini-kpi"><div class="mk-label">Coût vendus</div><div class="mk-val mk-rd" id="inv-cout">0</div></div>
+        <div class="mini-kpi admin-stat"><div class="mk-label">Coût vendus</div><div class="mk-val mk-rd" id="inv-cout">0</div></div>
         <div class="mini-kpi admin-stat"><div class="mk-label">Bénéfice brut</div><div class="mk-val mk-gr" id="inv-brut">0</div></div>
         <div class="mini-kpi admin-stat"><div class="mk-label">Marge moy.</div><div class="mk-val mk-bl" id="inv-marge">0%</div></div>
       </div>
@@ -1182,7 +1189,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
     <div class="card" style="margin-bottom:13px;">
       <div class="card-hdr"><h3>📦 Inventaire</h3>
         <select id="inv-sort" style="background:var(--surf2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:11px;border-radius:5px;padding:3px 6px;outline:none;" onchange="renderInventaire()">
-          <option value="nom">Nom</option><option value="stock">Stock</option><option value="ben">Bénéfice</option><option value="marge">Marge%</option>
+          <option value="nom">Nom</option><option value="stock">Stock</option><option value="ben" class="admin-opt">Bénéfice</option><option value="marge" class="admin-opt">Marge%</option>
         </select>
       </div>
       <div class="twrap"><table>
@@ -1192,14 +1199,14 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <div style="padding:9px 13px;background:var(--surf2);border-top:2px solid var(--gold);display:grid;grid-template-columns:repeat(5,1fr);gap:7px;">
         <div><div style="font-size:9px;color:var(--text2);text-transform:uppercase;margin-bottom:2px;">Unités</div><div class="mono" style="font-weight:900;color:var(--text)" id="inv-tot-u">0</div></div>
         <div><div style="font-size:9px;color:var(--text2);text-transform:uppercase;margin-bottom:2px;">Val. vente</div><div class="mono" style="font-weight:900;color:var(--gold)" id="inv-tot-v">0</div></div>
-        <div><div style="font-size:9px;color:var(--text2);text-transform:uppercase;margin-bottom:2px;">Val. achat</div><div class="mono" style="font-weight:900;color:var(--blue)" id="inv-tot-a">0</div></div>
-        <div><div style="font-size:9px;color:var(--text2);text-transform:uppercase;margin-bottom:2px;">Bén. pot.</div><div class="mono" style="font-weight:900;color:var(--green)" id="inv-tot-bp">0</div></div>
-        <div><div style="font-size:9px;color:var(--text2);text-transform:uppercase;margin-bottom:2px;">Bén. réel</div><div class="mono" style="font-weight:900;color:var(--purple)" id="inv-tot-br">0</div></div>
+        <div class="admin-bloc"><div style="font-size:9px;color:var(--text2);text-transform:uppercase;margin-bottom:2px;">Val. achat</div><div class="mono" style="font-weight:900;color:var(--blue)" id="inv-tot-a">0</div></div>
+        <div class="admin-bloc"><div style="font-size:9px;color:var(--text2);text-transform:uppercase;margin-bottom:2px;">Bén. pot.</div><div class="mono" style="font-weight:900;color:var(--green)" id="inv-tot-bp">0</div></div>
+        <div class="admin-bloc"><div style="font-size:9px;color:var(--text2);text-transform:uppercase;margin-bottom:2px;">Bén. réel</div><div class="mono" style="font-weight:900;color:var(--purple)" id="inv-tot-br">0</div></div>
       </div>
     </div>
     <div class="row">
       <div class="col card" style="padding:13px;"><h3 style="font-size:12px;font-weight:800;margin-bottom:11px;">🏆 Top Quantité</h3><div id="inv-top-qty"></div></div>
-      <div class="col card" style="padding:13px;"><h3 style="font-size:12px;font-weight:800;margin-bottom:11px;">💰 Top Bénéfice</h3><div id="inv-top-ben"></div></div>
+      <div class="col card admin-bloc" style="padding:13px;"><h3 style="font-size:12px;font-weight:800;margin-bottom:11px;">💰 Top Bénéfice</h3><div id="inv-top-ben"></div></div>
     </div>
   </div>
 
@@ -1675,7 +1682,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <div class="tv-filtres">
         <select id="tv-periode" onchange="renderTopVentes()"><option value="jour">Aujourd'hui</option><option value="7">7 derniers jours</option><option value="30" selected>30 derniers jours</option><option value="mois">Ce mois</option><option value="moisprec">Mois dernier</option><option value="90">3 derniers mois</option></select>
         <select id="tv-boutique" onchange="renderTopVentes()"></select>
-        <select id="tv-tri" onchange="renderTopVentes()"><option value="qte">Classer par quantité</option><option value="ca">Classer par chiffre d'affaires</option><option value="ben" id="tv-tri-ben">Classer par bénéfice</option></select>
+        <select id="tv-tri" onchange="renderTopVentes()"><option value="qte">Classer par quantité</option><option value="ca">Classer par chiffre d'affaires</option><option value="ben" id="tv-tri-ben" class="admin-opt">Classer par bénéfice</option></select>
         <label class="tv-chk"><input type="checkbox" id="tv-commander" onchange="renderTopVentes()"> 🛒 Seulement à commander</label>
         <button class="btn btn-green btn-sm" style="margin-left:auto;" onclick="partagerTopVentes()">📲 WhatsApp</button>
       </div>
@@ -2035,7 +2042,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
         <div class="fg"><label>Catégorie</label><input id="mp-cat" list="mp-cat-list" value="Accessoire High-Tech"><datalist id="mp-cat-list"></datalist></div>
         <div class="fg"><label>Fournisseur</label><select id="mp-fourn"><option value="">— Aucun —</option></select></div>
         <div class="fg"><label>Prix Vente (FCFA) *</label><input type="number" id="mp-prix" min="0"></div>
-        <div class="fg"><label>Prix Achat (FCFA)</label><input type="number" id="mp-achat" min="0"></div>
+        <div class="fg" id="mp-achat-wrap"><label>Prix Achat (FCFA)</label><input type="number" id="mp-achat" min="0"></div>
         <div class="fg"><label>Stock B1</label><input type="number" id="mp-s1" min="0" value="0"></div>
         <div class="fg"><label>Stock B2</label><input type="number" id="mp-s2" min="0" value="0"></div>
         <div class="fg"><label>Seuil Alerte</label><input type="number" id="mp-al" value="1" min="0"></div>
@@ -2745,7 +2752,9 @@ function maintenant(){return new Date(Date.now()+(window._decalageServeur||0));}
 const today=()=>maintenant().toISOString().slice(0,10);
 const getBName=b=>DB.settings[b]?.nom||b;
 const isAdmin=()=>['admin','superviseur'].includes(session.user?.role);
-const hasPerm=p=>session.user?.perms?.includes(p)||false;
+// Bénéfices, marges et prix d'achat : administrateur UNIQUEMENT, quelles que soient les permissions
+const PERMS_ADMIN_SEUL=['benefices','prix_achat'];
+const hasPerm=p=>PERMS_ADMIN_SEUL.includes(p)?session.user?.role==='admin':(session.user?.perms?.includes(p)||false);
 // ══ LOGOS DES MODES DE PAIEMENT ══
 const PAY_LOGOS={
   especes:'data:image/jpeg;base64,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',
@@ -3451,7 +3460,7 @@ function applyNavPerms(){
       return;
     }
     // Pages strictement réservées à l'admin — JAMAIS accessibles au superviseur, même avec permissions
-    const adminStrict=['comparaison','previsions','connexions','audit'];
+    const adminStrict=['comparaison','previsions','connexions','audit','benefice','tresorerie'];
     if(adminStrict.includes(page)){
       el.style.display='none'; // Toujours masqué (admin déjà géré par le retour précoce isAdmin)
       return;
@@ -3481,7 +3490,7 @@ function applyNavPerms(){
 
   // Colonne prix achat
   const thAchat=document.getElementById('th-achat');
-  if(thAchat)thAchat.style.display=perms.includes('prix_achat')?'':'none';
+  if(thAchat)thAchat.style.display='none';   // prix d'achat : administrateur uniquement
 }
 
 function logout(){
@@ -3531,13 +3540,16 @@ function _tvAgreger(d1,d2,bq){
   }
   return m;
 }
+// Options de tri sur le bénéfice : supprimées pour les non-admins (iPhone ignore le masquage CSS)
+function _retirerOptionsAdmin(){if(session.user?.role!=='admin')document.querySelectorAll('option.admin-opt').forEach(o=>o.remove());}
 function renderTopVentes(){
+  _retirerOptionsAdmin();
   const selB=document.getElementById('tv-boutique');if(!selB)return;
   const chef=session.user?.role==='admin'||session.user?.role==='superviseur'||session.user?.boutique==='all';
   if(!selB.options.length){
     selB.innerHTML=(chef?'<option value="tous">Les deux boutiques</option>':'')+['B1','B2'].filter(b=>chef||b===session.boutique).map(b=>`<option value="${b}">${escapeHtml(getBName(b))}</option>`).join('');
   }
-  const voirBen=hasPerm('prix_achat')||hasPerm('benefices')||session.user?.role==='admin';
+  const voirBen=session.user?.role==='admin';
   document.querySelectorAll('#sec-top-ventes .tv-ben').forEach(e=>e.style.display=voirBen?'':'none');
   const ob=document.getElementById('tv-tri-ben');if(ob)ob.disabled=!voirBen;
   const triSel=document.getElementById('tv-tri');if(!voirBen&&triSel.value==='ben')triSel.value='qte';
@@ -3622,7 +3634,7 @@ function nav(page){
   assainirDB();
   if(page==='parametres')setTimeout(()=>{try{chargerReglagesAlertes();}catch(e){}try{chargerReglagesTicket();}catch(e){}try{chargerReglagesObjectifs();}catch(e){}},0);
   // Sécurité: pages strictement admin, bloquées même via appel direct (console, etc.)
-  const adminStrictPages=['comparaison','previsions','connexions','audit'];
+  const adminStrictPages=['comparaison','previsions','connexions','audit','benefice','tresorerie'];
   if(adminStrictPages.includes(page)&&session.user?.role!=='admin'){
     soundErr();toast('⛔ Accès réservé à l\'administrateur','err');
     return;
@@ -3857,13 +3869,16 @@ function validerVente(){
     const perte=coutTotal-total;
     const detail=cart.filter(i=>(i.prix*(1-r/100))<(Number(i.achat)||0))
       .map(i=>'• '+i.nom+' : '+fmt(i.prix*(1-r/100))+' au lieu de '+fmt(i.achat)+' minimum').join('\n');
-    if(!confirm('🚨 VENTE À PERTE !\n\nCoût d\'achat : '+fmt(coutTotal)+'\nEncaissé : '+fmt(total)+(r>0?' (remise '+r+'%)':'')+'\nPERTE : '+fmt(perte)+'\n\n'+(detail?detail+'\n\n':'')+'Valider quand même ?')){
+    const _admV=session.user?.role==='admin';
+    if(!_admV){
+      if(!confirm('🚨 PRIX TROP BAS !\n\nAvec ce prix ou cette remise, la boutique perd de l\'argent sur cette vente.\nL\'administrateur sera prévenu.\n\nValider quand même ?')){toast('Vente annulée — réduisez la remise','err');return;}
+    } else if(!confirm('🚨 VENTE À PERTE !\n\nCoût d\'achat : '+fmt(coutTotal)+'\nEncaissé : '+fmt(total)+(r>0?' (remise '+r+'%)':'')+'\nPERTE : '+fmt(perte)+'\n\n'+(detail?detail+'\n\n':'')+'Valider quand même ?')){
       toast('Vente annulée — réduisez la remise','err');
       return;
     }
     logAction&&logAction('Alerte prix','Vente à perte validée: '+fmt(perte)+' de perte (remise '+r+'%)');
   } else if(coutTotal>0&&total===coutTotal){
-    if(!confirm('⚠️ MARGE NULLE\n\nCette vente ne rapporte aucun bénéfice.\n\nValider quand même ?'))return;
+    if(!confirm(session.user?.role==='admin'?'⚠️ MARGE NULLE\n\nCette vente ne rapporte aucun bénéfice.\n\nValider quand même ?':'⚠️ PRIX AU MINIMUM\n\nCe prix est le plus bas autorisé. Valider quand même ?'))return;
   }
   const cid=document.getElementById('pos-cl-id').value||'';const client=DB.clients.find(c=>c.id===cid);
   // Mode Acompte: exige un client sélectionné
@@ -4831,6 +4846,7 @@ function renderRetours(){
 function mpShowTab(tab){['manuel','photo','ia'].forEach(t=>{document.getElementById('mp-content-'+t).style.display=t===tab?'block':'none';document.getElementById('mp-tab-'+t).className=t===tab?'btn btn-gold btn-sm':'btn btn-ghost btn-sm';});}
 function openModalProd(){
   document.getElementById('mp-t').textContent='➕ Nouveau Produit';document.getElementById('mp-id').value='';
+  _mpAchatVisible(true);
   ['mp-nom','mp-ref','mp-code','mp-prix','mp-achat','mp-s1','mp-s2','mp-desc'].forEach(i=>{const el=document.getElementById(i);if(el)el.value='';});
   document.getElementById('mp-al').value='1';document.getElementById('mp-cat').value='Accessoire High-Tech';document.getElementById('mp-s1').value='0';document.getElementById('mp-s2').value='0';
   clearProdPhoto();refreshFournSel('mp-fourn');mpShowTab('manuel');
@@ -6301,7 +6317,13 @@ function saveProd(){
   const achatVal=parseFloat(document.getElementById('mp-achat').value)||0;
   if(achatVal===0&&!eid){if(!confirm('⚠️ Prix d\'achat = 0 FCFA. Continuer quand même ?')){return;}}
   // ══ PROTECTION VENTE À PERTE ══
-  if(achatVal>0){
+  // Un non-admin qui modifie un produit ne voit ni le prix d'achat ni la marge
+  const _voitCout=session.user?.role==='admin'||!eid;
+  if(achatVal>0&&!_voitCout&&prix<=achatVal){
+    soundErr();
+    if(!confirm('🚨 PRIX TROP BAS !\n\nÀ ce prix, la boutique perd de l\'argent sur ce produit.\nL\'administrateur sera prévenu.\n\nEnregistrer quand même ?')){toast('Enregistrement annulé — vérifiez le prix','err');return;}
+    try{alerteSuspecte('prix_bas','Prix de vente sous le coût : '+nom+' à '+fmt(prix));}catch(e){}
+  } else if(achatVal>0){
     if(prix<achatVal){
       soundErr();
       const perte=achatVal-prix;
@@ -6587,7 +6609,7 @@ function renderMouvements(){
   </tr>`),`<tr><td colspan="7" class="empty"><div class="ei">🔄</div>Aucun mouvement</td></tr>`);
 }
 function renderProduits(){
-  const q=(document.getElementById('srch-p')?.value||'').toLowerCase();const adm=hasPerm('prix_achat')||session.user?.role==='admin';
+  const q=(document.getElementById('srch-p')?.value||'').toLowerCase();const adm=session.user?.role==='admin';
   const catFil=document.getElementById('fil-cat-p')?.value||'';
   // Remplir le select des catégories dynamiquement
   const catSel=document.getElementById('fil-cat-p');
@@ -6601,13 +6623,14 @@ function renderProduits(){
   remplirProgressif('tb-p',list.map(p=>{
     const _t=(p.s1||0)+(p.s2||0);const st=_t<=0?'br':_t<=(p.alerte||1)?'by':'bg';const sl=_t<=0?'Rupture':_t<=(p.alerte||1)?'Faible':'En stock';
     // Signaler visuellement les prix incohérents (vente à perte / marge nulle)
-    const _ach=Number(p.achat)||0;const _perte=_ach>0&&p.prix<_ach;const _nulle=_ach>0&&p.prix===_ach;
+    const _ach=session.user?.role==='admin'?(Number(p.achat)||0):0;const _perte=_ach>0&&p.prix<_ach;const _nulle=_ach>0&&p.prix===_ach;
     const _badgePrix=_perte?'<span class="badge br" style="font-size:8px;margin-left:4px;" title="Prix de vente inférieur au prix d\'achat">🚨 PERTE</span>'
       :(_nulle?'<span class="badge by" style="font-size:8px;margin-left:4px;" title="Aucune marge">⚠️ 0%</span>':'');
     return`<tr><td>${p.photo?`<img src="${p.photo}" loading="lazy" decoding="async" style="width:30px;height:30px;border-radius:4px;object-fit:cover;">`:'<div style="width:30px;height:30px;border-radius:4px;background:var(--surf3);display:inline-flex;align-items:center;justify-content:center;font-size:13px;">📦</div>'}</td><td class="mono" style="font-size:9px;color:var(--orange)">${p.ref||'—'}</td><td><b>${escapeHtml(p.nom)}</b>${_badgePrix}${p.desc?`<br><span style="font-size:9px;color:var(--text2)">${escapeHtml(p.desc).substring(0,35)}...</span>`:''}</td><td><span class="badge bb">${escapeHtml(p.cat)}</span></td><td class="mono" style="color:${_perte?'var(--red)':'var(--green)'};font-weight:700">${fmt(p.prix)}</td>${adm?`<td class="mono" style="color:var(--text2)">${fmt(p.achat)}</td>`:''}<td style="font-weight:700;color:${p.s1<=(p.alerte||1)?'var(--red)':'inherit'}">${p.s1}</td><td style="font-weight:700;color:${p.s2<=(p.alerte||1)?'var(--red)':'inherit'}">${p.s2}</td><td>${p.alerte||1}</td><td><span class="badge ${st}">${sl}</span></td><td style="display:flex;gap:3px;">${canEdit?`<button class="btn btn-ghost btn-xs" onclick="editProd('${p.id}')">✏️</button><button class="btn btn-red btn-xs" onclick="delProd('${p.id}')">🗑</button>`:'—'}</td></tr>`;
   }),`<tr><td colspan="11" class="empty"><div class="ei">📦</div>Aucun produit</td></tr>`);
 }
-function editProd(id){const p=DB.produits.find(x=>x.id===id);document.getElementById('mp-t').textContent='✏️ Modifier';document.getElementById('mp-id').value=p.id;document.getElementById('mp-nom').value=p.nom;document.getElementById('mp-ref').value=p.ref||'';const _mc=document.getElementById('mp-code');if(_mc)_mc.value=p.codeBarre||'';document.getElementById('mp-cat').value=p.cat||'';document.getElementById('mp-prix').value=p.prix;document.getElementById('mp-achat').value=p.achat||0;document.getElementById('mp-s1').value=p.s1||0;document.getElementById('mp-s2').value=p.s2||0;document.getElementById('mp-al').value=p.alerte||1;document.getElementById('mp-un').value=p.unite||'pièce';document.getElementById('mp-desc').value=p.desc||'';if(p.photo){document.getElementById('mp-photo-data').value=p.photo;document.getElementById('mp-photo-preview').innerHTML=`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover;">`;document.getElementById('mp-photo-clear').style.display='inline-flex';}else clearProdPhoto();refreshFournSel('mp-fourn',p.fourn);mpShowTab('manuel');openModal('modal-prod');}
+function _mpAchatVisible(nouveau){const w=document.getElementById('mp-achat-wrap');if(w)w.style.display=(session.user?.role==='admin'||nouveau)?'':'none';}
+function editProd(id){const p=DB.produits.find(x=>x.id===id);setTimeout(()=>_mpAchatVisible(false),0);document.getElementById('mp-t').textContent='✏️ Modifier';document.getElementById('mp-id').value=p.id;document.getElementById('mp-nom').value=p.nom;document.getElementById('mp-ref').value=p.ref||'';const _mc=document.getElementById('mp-code');if(_mc)_mc.value=p.codeBarre||'';document.getElementById('mp-cat').value=p.cat||'';document.getElementById('mp-prix').value=p.prix;document.getElementById('mp-achat').value=p.achat||0;document.getElementById('mp-s1').value=p.s1||0;document.getElementById('mp-s2').value=p.s2||0;document.getElementById('mp-al').value=p.alerte||1;document.getElementById('mp-un').value=p.unite||'pièce';document.getElementById('mp-desc').value=p.desc||'';if(p.photo){document.getElementById('mp-photo-data').value=p.photo;document.getElementById('mp-photo-preview').innerHTML=`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover;">`;document.getElementById('mp-photo-clear').style.display='inline-flex';}else clearProdPhoto();refreshFournSel('mp-fourn',p.fourn);mpShowTab('manuel');openModal('modal-prod');}
 function openTransfertStock(){
   openModal('modal-transfert');
   const s=document.getElementById('tr-search');
@@ -6993,7 +7016,9 @@ function renderBenefice(){
 // ══ INVENTAIRE ══
 function renderInventaire(){
   const vQty={},vBen={},vCA={};DB.factures.forEach(f=>f.items.forEach(i=>{vQty[i.id]=(vQty[i.id]||0)+i.qty;vBen[i.id]=(vBen[i.id]||0)+(i.prix-(i.achat||0))*i.qty;vCA[i.id]=(vCA[i.id]||0)+i.prix*i.qty;}));
-  const sortKey=document.getElementById('inv-sort')?.value||'nom';
+  _retirerOptionsAdmin();
+  let sortKey=document.getElementById('inv-sort')?.value||'nom';
+  if(session.user?.role!=='admin'&&(sortKey==='ben'||sortKey==='marge'))sortKey='nom';
   let prods=[...DB.produits].sort((a,b)=>{if(sortKey==='stock')return(b.s1+b.s2)-(a.s1+a.s2);if(sortKey==='ben')return((b.prix-b.achat)*(b.s1+b.s2))-((a.prix-a.achat)*(a.s1+a.s2));if(sortKey==='marge'){const ma=a.prix>0?(a.prix-a.achat)/a.prix*100:0;const mb=b.prix>0?(b.prix-b.achat)/b.prix*100:0;return mb-ma;}return a.nom.localeCompare(b.nom);});
   let totU=0,totV=0,totA=0,totBP=0,totBR=0,caT=0,coutT=0;
   const rows=prods.map(p=>{const stk=p.s1+p.s2;const mu=p.prix-(p.achat||0);const mPct=p.prix>0?Math.round(mu/p.prix*100):0;const vV=p.prix*stk;const vA=(p.achat||0)*stk;const bPot=mu*stk;const qV=vQty[p.id]||0;const bR=vBen[p.id]||0;const caP=vCA[p.id]||0;totU+=stk;totV+=vV;totA+=vA;totBP+=bPot;totBR+=bR;caT+=caP;coutT+=caP-bR;const mCls=mPct>=50?'color:var(--green);font-weight:700':mPct>=25?'color:var(--gold);font-weight:700':'color:var(--orange);font-weight:700';const st=stk<=0?'br':stk<=(p.alerte||1)?'by':'bg';const sl=stk<=0?'Rupture':stk<=(p.alerte||1)?'Faible':'OK';return`<tr><td>${p.photo?`<img src="${p.photo}" loading="lazy" decoding="async" style="width:22px;height:22px;border-radius:3px;object-fit:cover;">`:'📦'}</td><td><b>${p.nom}</b></td><td style="color:${p.s1<=(p.alerte||1)?'var(--red)':'inherit'};font-weight:700">${p.s1}</td><td style="color:${p.s2<=(p.alerte||1)?'var(--red)':'inherit'};font-weight:700">${p.s2}</td><td style="font-weight:900;color:var(--cyan)">${stk}</td><td class="mono" style="color:var(--green)">${fmt(p.prix)}</td><td class="mono" style="color:var(--text2)">${fmt(p.achat||0)}</td><td class="mono" style="color:var(--gold);font-weight:700">${fmt(mu)}</td><td class="mono" style="${mCls}">${mPct}%</td><td class="mono" style="color:var(--blue)">${fmt(vV)}</td><td class="mono" style="color:var(--text2)">${fmt(vA)}</td><td class="mono" style="color:var(--green);font-weight:700">${fmt(bPot)}</td><td style="text-align:center"><span class="badge bb">${qV}</span></td><td class="mono" style="color:var(--purple);font-weight:700">${fmt(bR)}</td><td><span class="badge ${st}">${sl}</span></td></tr>`;});
@@ -7913,7 +7938,7 @@ function renderAccueil(){
   if(stockFaible>0)alertes.push({icon:'⚠️',text:`${stockFaible} produit(s) en stock faible`,type:'gold',nav:'inventaire'});
   // Produits vendus à perte (prix de vente < prix d'achat)
   const prixPerte=DB.produits.filter(p=>(Number(p.achat)||0)>0&&Number(p.prix)<Number(p.achat)).length;
-  if(prixPerte>0)alertes.push({icon:'🚨',text:`${prixPerte} produit(s) vendu(s) À PERTE — prix à corriger`,type:'red',nav:'produits'});
+  if(prixPerte>0&&session.user?.role==='admin')alertes.push({icon:'🚨',text:`${prixPerte} produit(s) vendu(s) À PERTE — prix à corriger`,type:'red',nav:'produits'});
   // Factures en attente depuis trop longtemps
   const enAttente=(DB.brouillons||[]).filter(b=>b&&b.boutique===session.boutique);
   if(enAttente.length){
@@ -9153,7 +9178,7 @@ function afficherFicheClientPOS(id){
 // chaque ligne est inscrite dans les mouvements de stock. Le brouillon survit à un
 // rechargement de la page.
 let _recLignes=[],_recInconnu=null,_recStream=null,_recTimer=null,_recDernier={code:'',t:0};
-function _recVoitAchat(){return session.user?.role==='admin'||(session.user?.perms||[]).includes('prix_achat');}
+function _recVoitAchat(){return session.user?.role==='admin';}
 function _recSauver(){
   try{SS('receptionBrouillon',{lignes:_recLignes.map(l=>({id:l.id,qte:l.qte,achat:l.achat})),
     boutique:document.getElementById('rec-boutique')?.value,fourn:document.getElementById('rec-fourn')?.value});}catch(e){}
@@ -11249,7 +11274,7 @@ function searchBarcode(code){scanTraiter(code,'saisie');}
 function scanAfficherFiche(p,r,etat){
   const el=document.getElementById('scanner-result');el.style.display='block';
   const s1=Number(p.s1)||0,s2=Number(p.s2)||0;
-  const chef=session.user?.role==='admin'||session.user?.role==='superviseur';
+  const chef=session.user?.role==='admin';
   const nb1=escapeHtml(DB.settings?.B1?.nom||'Boutique 1'),nb2=escapeHtml(DB.settings?.B2?.nom||'Boutique 2');
   let dispo=0;try{dispo=stockDisponible(p,session.boutique);}catch(e){dispo=session.boutique==='B2'?s2:s1;}
   const photo=p.photo?`<img src="${escapeHtml(p.photo)}" alt="">`:'<div class="scan-ph">📦</div>';
@@ -11974,8 +11999,9 @@ function updateExportStatus(){
 }
 
 function exportProduitsCSV(){
-  const header='ID,Nom,Ref,Categorie,Prix Vente,Prix Achat,Stock B1,Stock B2,Alerte,Unite,Description';
-  const rows=DB.produits.map(p=>`${p.id},${p.nom},${p.ref||''},${p.cat},${p.prix},${p.achat||0},${p.s1},${p.s2},${p.alerte||1},${p.unite||'pièce'},"${(p.desc||'').replace(/"/g,"'")}"`);
+  const _adm=session.user?.role==='admin';
+  const header='ID,Nom,Ref,Categorie,Prix Vente,'+(_adm?'Prix Achat,':'')+'Stock B1,Stock B2,Alerte,Unite,Description';
+  const rows=DB.produits.map(p=>`${p.id},${p.nom},${p.ref||''},${p.cat},${p.prix},${_adm?(p.achat||0)+',':''}${p.s1},${p.s2},${p.alerte||1},${p.unite||'pièce'},"${(p.desc||'').replace(/"/g,"'")}"`);
   const csv=header+'\n'+rows.join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`Produits_${today()}.csv`;a.click();toast('Produits exportés ✅','ok');
 }
