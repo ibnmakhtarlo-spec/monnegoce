@@ -257,6 +257,10 @@ tbody tr:hover{background:var(--surf2);}
 .tv-rang{font-size:15px;text-align:center;font-weight:800}
 .tv-up{color:var(--green);font-weight:700}.tv-down{color:var(--red);font-weight:700}.tv-eq{color:var(--text2)}.tv-new{color:var(--gold);font-size:10px;font-weight:700}
 .tv-rupt{color:var(--red);font-weight:800}tr.tv-cmd td{background:rgba(239,68,68,.06)}
+.pos-prime{font-size:10.5px;color:var(--gold);margin-top:4px}
+.ma-prime{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px}
+.ma-prime>div{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);border-radius:8px;padding:8px;text-align:center}
+.ma-prime span{display:block;font-size:9.5px;color:var(--text2)}.ma-prime b{font-size:16px;color:var(--gold)}
 .pos-mult{background:rgba(245,158,11,.15);border:1px solid var(--gold);color:var(--gold);border-radius:7px;padding:6px 9px;font-size:12px;margin-bottom:7px;}
 .qte-edit:focus{border-color:var(--gold);}
 .qb{background:var(--surf3);border:1px solid var(--border2);color:var(--text);width:19px;height:19px;border-radius:4px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;}
@@ -733,6 +737,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="ni admin-nav" onclick="nav('agenda')"><span class="ic">📅</span> Agenda</div>
   <div class="ni admin-nav" onclick="nav('heures-fortes')"><span class="ic">🔥</span> Heures Fortes</div>
   <div class="ni admin-nav" onclick="nav('top-ventes')"><span class="ic">🏆</span> Meilleures Ventes</div>
+  <div class="ni admin-nav" onclick="nav('primes')"><span class="ic">🏅</span> Primes Vendeurs</div>
   <div class="ni admin-nav" onclick="nav('produits-lents')"><span class="ic">🐢</span> Produits Lents</div>
   <div class="ni" onclick="nav('chat')"><span class="ic">💬</span> Chat Personnel</div>
   <div class="ni admin-nav" onclick="nav('users')"><span class="ic">🔐</span> Utilisateurs & Rôles</div>
@@ -1506,6 +1511,18 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <button class="btn btn-gold" id="obj-save" onclick="sauverObjectifs()">💾 Enregistrer</button>
     </div>
     <div class="setting-card">
+      <h4>🏅 Primes des vendeurs</h4>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Calculée chaque jour pour chaque vendeur. Modifiable par l'administrateur.</div>
+      <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:6px;"><input type="checkbox" id="pr-actif"> Primes activées</label>
+      <div class="fgrid">
+        <div class="fg"><label>Seuil de ventes par jour (FCFA)</label><input type="number" id="pr-seuil" min="0" step="10000" inputmode="numeric" oninput="majExemplePrime()"></div>
+        <div class="fg"><label>Pourcentage au-delà du seuil (%)</label><input type="number" id="pr-taux" min="0" max="20" step="0.5" inputmode="decimal" oninput="majExemplePrime()"></div>
+        <div class="fg"><label>Bonus si la boutique atteint l'objectif (FCFA)</label><input type="number" id="pr-bonus" min="0" step="500" inputmode="numeric" oninput="majExemplePrime()"></div>
+      </div>
+      <div id="pr-exemple" style="font-size:11px;color:var(--gold);margin:4px 0 8px;"></div>
+      <button class="btn btn-gold" id="pr-save" onclick="sauverReglagesPrimes()">💾 Enregistrer</button>
+    </div>
+    <div class="setting-card">
       <h4>🖨️ Ticket de caisse (imprimante thermique)</h4>
       <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Réglé pour <b>cet appareil</b> : chaque caisse peut avoir son imprimante.</div>
       <div class="fgrid">
@@ -1677,6 +1694,21 @@ canvas.chart-canvas{display:block;width:100%!important;}
   </div>
 
   <!-- PRODUITS LENTS -->
+  <div class="sec" id="sec-primes">
+    <div class="card" style="padding:11px;margin-bottom:11px;">
+      <div class="tv-filtres">
+        <select id="pr-periode" onchange="renderPrimes()"><option value="jour">Aujourd'hui</option><option value="hier">Hier</option><option value="7">7 derniers jours</option><option value="mois" selected>Ce mois</option><option value="moisprec">Mois dernier</option></select>
+        <select id="pr-boutique" onchange="renderPrimes()"><option value="tous">Les deux boutiques</option><option value="B1">Boutique 1</option><option value="B2">Boutique 2</option></select>
+        <span id="pr-regle" style="font-size:10.5px;color:var(--text2);"></span>
+        <button class="btn btn-green btn-sm" style="margin-left:auto;" onclick="partagerPrimes()">📲 WhatsApp</button>
+      </div>
+    </div>
+    <div class="tv-resume" id="pr-resume"></div>
+    <div class="card"><div class="twrap"><table>
+      <thead><tr><th>#</th><th>Vendeur</th><th>Boutique</th><th>Ventes</th><th>Chiffre d'aff.</th><th>Panier moyen</th><th>Jours objectif ✅</th><th>Prime</th></tr></thead>
+      <tbody id="pr-body"></tbody></table></div></div>
+    <div style="font-size:10.5px;color:var(--text2);margin-top:8px;">La prime se calcule chaque jour : un pourcentage des ventes du vendeur au-delà du seuil, plus un bonus si sa boutique atteint l'objectif du jour. Règles modifiables dans Paramètres.</div>
+  </div>
   <div class="sec" id="sec-top-ventes">
     <div class="card" style="padding:11px;margin-bottom:11px;">
       <div class="tv-filtres">
@@ -3452,6 +3484,7 @@ function applyNavPerms(){
     const page=m[1];
     // Pages toujours visibles pour tous
     const alwaysVisible=['accueil','caisse','chat'];
+    if(page==='primes'){el.style.display=(role==='superviseur')?'flex':'none';return;}
     if(alwaysVisible.includes(page)){el.style.display='flex';return;}
     // Pages admin uniquement — superviseur y accède si permission 'admin_menus'
     const adminOnly=['users','caisses-config','salaires','parametres'];
@@ -3617,6 +3650,112 @@ function partagerTopVentes(){
 TITLES['top-ventes']='Meilleures <span>Ventes</span>';
 RENDERS['top-ventes']=renderTopVentes;
 
+// ══ PRIMES DES VENDEURS ══
+// Chaque jour : taux % des ventes du vendeur au-delà du seuil + bonus si la boutique atteint son objectif.
+function reglesPrimes(){
+  const d={actif:true,seuil:100000,taux:2,bonus:1000};
+  const r=Object.assign(d,DB.settings.primes||{});
+  r.seuil=Math.max(0,Number(r.seuil)||0);r.taux=Math.max(0,Number(r.taux)||0);r.bonus=Math.max(0,Number(r.bonus)||0);
+  return r;
+}
+function _cleVendeur(f){return f.userId||f._author||('nom:'+(f.vendeur||'?'));}
+function _nomVendeur(cle,f){const u=(DB.users||[]).find(x=>x.id===cle);return u?.nom||f?.vendeur||String(cle).replace(/^nom:/,'');}
+// Calcule les primes entre deux dates (incluses) ; renvoie une liste par vendeur
+function calculerPrimes(d1,d2,bq){
+  const R=reglesPrimes();
+  const jours={};       // jour → {B1:ca, B2:ca, vend:{cle:{ca,nb,b,nom}}}
+  for(const f of (DB.factures||[])){
+    if(!f||typeof f.date!=='string')continue;
+    const j=f.date.slice(0,10);if(j<d1||j>d2)continue;
+    if(typeof estFactureSupprimee==='function'&&estFactureSupprimee(f.id))continue;
+    const J=jours[j]||(jours[j]={B1:0,B2:0,vend:{}});
+    const t=Number(f.total)||0;if(J[f.boutique]!=null)J[f.boutique]+=t;
+    const k=_cleVendeur(f)+'|'+f.boutique;
+    const v=J.vend[k]||(J.vend[k]={cle:_cleVendeur(f),b:f.boutique,ca:0,nb:0,nom:_nomVendeur(_cleVendeur(f),f)});
+    v.ca+=t;v.nb++;
+  }
+  const res={};
+  Object.entries(jours).forEach(([j,J])=>{
+    Object.values(J.vend).forEach(v=>{
+      if(bq!=='tous'&&v.b!==bq)return;
+      const x=res[v.cle+'|'+v.b]||(res[v.cle+'|'+v.b]={cle:v.cle,nom:v.nom,b:v.b,ca:0,nb:0,joursObj:0,joursVente:0,prime:0});
+      x.ca+=v.ca;x.nb+=v.nb;x.joursVente++;
+      let p=Math.max(0,v.ca-R.seuil)*R.taux/100;
+      if(J[v.b]>=objectifBoutique(v.b)){x.joursObj++;p+=R.bonus;}
+      x.prime+=R.actif?p:0;
+    });
+  });
+  return Object.values(res).map(x=>{x.prime=Math.round(x.prime/50)*50;return x;}).sort((a,b)=>b.prime-a.prime||b.ca-a.ca);
+}
+// Prime du jour d'un vendeur + ce qu'il manque pour gagner plus
+function maPrimeDuJour(){
+  const R=reglesPrimes();if(!R.actif||!session.user)return null;
+  const j=today(),moi=session.user.id,b=session.boutique;
+  const L=calculerPrimes(j,j,b).find(x=>x.cle===moi);
+  const ca=L?L.ca:0,prime=L?L.prime:0;
+  return {ca,prime,manqueSeuil:Math.max(0,R.seuil-ca),R};
+}
+function _prPeriode(v){
+  const j=today(),d=new Date(j+'T00:00:00Z'),iso=x=>x.toISOString().slice(0,10);
+  if(v==='jour')return {d1:j,d2:j,lib:"aujourd'hui"};
+  if(v==='hier'){const x=new Date(d);x.setUTCDate(x.getUTCDate()-1);return {d1:iso(x),d2:iso(x),lib:'hier'};}
+  if(v==='7'){const x=new Date(d);x.setUTCDate(x.getUTCDate()-6);return {d1:iso(x),d2:j,lib:'7 derniers jours'};}
+  if(v==='moisprec'){const x=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()-1,1)),y=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),0));
+    return {d1:iso(x),d2:iso(y),lib:x.toLocaleDateString('fr-FR',{month:'long',year:'numeric',timeZone:'UTC'})};}
+  return {d1:j.slice(0,8)+'01',d2:j,lib:d.toLocaleDateString('fr-FR',{month:'long',year:'numeric',timeZone:'UTC'})};
+}
+let _prDernier=null;
+function renderPrimes(){
+  const sb=document.getElementById('pr-boutique');
+  if(sb&&!sb.dataset.ok){sb.options[1].text=getBName('B1');sb.options[2].text=getBName('B2');sb.dataset.ok=1;}
+  const R=reglesPrimes(),P=_prPeriode(document.getElementById('pr-periode').value),bq=sb.value;
+  document.getElementById('pr-regle').textContent=R.actif?`Règle : ${R.taux} % au-delà de ${fmt(R.seuil)} par jour + ${fmt(R.bonus)} si objectif boutique atteint`:'⚠️ Primes désactivées (Paramètres)';
+  const L=calculerPrimes(P.d1,P.d2,bq);_prDernier={P,bq,L};
+  const tot=L.reduce((t,x)=>t+x.prime,0),ca=L.reduce((t,x)=>t+x.ca,0);
+  document.getElementById('pr-resume').innerHTML=`
+    <div class="tv-kpi"><span>Total des primes</span><b style="color:var(--gold)">${fmt(tot)}</b><small>${escapeHtml(P.lib)}</small></div>
+    <div class="tv-kpi"><span>Ventes des vendeurs</span><b>${fmt(ca)}</b><small>${L.reduce((t,x)=>t+x.nb,0)} ventes</small></div>
+    <div class="tv-kpi"><span>Coût des primes</span><b>${ca?(tot/ca*100).toFixed(1):0} %</b><small>du chiffre d'affaires</small></div>
+    <div class="tv-kpi"><span>Meilleur vendeur</span><b style="font-size:14px">${L[0]?escapeHtml(L[0].nom):'—'}</b><small>${L[0]?fmt(L[0].ca):''}</small></div>`;
+  const med=r=>r===1?'🥇':r===2?'🥈':r===3?'🥉':r;
+  document.getElementById('pr-body').innerHTML=L.length?L.map((x,i)=>`<tr><td class="tv-rang">${med(i+1)}</td><td><b>${escapeHtml(x.nom)}</b></td>
+    <td><span class="badge ${x.b==='B1'?'by':'bb'}">${escapeHtml(getBName(x.b))}</span></td><td class="mono">${x.nb}</td><td class="mono">${fmt(x.ca)}</td>
+    <td class="mono">${fmt(x.nb?Math.round(x.ca/x.nb):0)}</td><td>${x.joursObj} / ${x.joursVente}</td>
+    <td class="mono" style="color:var(--gold);font-weight:900">${fmt(x.prime)}</td></tr>`).join('')
+    :`<tr><td colspan="8" class="empty"><div class="ei">🏅</div>Aucune vente ${escapeHtml(P.lib)}</td></tr>`;
+}
+function partagerPrimes(){
+  if(!_prDernier)renderPrimes();
+  const {P,bq,L}=_prDernier,R=reglesPrimes();
+  const l=['🏅 *PRIMES VENDEURS* — '+P.lib+(bq==='tous'?'':' — '+getBName(bq)),''];
+  L.forEach((x,i)=>l.push(`${i+1}. ${x.nom} (${getBName(x.b).split(' ')[0]}) : ${fmt(x.ca)} de ventes → prime *${fmt(x.prime)}*`));
+  l.push('','💰 Total primes : '+fmt(L.reduce((t,x)=>t+x.prime,0)));
+  l.push('📌 Règle : '+R.taux+' % au-delà de '+fmt(R.seuil)+'/jour + '+fmt(R.bonus)+' si objectif boutique atteint');
+  window.open('https://wa.me/?text='+encodeURIComponent(l.join('\n')),'_blank');
+}
+function chargerReglagesPrimes(){
+  const R=reglesPrimes(),set=(id,v)=>{const el=document.getElementById(id);if(!el)return;if(el.type==='checkbox')el.checked=!!v;else el.value=v;};
+  set('pr-actif',R.actif);set('pr-seuil',R.seuil);set('pr-taux',R.taux);set('pr-bonus',R.bonus);
+  const adm=session.user?.role==='admin';['pr-actif','pr-seuil','pr-taux','pr-bonus','pr-save'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=!adm;});
+  majExemplePrime();
+}
+function majExemplePrime(){
+  const el=document.getElementById('pr-exemple');if(!el)return;
+  const s=Number(document.getElementById('pr-seuil')?.value)||0,t=Number(document.getElementById('pr-taux')?.value)||0,b=Number(document.getElementById('pr-bonus')?.value)||0;
+  const ex=200000,p=Math.round((Math.max(0,ex-s)*t/100+b)/50)*50;
+  el.textContent=`Exemple : un vendeur qui vend ${fmt(ex)} un jour où sa boutique atteint l'objectif gagne ${fmt(p)} ce jour-là (≈ ${fmt(p*26)} sur un mois de 26 jours).`;
+}
+function sauverReglagesPrimes(){
+  if(session.user?.role!=='admin'){toast('Seul l\'administrateur peut changer les primes','err');return;}
+  const n=id=>Math.max(0,Number(document.getElementById(id)?.value)||0);
+  const t=n('pr-taux');if(t>20){toast('Taux trop élevé (20 % maximum)','err');return;}
+  DB.settings.primes={actif:document.getElementById('pr-actif').checked,seuil:Math.round(n('pr-seuil')),taux:t,bonus:Math.round(n('pr-bonus'))};
+  save();try{logAction('Primes','Règle : '+t+' % au-delà de '+fmt(DB.settings.primes.seuil)+' + bonus '+fmt(DB.settings.primes.bonus));}catch(e){}
+  toast('🏅 Règles des primes enregistrées','ok');
+}
+TITLES['primes']='Primes <span>Vendeurs</span>';
+RENDERS['primes']=renderPrimes;
+
 // ══ MENU SUR TÉLÉPHONE ══
 function basculerMenu(){
   const sb=document.getElementById('sidebar'),v=document.getElementById('voile-menu');
@@ -3632,8 +3771,9 @@ function fermerMenu(){
 
 function nav(page){
   assainirDB();
-  if(page==='parametres')setTimeout(()=>{try{chargerReglagesAlertes();}catch(e){}try{chargerReglagesTicket();}catch(e){}try{chargerReglagesObjectifs();}catch(e){}},0);
+  if(page==='parametres')setTimeout(()=>{try{chargerReglagesAlertes();}catch(e){}try{chargerReglagesTicket();}catch(e){}try{chargerReglagesObjectifs();}catch(e){}try{chargerReglagesPrimes();}catch(e){}},0);
   // Sécurité: pages strictement admin, bloquées même via appel direct (console, etc.)
+  if(page==='primes'&&!['admin','superviseur'].includes(session.user?.role)){soundErr();toast('⛔ Accès réservé aux responsables','err');return;}
   const adminStrictPages=['comparaison','previsions','connexions','audit','benefice','tresorerie'];
   if(adminStrictPages.includes(page)&&session.user?.role!=='admin'){
     soundErr();toast('⛔ Accès réservé à l\'administrateur','err');
@@ -7759,13 +7899,22 @@ function renderObjectifs(){
   el.innerHTML=`<h3 style="font-size:13px;font-weight:800;margin-bottom:9px;">🎯 Objectif du jour</h3>`+lignes.join('');
   el.style.display='block';
 }
+// Ligne « Ma prime du jour » (vendeurs et caissiers)
+function _lignePrimeCaisse(){
+  try{
+    if(session.user?.role==='admin')return '';
+    const m=maPrimeDuJour();if(!m)return '';
+    const txt=m.manqueSeuil>0?`encore ${fmt(m.manqueSeuil)} de ventes pour commencer à gagner ${m.R.taux} %`:`${m.R.taux} % sur chaque vente en plus`;
+    return `<div class="pos-prime">🏅 Ma prime du jour : <b>${fmt(m.prime)}</b> · ${txt}</div>`;
+  }catch(e){return '';}
+}
 // Bandeau compact en caisse
 function majObjectifCaisse(){
   const el=document.getElementById('pos-objectif');if(!el)return;
   const x=statsObjectif(session.boutique||'B1'),ok=x.ca>=x.obj;
   el.className='pos-obj obj-'+(session.boutique||'B1')+(ok?' ok':'');
   el.innerHTML=`<div class="pos-obj-txt"><span>🎯 ${ok?'Objectif atteint 🎉':'Objectif du jour'}</span><span><b>${fmt(x.ca)}</b> / ${fmt(x.obj)} · ${Math.round(x.pct)} %</span></div>
-    <div class="obj-barre fine"><div style="width:${Math.min(100,x.pct).toFixed(1)}%"></div></div>`;
+    <div class="obj-barre fine"><div style="width:${Math.min(100,x.pct).toFixed(1)}%"></div></div>${_lignePrimeCaisse()}`;
 }
 // Fête quand l'objectif est atteint (une seule fois par jour et par boutique)
 function verifierObjectifs(){
@@ -7853,6 +8002,9 @@ function renderAccueil(){
     const mesStatsHTML=`
     <div style="background:var(--surf2);border-radius:12px;padding:12px 14px;margin-bottom:14px;border:1px solid var(--border);">
       <div style="font-size:11px;font-weight:800;color:var(--text2);margin-bottom:10px;">📊 MES VENTES</div>
+      ${(()=>{try{if(session.user?.role==='admin')return '';const m=maPrimeDuJour();if(!m)return '';const j=today();const mois=calculerPrimes(j.slice(0,8)+'01',j,session.boutique).find(x=>x.cle===session.user.id);
+        return `<div class="ma-prime"><div><span>🏅 Ma prime aujourd'hui</span><b>${fmt(m.prime)}</b></div><div><span>Ce mois</span><b>${fmt(mois?mois.prime:0)}</b></div></div>
+        <div style="font-size:10px;color:var(--text2);margin:-4px 0 9px;">${m.manqueSeuil>0?'Encore '+fmt(m.manqueSeuil)+' de ventes aujourd\'hui pour commencer à gagner '+m.R.taux+' %':'Vous gagnez '+m.R.taux+' % sur chaque vente en plus'}${m.R.bonus?' · +'+fmt(m.R.bonus)+' si la boutique atteint l\'objectif':''}</div>`;}catch(e){return '';}})()}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <div style="background:var(--surf3);border-radius:8px;padding:10px;text-align:center;">
           <div style="font-size:9px;color:var(--text2);margin-bottom:3px;">Aujourd'hui</div>
@@ -7890,7 +8042,9 @@ function renderAccueil(){
       ${Object.entries(maCaisseByMode).map(([m,v])=>`<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0;color:var(--text2);"><span>${payIcon(m,14)} ${m}</span><span class="mono" style="color:var(--gold);">${fmt(v)}</span></div>`).join('')}
     </div>`:'' ;
     const alertesEl=document.getElementById('accueil-alertes');
-    if(alertesEl)alertesEl.insertAdjacentHTML('beforebegin',mesStatsHTML+(caisseStatsHTML||''));
+    // Remplacer le bloc au lieu de l'ajouter à chaque affichage (il se répétait)
+    document.getElementById('accueil-mes-stats')?.remove();
+    if(alertesEl)alertesEl.insertAdjacentHTML('beforebegin','<div id="accueil-mes-stats">'+mesStatsHTML+(caisseStatsHTML||'')+'</div>');
   }
   const stockCrit=DB.produits.filter(p=>p.s1<=0&&p.s2<=0).length;
   // Stock faible = stock TOTAL bas (et pas 'une des deux boutiques basse', qui gonflait le compteur)
