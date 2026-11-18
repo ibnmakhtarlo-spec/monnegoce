@@ -247,6 +247,16 @@ tbody tr:hover{background:var(--surf2);}
 .obj-info{font-size:10.5px;color:var(--text2);margin-top:4px}
 .pos-obj{background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:6px 9px;margin-bottom:7px}
 .pos-obj-txt{display:flex;justify-content:space-between;gap:8px;font-size:11px;flex-wrap:wrap}
+.tv-filtres{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.tv-filtres select{background:var(--surf2);border:1px solid var(--border2);color:var(--text);border-radius:7px;padding:5px 8px;font-size:11px}
+.tv-chk{font-size:11px;display:flex;gap:4px;align-items:center;cursor:pointer}
+.tv-resume{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:11px}
+.tv-kpi{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:9px 11px;display:flex;flex-direction:column}
+.tv-kpi span{font-size:10px;color:var(--text2)}.tv-kpi b{font-size:17px;margin:2px 0}.tv-kpi small{font-size:9.5px;color:var(--text3)}
+.tv-kpi.alerte{border-color:var(--red)}.tv-kpi.alerte b{color:var(--red)}
+.tv-rang{font-size:15px;text-align:center;font-weight:800}
+.tv-up{color:var(--green);font-weight:700}.tv-down{color:var(--red);font-weight:700}.tv-eq{color:var(--text2)}.tv-new{color:var(--gold);font-size:10px;font-weight:700}
+.tv-rupt{color:var(--red);font-weight:800}tr.tv-cmd td{background:rgba(239,68,68,.06)}
 .pos-mult{background:rgba(245,158,11,.15);border:1px solid var(--gold);color:var(--gold);border-radius:7px;padding:6px 9px;font-size:12px;margin-bottom:7px;}
 .qte-edit:focus{border-color:var(--gold);}
 .qb{background:var(--surf3);border:1px solid var(--border2);color:var(--text);width:19px;height:19px;border-radius:4px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;}
@@ -715,6 +725,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="ni" onclick="nav('ia-centre')"><span class="ic">🤖</span> Centre IA</div>
   <div class="ni admin-nav" onclick="nav('agenda')"><span class="ic">📅</span> Agenda</div>
   <div class="ni admin-nav" onclick="nav('heures-fortes')"><span class="ic">🔥</span> Heures Fortes</div>
+  <div class="ni admin-nav" onclick="nav('top-ventes')"><span class="ic">🏆</span> Meilleures Ventes</div>
   <div class="ni admin-nav" onclick="nav('produits-lents')"><span class="ic">🐢</span> Produits Lents</div>
   <div class="ni" onclick="nav('chat')"><span class="ic">💬</span> Chat Personnel</div>
   <div class="ni admin-nav" onclick="nav('users')"><span class="ic">🔐</span> Utilisateurs & Rôles</div>
@@ -1659,6 +1670,23 @@ canvas.chart-canvas{display:block;width:100%!important;}
   </div>
 
   <!-- PRODUITS LENTS -->
+  <div class="sec" id="sec-top-ventes">
+    <div class="card" style="padding:11px;margin-bottom:11px;">
+      <div class="tv-filtres">
+        <select id="tv-periode" onchange="renderTopVentes()"><option value="jour">Aujourd'hui</option><option value="7">7 derniers jours</option><option value="30" selected>30 derniers jours</option><option value="mois">Ce mois</option><option value="moisprec">Mois dernier</option><option value="90">3 derniers mois</option></select>
+        <select id="tv-boutique" onchange="renderTopVentes()"></select>
+        <select id="tv-tri" onchange="renderTopVentes()"><option value="qte">Classer par quantité</option><option value="ca">Classer par chiffre d'affaires</option><option value="ben" id="tv-tri-ben">Classer par bénéfice</option></select>
+        <label class="tv-chk"><input type="checkbox" id="tv-commander" onchange="renderTopVentes()"> 🛒 Seulement à commander</label>
+        <button class="btn btn-green btn-sm" style="margin-left:auto;" onclick="partagerTopVentes()">📲 WhatsApp</button>
+      </div>
+    </div>
+    <div class="tv-resume" id="tv-resume"></div>
+    <div class="card"><div class="twrap"><table>
+      <thead><tr><th>#</th><th>Produit</th><th>Vendus</th><th>Chiffre d'aff.</th><th class="tv-ben">Bénéfice</th><th class="tv-ben">Marge</th><th>Tendance</th><th>Stock</th><th>Tient encore</th></tr></thead>
+      <tbody id="tv-body"></tbody></table></div>
+      <div id="tv-plus" style="text-align:center;padding:9px;display:none;"><button class="btn btn-ghost btn-sm" onclick="_tvTout=true;renderTopVentes()">Afficher tous les produits vendus</button></div>
+    </div>
+  </div>
   <div class="sec" id="sec-produits-lents">
     <div class="card" style="padding:11px;margin-bottom:11px;">
       <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;">
@@ -3434,7 +3462,7 @@ function applyNavPerms(){
       'depenses':'depenses','produits':'produits','fournisseurs':'fournisseurs',
       'clients':'clients','dashboard':'dashboard','benefice':'benefices',
       'inventaire':'inventaire','rapports':'rapports','creances':'clients',
-      'heures-fortes':'dashboard','produits-lents':'produits','mouvements':'produits','tresorerie':'benefices',
+      'heures-fortes':'dashboard','produits-lents':'produits','top-ventes':'produits','mouvements':'produits','tresorerie':'benefices',
       'ventes-jour':'ventes_jour','ia-centre':'ia','agenda':'agenda',
     };
     const requiredPerm=permMap[page];
@@ -3474,6 +3502,108 @@ function changeBoutique(b){session.boutique=b;appliquerCouleurBoutique(b);updCSi
 // ══ NAV ══
 const TITLES={accueil:'<span>Accueil</span>',caisse:'Caisse / <span>POS</span>','ventes-jour':'Ventes du <span>Jour</span>',factures:'Historique <span>Factures</span>',devis:'<span>Devis</span>',retours:'<span>Retours</span>',depenses:'<span>Dépenses</span>',produits:'Gestion <span>Produits</span>',fournisseurs:'<span>Fournisseurs</span>',clients:'Gestion <span>Clients</span>',dashboard:'Tableau de <span>Bord</span>',benefice:'Bénéfice <span>Journalier</span>',inventaire:'Inventaire & <span>Analyses</span>','ia-centre':'Centre <span>IA</span>',agenda:'<span>Agenda</span> & Rappels',creances:'<span>Créances</span> & Relances','heures-fortes':'🔥 Heures <span>Fortes</span>','produits-lents':'🐢 Produits <span>Lents</span>',chat:'💬 Chat <span>Personnel</span>',comparaison:'📊 Comparaison <span>Boutiques</span>',previsions:'🤖 IA <span>Prévisions</span>',users:'Utilisateurs & <span>Rôles</span>','caisses-config':'Config <span>Caisses</span>',salaires:'<span>Salaires</span>',rapports:'<span>Rapports</span>',parametres:'<span>Paramètres</span>',mouvements:'🔄 Mouvements de <span>Stock</span>',tresorerie:'🏦 <span>Trésorerie</span>',connexions:'🔑 Journal des <span>Connexions</span>',audit:'📋 Journal d\'<span>Audit</span>',diagnostic:'🩺 <span>Diagnostic</span>',commandes:'🛒 À <span>Commander</span>',attente:'📋 Factures en <span>Attente</span>'};
 const RENDERS={accueil:renderAccueil,caisse:renderGrid,'ventes-jour':renderVentesJour,factures:renderFactures,devis:renderDevis,retours:renderRetours,depenses:renderDepenses,produits:renderProduits,fournisseurs:renderFourn,clients:renderClients,dashboard:renderDash,benefice:renderBenefice,inventaire:renderInventaire,'ia-centre':renderIACentre,agenda:renderAgenda,creances:renderCreances,'heures-fortes':renderHeuresFortes,'produits-lents':renderProduitsLents,chat:renderChat,comparaison:renderComparaison,previsions:()=>{},users:renderUsers,'caisses-config':renderCaissesConfig,salaires:renderSalaires,rapports:renderRapports,parametres:loadSettings,mouvements:renderMouvements,tresorerie:renderTresorerie,connexions:renderConnexions,audit:renderAudit,diagnostic:renderDiagnostic,commandes:renderCommandes,attente:renderBrouillons};
+
+// ══ MEILLEURES VENTES ══
+// Classement des produits qui se vendent le plus, avec tendance et risque de rupture.
+let _tvTout=false,_tvDernier=null;
+function _tvPeriode(v){
+  const j=today(),d=new Date(j+'T00:00:00Z'),iso=x=>x.toISOString().slice(0,10);
+  const moins=n=>{const x=new Date(d);x.setUTCDate(x.getUTCDate()-n);return iso(x);};
+  if(v==='jour')return {d1:j,d2:j,jours:1,lib:"aujourd'hui"};
+  if(v==='mois'){const d1=j.slice(0,8)+'01';return {d1,d2:j,jours:Number(j.slice(8,10)),lib:'ce mois'};}
+  if(v==='moisprec'){const x=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()-1,1)),y=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),0));
+    return {d1:iso(x),d2:iso(y),jours:y.getUTCDate(),lib:'le mois dernier'};}
+  const n=Number(v)||30;return {d1:moins(n-1),d2:j,jours:n,lib:n+' derniers jours'};
+}
+function _tvAgreger(d1,d2,bq){
+  const m=new Map();
+  for(const f of (DB.factures||[])){
+    if(!f||typeof f.date!=='string')continue;
+    const j=f.date.slice(0,10);if(j<d1||j>d2)continue;
+    if(bq!=='tous'&&f.boutique!==bq)continue;
+    if(typeof estFactureSupprimee==='function'&&estFactureSupprimee(f.id))continue;
+    const rem=1-(Number(f.remise)||0)/100;
+    for(const i of (f.items||[])){
+      const cle=i.id||('nom:'+i.nom);const q=Number(i.qty)||0,pv=(Number(i.prix)||0)*rem;
+      let x=m.get(cle);if(!x){x={id:i.id,nom:i.nom,qte:0,ca:0,ben:0,nbFact:0,qB:{B1:0,B2:0}};m.set(cle,x);}
+      x.qte+=q;if(x.qB[f.boutique]!=null)x.qB[f.boutique]+=q;x.ca+=pv*q;x.ben+=(pv-(Number(i.achat)||0))*q;x.nbFact++;
+    }
+  }
+  return m;
+}
+function renderTopVentes(){
+  const selB=document.getElementById('tv-boutique');if(!selB)return;
+  const chef=session.user?.role==='admin'||session.user?.role==='superviseur'||session.user?.boutique==='all';
+  if(!selB.options.length){
+    selB.innerHTML=(chef?'<option value="tous">Les deux boutiques</option>':'')+['B1','B2'].filter(b=>chef||b===session.boutique).map(b=>`<option value="${b}">${escapeHtml(getBName(b))}</option>`).join('');
+  }
+  const voirBen=hasPerm('prix_achat')||hasPerm('benefices')||session.user?.role==='admin';
+  document.querySelectorAll('#sec-top-ventes .tv-ben').forEach(e=>e.style.display=voirBen?'':'none');
+  const ob=document.getElementById('tv-tri-ben');if(ob)ob.disabled=!voirBen;
+  const triSel=document.getElementById('tv-tri');if(!voirBen&&triSel.value==='ben')triSel.value='qte';
+  const P=_tvPeriode(document.getElementById('tv-periode').value),bq=selB.value,tri=triSel.value;
+  const cur=_tvAgreger(P.d1,P.d2,bq);
+  // Période précédente de même durée, pour la tendance
+  const dd=new Date(P.d1+'T00:00:00Z');const fin=new Date(dd);fin.setUTCDate(fin.getUTCDate()-1);const deb=new Date(dd);deb.setUTCDate(deb.getUTCDate()-P.jours);
+  const prev=_tvAgreger(deb.toISOString().slice(0,10),fin.toISOString().slice(0,10),bq);
+  let L=[...cur.values()].filter(x=>x.qte>0);
+  const caTot=L.reduce((t,x)=>t+x.ca,0),qteTot=L.reduce((t,x)=>t+x.qte,0);
+  L.sort((a,b)=>tri==='ca'?b.ca-a.ca:tri==='ben'?b.ben-a.ben:(b.qte-a.qte||b.ca-a.ca));
+  const parId=new Map((DB.produits||[]).map(p=>[p.id,p]));
+  L.forEach((x,i)=>{
+    x.rang=i+1;
+    const p=x.id?parId.get(x.id):null;x.p=p;
+    x.s1=p?Number(p.s1)||0:null;x.s2=p?Number(p.s2)||0:null;
+    x.stock=p?(bq==='B1'?x.s1:bq==='B2'?x.s2:x.s1+x.s2):null;
+    // Durée de stock calculée boutique par boutique (le stock d'une boutique ne sert pas l'autre)
+    x.jours=null;x.ouJours='';x.rupt=false;
+    if(p){(bq==='tous'?['B1','B2']:[bq]).forEach(b=>{
+      const q=x.qB[b]||0;if(!q)return;
+      const st=b==='B1'?x.s1:x.s2,jr=st/(q/P.jours);
+      if(st<=0)x.rupt=true;
+      if(x.jours==null||jr<x.jours){x.jours=jr;x.ouJours=bq==='tous'?getBName(b).split(' ')[0]:'';}
+    });}
+    const pv=prev.get(x.id||('nom:'+x.nom));x.qPrev=pv?pv.qte:0;
+    x.aCommander=x.stock!=null&&(x.rupt||(x.jours!=null&&x.jours<7));
+  });
+  _tvDernier={P,bq,L,caTot};
+  const top10=L.slice(0,10).reduce((t,x)=>t+x.ca,0);
+  const nbCmd=L.filter(x=>x.aCommander).length;
+  document.getElementById('tv-resume').innerHTML=L.length?`
+    <div class="tv-kpi"><span>Produits vendus</span><b>${L.length}</b><small>${qteTot} pièces</small></div>
+    <div class="tv-kpi"><span>Chiffre d'affaires</span><b>${fmt(Math.round(caTot))}</b><small>${escapeHtml(P.lib)}</small></div>
+    <div class="tv-kpi"><span>Le top 10 fait</span><b>${caTot?Math.round(top10/caTot*100):0} %</b><small>du chiffre d'affaires</small></div>
+    <div class="tv-kpi ${nbCmd?'alerte':''}"><span>À commander vite</span><b>${nbCmd}</b><small>stock pour moins de 7 jours</small></div>`:'';
+  let rows=L;if(document.getElementById('tv-commander').checked)rows=rows.filter(x=>x.aCommander);
+  const plus=document.getElementById('tv-plus');
+  if(!_tvTout&&rows.length>50){plus.style.display='block';rows=rows.slice(0,50);}else plus.style.display='none';
+  const med=r=>r===1?'🥇':r===2?'🥈':r===3?'🥉':r;
+  const tend=x=>{if(!x.qPrev)return '<span class="tv-new">nouveau</span>';const v=Math.round((x.qte-x.qPrev)/x.qPrev*100);
+    return v>=10?`<span class="tv-up">▲ ${v} %</span>`:v<=-10?`<span class="tv-down">▼ ${-v} %</span>`:'<span class="tv-eq">= stable</span>';};
+  const tient=x=>{if(x.stock==null||x.jours==null)return '—';const ou=x.ouJours?x.ouJours+' : ':'';
+    if(x.jours<=0)return `<span class="tv-rupt">❌ ${ou}Rupture</span>`;
+    const j=Math.floor(x.jours);return j<7?`<span class="tv-rupt">⚠️ ${ou}${j<1?'moins d\'1 jour':j+' j'}</span>`:j>90?'+ de 3 mois':ou+j+' j';};
+  const stk=x=>x.stock==null?'<span style="color:var(--text3)">supprimé</span>':bq==='tous'?`${x.stock} <small style="color:var(--text3)">(${x.s1} / ${x.s2})</small>`:x.stock;
+  document.getElementById('tv-body').innerHTML=rows.length?rows.map(x=>`<tr class="${x.aCommander?'tv-cmd':''}">
+    <td class="tv-rang">${med(x.rang)}</td><td><b>${escapeHtml(x.nom)}</b></td><td class="mono"><b>${x.qte}</b></td>
+    <td class="mono">${fmt(Math.round(x.ca))}</td>
+    <td class="mono tv-ben" style="${voirBen?'':'display:none'};color:${x.ben>=0?'var(--green)':'var(--red)'}">${fmt(Math.round(x.ben))}</td>
+    <td class="tv-ben" style="${voirBen?'':'display:none'}">${x.ca?Math.round(x.ben/x.ca*100):0} %</td>
+    <td>${tend(x)}</td><td class="mono">${stk(x)}</td><td>${tient(x)}</td></tr>`).join('')
+    :`<tr><td colspan="9" class="empty"><div class="ei">🏆</div>Aucune vente ${escapeHtml(P.lib)}</td></tr>`;
+}
+function partagerTopVentes(){
+  if(!_tvDernier)renderTopVentes();
+  const {P,bq,L,caTot}=_tvDernier;
+  const lignes=['🏆 *MEILLEURES VENTES* — '+P.lib+(bq==='tous'?'':' — '+getBName(bq)),''];
+  L.slice(0,10).forEach(x=>lignes.push(`${x.rang}. ${x.nom} : ${x.qte} vendus (${fmt(Math.round(x.ca))})`+(x.aCommander?' ⚠️ à commander':'')));
+  lignes.push('','💰 Total : '+fmt(Math.round(caTot)));
+  const cmd=L.filter(x=>x.aCommander).slice(0,15);
+  if(cmd.length){lignes.push('','🛒 *À commander vite :*');cmd.forEach(x=>lignes.push('• '+x.nom+' (stock '+(x.stock??0)+')'));}
+  window.open('https://wa.me/?text='+encodeURIComponent(lignes.join('\n')),'_blank');
+}
+TITLES['top-ventes']='Meilleures <span>Ventes</span>';
+RENDERS['top-ventes']=renderTopVentes;
 
 // ══ MENU SUR TÉLÉPHONE ══
 function basculerMenu(){
