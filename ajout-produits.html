@@ -370,10 +370,47 @@ let produitEnEdition=null; // id du produit en cours de modification, ou null = 
 
 firebase.initializeApp(FIREBASE_CONFIG);
 fbDB=firebase.database();
-firebase.auth().signInAnonymously().catch(e=>toast('⚠️ Connexion échouée : '+e.message,'err'));
+// ── Comptes sécurisés (mêmes comptes que Mon Négoce) ──
+const DOMAINE_COMPTES='comptes.monnegoce.app',CODE_MIN=6;
+let _etatSecu=(()=>{try{return Object.assign({ferme:false,versions:{}},JSON.parse(localStorage.getItem('mn5_etat_secu')||'null')||{});}catch(e){return {ferme:false,versions:{}};}})();
+function emailCompte(id,v){id=String(id||'').toLowerCase().replace(/[^a-z0-9_-]/g,'');return id+((Number(v)||1)>1?'.v'+Number(v):'')+'@'+DOMAINE_COMPTES;}
+function _avecDelai(p,ms){return Promise.race([p,new Promise((_,ko)=>setTimeout(()=>ko(Object.assign(new Error('délai dépassé'),{code:'timeout'})),ms))]);}
+function _attendreAuth(){return new Promise(res=>{try{const un=firebase.auth().onAuthStateChanged(()=>{try{un();}catch(e){}res();});}catch(e){res();}setTimeout(res,4000);});}
+async function lireEtatSecu(){
+  const lire=async()=>{const [a,b]=await Promise.all([fbDB.ref('public/securite').once('value'),fbDB.ref('public/versions').once('value')]);const sv=a.val(),vv=b.val();return {ferme:!!(sv&&sv.ferme===true),versions:(vv&&typeof vv==='object'&&!Array.isArray(vv))?vv:{}};};
+  try{
+    let e;
+    try{e=await _avecDelai(lire(),7000);}
+    catch(err){await _attendreAuth();if(!firebase.auth().currentUser&&!_etatSecu.ferme){await firebase.auth().signInAnonymously();e=await _avecDelai(lire(),7000);}else throw err;}
+    _etatSecu=e;try{localStorage.setItem('mn5_etat_secu',JSON.stringify(e));}catch(x){}
+  }catch(e){console.warn('État sécurité:',e&&e.message);}
+  return _etatSecu;
+}
+async function connexionSecurisee(id,code){
+  await lireEtatSecu();
+  const v=Number(_etatSecu.versions&&_etatSecu.versions[id])||1;
+  try{
+    const cred=await _avecDelai(firebase.auth().signInWithEmailAndPassword(emailCompte(id,v),String(code)),15000);
+    const prof=(await _avecDelai(fbDB.ref('negoce_comptes/'+cred.user.uid).once('value'),10000)).val();
+    if(!prof||prof.id!==id){await firebase.auth().signOut().catch(()=>{});return {ok:false,raison:'code'};}
+    if(prof.actif===false){await firebase.auth().signOut().catch(()=>{});return {ok:false,raison:'desactive'};}
+    return {ok:true,profil:prof};
+  }catch(e){const c=String((e&&e.code)||'')+' '+String((e&&e.message)||'');
+    if(/network|timeout|délai|unavailable/i.test(c))return {ok:false,raison:'reseau'};
+    if(/too-many-requests/.test(c))return {ok:false,raison:'trop'};
+    return {ok:false,raison:'code'};}
+}
+(async()=>{
+  await _attendreAuth();await lireEtatSecu();
+  if(!firebase.auth().currentUser&&!_etatSecu.ferme)firebase.auth().signInAnonymously().catch(e=>toast('⚠️ Connexion échouée : '+e.message,'err'));
+  if(_etatSecu.ferme)lgEtat('🔐 Entrez votre identifiant et votre code sécurisé');
+})();
+let _ecoutesOk=false;
 firebase.auth().onAuthStateChanged(u=>{
   if(!u)return;
-  chargerComptesAjout();
+  if(!_etatSecu.ferme)chargerComptesAjout();
+  if(_ecoutesOk){if(fbConnected)chargerCatalogue();return;}
+  _ecoutesOk=true;
   fbDB.ref('.info/connected').on('value',snap=>{
     fbConnected=snap.val()===true;
     const el=document.getElementById('etat-conn');
@@ -440,14 +477,30 @@ async function connexionAjout(){
   const id=(document.getElementById('lg-id').value||'').trim().toUpperCase();
   const pwd=document.getElementById('lg-pwd').value||'';
   if(!id||!pwd){toast('Identifiant et code requis','err');return;}
-  if(!comptesAjout){toast('⏳ Comptes en cours de chargement… vérifiez internet','err');return;}
   let tent={};try{tent=JSON.parse(localStorage.getItem(TENT_AJOUT)||'{}')||{};}catch(e){}
   const t=tent[id]||{n:0,jusqua:0};
   if(t.jusqua>Date.now()){toast('🔒 Compte verrouillé, réessayez dans '+Math.ceil((t.jusqua-Date.now())/60000)+' min','err');return;}
-  const u=comptesAjout.find(x=>x&&x.id===id);
-  let ok=false;
-  if(u&&u.pwd)ok=String(u.pwd).length<20?pwd===u.pwd:(await hashCodeAjout(pwd))===u.pwd;
-  if(!ok||u.actif===false){
+  let u=null,ok=false;
+  // 1) Compte sécurisé (Firebase vérifie le code)
+  if(pwd.length>=CODE_MIN){
+    lgEtat('🔐 Vérification du code...');
+    const r=await connexionSecurisee(id,pwd);
+    if(r.ok){
+      let fiche=null;try{const d=(await fbDB.ref('negoce_users').once('value')).val();const L=(d&&Array.isArray(d.users))?d.users:Object.values((d&&d.users)||{});fiche=L.find(x=>x&&x.id===id);}catch(e){}
+      u={...(fiche||{id,perms:[]}),id,nom:r.profil.nom||fiche?.nom||id,role:r.profil.role||fiche?.role||'',actif:true};ok=true;
+    } else if(r.raison==='desactive'){toast('Compte désactivé — contactez l\'administrateur','err');lgEtat('');return;}
+    else if(r.raison==='trop'){toast('🔒 Trop d\'essais : attendez quelques minutes','err');lgEtat('');return;}
+    else if(r.raison==='reseau'&&_etatSecu.ferme){toast('📶 Connexion internet nécessaire','err');lgEtat('');return;}
+    lgEtat('');
+  }
+  // 2) Ancien code : seulement pendant la transition
+  if(!ok&&!_etatSecu.ferme){
+    if(!comptesAjout){toast('⏳ Comptes en cours de chargement… vérifiez internet','err');return;}
+    u=comptesAjout.find(x=>x&&x.id===id);
+    if(u&&u.pwd)ok=String(u.pwd).length<20?pwd===u.pwd:(await hashCodeAjout(pwd))===u.pwd;
+  }
+  if(!ok&&_etatSecu.ferme&&pwd.length<CODE_MIN){toast('🔐 Utilisez votre nouveau code sécurisé (6 chiffres minimum)','err');return;}
+  if(!ok||!u||u.actif===false){
     t.n++;if(t.n>=5){t.jusqua=Date.now()+5*60*1000;t.n=0;}
     tent[id]=t;try{localStorage.setItem(TENT_AJOUT,JSON.stringify(tent));}catch(e){}
     toast(t.jusqua>Date.now()?'🔒 5 erreurs — compte verrouillé 5 minutes':'Identifiant ou code incorrect','err');
@@ -462,6 +515,7 @@ async function connexionAjout(){
   document.getElementById('lg-pwd').value='';
   document.getElementById('login-overlay').style.display='none';
   toast('✅ Bienvenue '+(u.nom||u.id),'ok');
+  if(fbConnected)chargerCatalogue();
 }
 function deconnexionAjout(){
   sessionAjout=null;

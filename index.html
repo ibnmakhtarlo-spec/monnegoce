@@ -261,6 +261,11 @@ tbody tr:hover{background:var(--surf2);}
 .ma-prime{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px}
 .ma-prime>div{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);border-radius:8px;padding:8px;text-align:center}
 .ma-prime span{display:block;font-size:9.5px;color:var(--text2)}.ma-prime b{font-size:16px;color:var(--gold)}
+.gs-guide{font-size:12px;line-height:1.55;max-height:65vh;overflow:auto;padding-right:4px}
+.gs-guide h4{font-size:13px;margin:12px 0 5px;color:var(--gold)}.gs-guide ol,.gs-guide ul{padding-left:20px}.gs-guide li{margin:3px 0}
+.gs-regles{position:relative;background:var(--surf3);border:1px solid var(--border2);border-radius:8px;padding:8px;margin:6px 0}
+.gs-regles pre{font-size:10px;white-space:pre-wrap;word-break:break-all;max-height:180px;overflow:auto;margin:0;font-family:var(--mono)}
+.gs-regles button{position:absolute;top:6px;right:6px}
 .pos-mult{background:rgba(245,158,11,.15);border:1px solid var(--gold);color:var(--gold);border-radius:7px;padding:6px 9px;font-size:12px;margin-bottom:7px;}
 .qte-edit:focus{border-color:var(--gold);}
 .qb{background:var(--surf3);border:1px solid var(--border2);color:var(--text);width:19px;height:19px;border-radius:4px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;}
@@ -1309,6 +1314,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <table><thead><tr><th>ID</th><th>Nom</th><th>Rôle</th><th>Boutique</th><th>Caisse</th><th>Permissions</th><th>Statut</th><th>Actions</th></tr></thead>
       <tbody id="tb-u"></tbody></table>
     </div></div>
+    <div class="card" id="secu-comptes" style="padding:13px;margin-top:13px;display:none;"></div>
   </div>
 
   <!-- CONFIG CAISSES -->
@@ -2147,7 +2153,7 @@ canvas.chart-canvas{display:block;width:100%!important;}
     <div class="fgrid">
       <div class="fg"><label>Nom complet *</label><input id="mu-nom"></div>
       <div class="fg"><label>Identifiant *</label><input id="mu-id2" placeholder="VEN03..."></div>
-      <div class="fg"><label>Code secret *</label><input type="password" id="mu-pwd"></div>
+      <div class="fg"><label>Code secret * <span style="font-weight:400;color:var(--text2)">(6 chiffres minimum)</span></label><input type="password" id="mu-pwd" inputmode="numeric" autocomplete="new-password"></div>
       <div class="fg"><label>Rôle de base</label>
         <select id="mu-role" onchange="updatePermGrid()">
           <option value="caissier">💵 Caissier</option>
@@ -2446,6 +2452,55 @@ canvas.chart-canvas{display:block;width:100%!important;}
       <button class="btn btn-ghost" onclick="closeModal('modal-etiq')">Fermer</button>
       <button class="btn btn-gold" onclick="imprimerEtiquettes()">🖨️ Imprimer</button>
     </div>
+  </div>
+</div>
+<div class="overlay" id="modal-nouveau-code">
+  <div class="modal sm">
+    <div class="mtitle"><span>🔐 Sécurisez votre compte</span></div>
+    <div style="font-size:12px;line-height:1.5;margin-bottom:10px;">Bonjour <b id="ns-nom"></b>. Pour protéger les données de la boutique, choisissez un <b>nouveau code secret de 6 chiffres minimum</b>. Il remplacera votre ancien code sur tous les appareils.</div>
+    <div class="fg"><label>Nouveau code (6 chiffres minimum)</label><input type="password" id="ns-code1" inputmode="numeric" autocomplete="new-password" maxlength="12"></div>
+    <div class="fg"><label>Retapez le nouveau code</label><input type="password" id="ns-code2" inputmode="numeric" autocomplete="new-password" maxlength="12" onkeydown="if(event.key==='Enter')validerNouveauCode()"></div>
+    <div style="font-size:10.5px;color:var(--text2);">Évitez 123456, votre date de naissance ou votre numéro de téléphone. Ne le donnez à personne.</div>
+    <div class="mfooter">
+      <button class="btn btn-ghost" onclick="plusTardCompteSecurise()">Plus tard</button>
+      <button class="btn btn-gold" id="ns-btn" onclick="validerNouveauCode()">🔐 Enregistrer mon nouveau code</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="modal-guide-secu">
+  <div class="modal">
+    <div class="mtitle"><span>🔐 Guide : sécuriser Firebase</span><span class="mclose" onclick="closeModal('modal-guide-secu')">✕</span></div>
+    <div class="gs-guide">
+      <h4>Étape 1 — Maintenant (5 minutes, sur ordinateur)</h4>
+      <ol>
+        <li>Ouvrez <b>console.firebase.google.com</b> avec le compte Google du projet <b>monnegoce-84a54</b>.</li>
+        <li>Menu <b>Authentication</b> → onglet <b>Sign-in method</b> → <b>Ajouter un fournisseur</b> → <b>E-mail/Mot de passe</b> → activez le premier interrupteur → <b>Enregistrer</b>. Laissez « Anonyme » activé pour l'instant.</li>
+        <li>Menu <b>Realtime Database</b> → onglet <b>Règles</b>. <b>Copiez d'abord les règles actuelles</b> et gardez-les (envoyez-les-vous sur WhatsApp) : c'est votre copie de secours.</li>
+        <li>Remplacez-les par les <b>règles de transition</b> ci-dessous → <b>Publier</b>. Rien ne change pour les caisses.</li>
+      </ol>
+      <div class="gs-regles"><pre id="gs-transition"></pre><button class="btn btn-ghost btn-xs" onclick="copierRegles('gs-transition')">📋 Copier</button></div>
+      <h4>Étape 2 — Jusqu'à dimanche</h4>
+      <ol>
+        <li>Chaque employé se connecte avec son ancien code : le logiciel lui demande de choisir son <b>nouveau code de 6 chiffres</b>.</li>
+        <li>Ou vous lui donnez un code vous-même : <b>Utilisateurs → Sécurité des comptes → 🔑</b>.</li>
+        <li>Commencez par <b>votre propre compte</b>, puis reconnectez-vous avec votre nouveau code.</li>
+        <li>Suivez le compteur « X / Y employés sécurisés ».</li>
+      </ol>
+      <h4 id="gs-etape3">Étape 3 — Dimanche : fermer la porte</h4>
+      <ol>
+        <li>Dans le logiciel : <b>Utilisateurs → 🔒 Passer en mode sécurisé</b> (connecté avec votre nouveau code).</li>
+        <li>Dans Firebase → Realtime Database → Règles : collez les <b>règles de fermeture</b> ci-dessous → <b>Publier</b>.</li>
+        <li>Dans Authentication → Sign-in method : <b>désactivez « Anonyme »</b>.</li>
+        <li>Testez : une connexion vendeur et une vente sur chaque boutique.</li>
+      </ol>
+      <div class="gs-regles"><pre id="gs-fermeture"></pre><button class="btn btn-ghost btn-xs" onclick="copierRegles('gs-fermeture')">📋 Copier</button></div>
+      <h4>En cas de problème</h4>
+      <ul>
+        <li>Recollez vos <b>règles de secours</b> (étape 1) ou les règles de transition : tout le monde retrouve l'accès en une minute.</li>
+        <li>Un employé a oublié son code : <b>Utilisateurs → Sécurité des comptes → 🔑 Nouveau code</b>.</li>
+      </ul>
+    </div>
+    <div class="mfooter"><button class="btn btn-gold" onclick="closeModal('modal-guide-secu')">Fermer</button></div>
   </div>
 </div>
 <div class="overlay" id="modal-scanner">
@@ -2929,6 +2984,9 @@ async function prechargerComptesLogin(){
   _comptesEnCours=true;
   try{
     if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
+    await lireEtatSecu();
+    if(_etatSecu.ferme)return;   // mode sécurisé : la connexion passe par Firebase, pas besoin de la liste
+    await _attendreAuth();
     if(!firebase.auth().currentUser)await firebase.auth().signInAnonymously();
     const snap=await firebase.database().ref('negoce_users').once('value');
     const data=snap.val();
@@ -2960,7 +3018,7 @@ function verifierAutoConnexion(){
     if(att.lockUntil>Date.now())return; // compte verrouillé : ne pas forcer, laisser le message habituel
     const userFound=DB.users.find(u=>u.id===id);
     if(!userFound||userFound.actif===false)return;
-    const ok=await checkPwd(pwd,userFound.pwd);
+    const ok=(!_etatSecu.ferme&&await checkPwd(pwd,userFound.pwd))||(String(pwd).length>=CODE_MIN&&!!(await verifierCodeLocal(id,pwd)));
     // Revérifier que rien n'a changé pendant le calcul, et que l'écran de connexion est toujours affiché
     if(ok&&pwdEl.value===pwd&&document.getElementById('login-screen')?.style.display!=='none'){
       doLogin();
@@ -2987,7 +3045,8 @@ async function doResetPassword(){
   const adminCode=document.getElementById('reset-admin-code').value;
   const newPwd=document.getElementById('reset-new-pwd').value;
   if(!targetId){toast('Entrez d\'abord l\'identifiant en haut','err');return;}
-  if(!newPwd||newPwd.length<2){toast('Nouveau code trop court','err');return;}
+  if(_etatSecu.ferme){toast('🔐 Mode sécurisé : l\'administrateur donne un nouveau code depuis Utilisateurs → Sécurité des comptes','info');return;}
+  if(!/^\d{6,}$/.test(newPwd)){toast('Le nouveau code doit avoir au moins 6 chiffres','err');return;}
   let admin=null;
   for(const u of DB.users){
     if(u.role==='admin'&&u.actif!==false&&await checkPwd(adminCode,u.pwd)){admin=u;break;}
@@ -3206,6 +3265,294 @@ async function checkPwd(inputPwd,storedPwd){
   return h===storedPwd;
 }
 
+// ══════════════════════════════════════════════════════════
+// COMPTES SÉCURISÉS (Firebase Authentication)
+// Chaque employé a un vrai compte Firebase (identifiant + code de 6 chiffres minimum).
+// Le code n'est plus stocké dans les données : c'est Firebase qui le vérifie.
+// Deux phases :
+//  - transition : l'ancien code marche encore, l'employé choisit son nouveau code ;
+//  - mode sécurisé (« fermé ») : seuls les comptes sécurisés actifs ont accès aux données.
+// ══════════════════════════════════════════════════════════
+const DOMAINE_COMPTES='comptes.monnegoce.app';
+const CODE_MIN=6;
+let _codeSession=null;   // code tapé à la connexion, gardé en mémoire seulement (reconnexion après coupure)
+let _etatSecu=Object.assign({ferme:false,versions:{}},LS('etat_secu')||{});
+function emailCompte(id,v){
+  id=String(id||'').toLowerCase().replace(/[^a-z0-9_-]/g,'');
+  return id+((Number(v)||1)>1?'.v'+Number(v):'')+'@'+DOMAINE_COMPTES;
+}
+function _fbPret(){
+  if(typeof firebase==='undefined'||!firebase.auth)return false;
+  if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
+  return true;
+}
+function _avecDelai(p,ms){return Promise.race([p,new Promise((_,ko)=>setTimeout(()=>ko(Object.assign(new Error('délai dépassé'),{code:'timeout'})),ms))]);}
+function _attendreAuth(){
+  return new Promise(res=>{try{const un=firebase.auth().onAuthStateChanged(()=>{try{un();}catch(e){}res();});}catch(e){res();}setTimeout(res,4000);});
+}
+// État public : mode fermé ? version du compte de chaque identifiant ?
+async function lireEtatSecu(){
+  if(!_fbPret()||!navigator.onLine)return _etatSecu;
+  const lire=async()=>{
+    const [a,b]=await Promise.all([firebase.database().ref('public/securite').once('value'),firebase.database().ref('public/versions').once('value')]);
+    const sv=a.val(),vv=b.val();return {ferme:!!(sv&&sv.ferme===true),versions:(vv&&typeof vv==='object'&&!Array.isArray(vv))?vv:{}};
+  };
+  try{
+    let e;
+    try{e=await _avecDelai(lire(),7000);}
+    catch(err){
+      // Règles actuelles : lecture réservée aux appareils connectés → connexion anonyme (phase de transition)
+      await _attendreAuth();
+      if(!firebase.auth().currentUser&&!_etatSecu.ferme){await firebase.auth().signInAnonymously();e=await _avecDelai(lire(),7000);}
+      else throw err;
+    }
+    _etatSecu=e;SS('etat_secu',e);
+  }catch(e){console.warn('État sécurité:',e&&e.message);}
+  return _etatSecu;
+}
+// Vérificateur local du code (pour se connecter sans internet) — jamais envoyé
+async function _pbkdf2(code,sel){
+  const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(String(code)),'PBKDF2',false,['deriveBits']);
+  const b=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(sel),iterations:150000,hash:'SHA-256'},k,256);
+  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function memoriserCodeLocal(id,code,profil){
+  try{
+    const sel=Array.from(crypto.getRandomValues(new Uint32Array(4))).join('-');
+    const m=LS('codes_locaux')||{};
+    m[id]={sel,h:await _pbkdf2(code,sel),t:Date.now(),role:profil?.role||'',nom:profil?.nom||''};
+    SS('codes_locaux',m);
+  }catch(e){console.warn('code local:',e);}
+}
+async function verifierCodeLocal(id,code){
+  const m=(LS('codes_locaux')||{})[id];if(!m)return null;
+  try{return (await _pbkdf2(code,m.sel))===m.h?m:null;}catch(e){return null;}
+}
+function oublierCodeLocal(id){const m=LS('codes_locaux')||{};delete m[id];SS('codes_locaux',m);}
+// Connexion avec un compte sécurisé → {ok, profil} ou {ok:false, raison}
+async function connexionSecurisee(id,code){
+  if(!_fbPret())return {ok:false,raison:'reseau'};
+  await lireEtatSecu();
+  const v=Number(_etatSecu.versions&&_etatSecu.versions[id])||1;
+  try{
+    const cred=await _avecDelai(firebase.auth().signInWithEmailAndPassword(emailCompte(id,v),String(code)),15000);
+    const prof=(await _avecDelai(firebase.database().ref('negoce_comptes/'+cred.user.uid).once('value'),10000)).val();
+    if(!prof||prof.id!==id){await firebase.auth().signOut().catch(()=>{});return {ok:false,raison:'code'};}
+    if(prof.actif===false){await firebase.auth().signOut().catch(()=>{});return {ok:false,raison:'desactive'};}
+    return {ok:true,profil:prof,uid:cred.user.uid};
+  }catch(e){
+    const c=String((e&&e.code)||'')+' '+String((e&&e.message)||'');
+    if(/network|timeout|délai|unavailable/i.test(c))return {ok:false,raison:'reseau'};
+    if(/too-many-requests/.test(c))return {ok:false,raison:'trop'};
+    return {ok:false,raison:'code'};
+  }
+}
+// Lecture de tous les comptes sécurisés (administrateur, ou phase de transition)
+async function lireComptesSecurises(){
+  try{return (await _avecDelai(firebase.database().ref('negoce_comptes').once('value'),10000)).val()||{};}
+  catch(e){console.warn('comptes sécurisés:',e&&e.message);return null;}
+}
+// Crée (ou remplace) le compte sécurisé d'un employé avec le code donné.
+// Un nouveau code = nouvelle version du compte : l'ancien code ne marche plus.
+async function creerCompteSecurise(user,code){
+  code=String(code||'');
+  if(!/^\d{6,}$/.test(code))throw new Error('Le code doit avoir au moins '+CODE_MIN+' chiffres');
+  if(!_fbPret()||!navigator.onLine)throw new Error('Connexion internet nécessaire');
+  await lireEtatSecu();
+  const app2=firebase.apps.find(a=>a.name==='creation')||firebase.initializeApp(FIREBASE_CONFIG,'creation');
+  let v=Number(_etatSecu.versions&&_etatSecu.versions[user.id])||0,cred=null,err=null;
+  for(let essai=0;essai<6&&!cred;essai++){
+    v++;
+    try{cred=await _avecDelai(app2.auth().createUserWithEmailAndPassword(emailCompte(user.id,v),code),15000);}
+    catch(e){if(e&&e.code==='auth/email-already-in-use')continue;err=e;break;}
+  }
+  if(!cred){
+    const c=(err&&err.code)||'';
+    throw new Error(c==='auth/operation-not-allowed'?'PAS_ACTIVE':c==='auth/weak-password'?'Code trop faible (6 chiffres minimum)':/network/.test(c)?'Connexion internet nécessaire':((err&&err.message)||'Création impossible'));
+  }
+  const uid=cred.user.uid;
+  try{
+    const tous=await lireComptesSecurises()||{};
+    const maj={};
+    maj['negoce_comptes/'+uid]={id:user.id,nom:user.nom||user.id,role:user.role||'vendeur',boutique:user.boutique||'',actif:user.actif!==false,v,cree:Date.now(),par:session.user?.id||user.id};
+    Object.entries(tous).forEach(([k,p])=>{if(p&&p.id===user.id&&k!==uid)maj['negoce_comptes/'+k]=null;});
+    maj['public/versions/'+user.id]=v;
+    await _avecDelai(firebase.database().ref().update(maj),15000);
+  }catch(e){
+    // Les règles refusent l'écriture : on annule la création pour ne pas laisser un compte à moitié fait
+    try{await cred.user.delete();}catch(x){}
+    try{await app2.auth().signOut();}catch(x){}
+    throw new Error(/permission/i.test(String(e&&e.message))?'REGLES':(e&&e.message)||'Enregistrement impossible');
+  }
+  try{await app2.auth().signOut();}catch(e){}
+  _etatSecu.versions=_etatSecu.versions||{};_etatSecu.versions[user.id]=v;SS('etat_secu',_etatSecu);
+  // Garder la même valeur en local pour l'ancien mode (transition) et la connexion hors ligne
+  try{const lu=DB.users.find(x=>x.id===user.id);if(lu){lu.pwd=await hashPwd(code);lu._securise=v;lu._updated=Date.now();}}catch(e){}
+  await memoriserCodeLocal(user.id,code,user);
+  // Si c'est l'utilisateur connecté, l'appareil passe tout de suite sur le nouveau compte
+  if(session.user&&session.user.id===user.id){
+    _codeSession=code;session.user._securise=v;
+    try{await firebase.auth().signInWithEmailAndPassword(emailCompte(user.id,v),code);}catch(e){console.warn('reconnexion:',e);}
+  }
+  return {uid,v};
+}
+function _messageErreurSecu(e){
+  const m=String((e&&e.message)||e);
+  if(m==='PAS_ACTIVE')return 'La connexion « E-mail/Mot de passe » n\'est pas encore activée dans Firebase (étape 1 du guide).';
+  if(m==='REGLES')return 'Les règles Firebase refusent l\'enregistrement : collez d\'abord les règles de transition (étape 1 du guide).';
+  return m;
+}
+// Après une connexion avec l'ancien code : proposer le nouveau code sécurisé
+function proposerCompteSecurise(force){
+  if(!session.user||_etatSecu.ferme)return;
+  if(session.user._securise)return;
+  // Les employés ne sont sollicités qu'une fois la sécurisation lancée par l'administrateur (son compte créé)
+  if(session.user.role!=='admin'&&!Object.keys(_etatSecu.versions||{}).length)return;
+  if(!force&&LS('secu_plus_tard_'+session.user.id)&&Date.now()-LS('secu_plus_tard_'+session.user.id)<4*3600*1000)return;
+  document.getElementById('ns-code1').value='';document.getElementById('ns-code2').value='';
+  document.getElementById('ns-nom').textContent=session.user.nom||session.user.id;
+  openModal('modal-nouveau-code');
+  setTimeout(()=>document.getElementById('ns-code1')?.focus(),150);
+}
+async function validerNouveauCode(){
+  const c1=document.getElementById('ns-code1').value.trim(),c2=document.getElementById('ns-code2').value.trim();
+  if(!/^\d{6,}$/.test(c1)){soundErr();toast('Le code doit avoir au moins 6 chiffres','err');return;}
+  if(['000000','111111','123456','654321','121212','112233'].includes(c1)||/^(\d)\1+$/.test(c1)){soundErr();toast('Code trop facile à deviner, choisissez-en un autre','err');return;}
+  if(c1!==c2){soundErr();toast('Les deux codes ne sont pas identiques','err');return;}
+  const btn=document.getElementById('ns-btn');btn.disabled=true;btn.textContent='⏳ Création...';
+  try{
+    await creerCompteSecurise(session.user,c1);
+    closeModal('modal-nouveau-code');
+    try{logAction('Sécurité','Compte sécurisé créé pour '+session.user.id);}catch(e){}
+    save();try{pushUsersToFirebase();}catch(e){}
+    toast('🔐 Compte sécurisé ! Utilisez maintenant ce nouveau code pour vous connecter','ok');
+  }catch(e){soundErr();toast('❌ '+_messageErreurSecu(e),'err');}
+  finally{btn.disabled=false;btn.textContent='🔐 Enregistrer mon nouveau code';}
+}
+function plusTardCompteSecurise(){
+  try{SS('secu_plus_tard_'+session.user.id,Date.now());}catch(e){}
+  closeModal('modal-nouveau-code');
+  toast('Vous pourrez le faire à la prochaine connexion','info');
+}
+// Met à jour rôle / nom / boutique / statut dans les comptes sécurisés (administrateur)
+async function majComptesSecurises(u){
+  if(!fbInitialized||!fbConnected||session.user?.role!=='admin')return;
+  const tous=await lireComptesSecurises();if(!tous)return;
+  const maj={};
+  Object.entries(tous).forEach(([k,p])=>{if(p&&p.id===u.id){
+    maj['negoce_comptes/'+k+'/role']=u.role;maj['negoce_comptes/'+k+'/nom']=u.nom||u.id;
+    maj['negoce_comptes/'+k+'/boutique']=u.boutique||'';maj['negoce_comptes/'+k+'/actif']=u.actif!==false;
+  }});
+  if(Object.keys(maj).length){try{await firebase.database().ref().update(maj);}catch(e){console.error('maj comptes sécurisés:',e);}}
+}
+// ── Carte « Sécurité des comptes » (page Utilisateurs, administrateur) ──
+async function renderSecuriteComptes(){
+  const el=document.getElementById('secu-comptes');if(!el)return;
+  if(session.user?.role!=='admin'){el.style.display='none';return;}
+  el.style.display='block';
+  await lireEtatSecu();
+  const tous=(fbInitialized?await lireComptesSecurises():null);
+  const parId={};if(tous)Object.entries(tous).forEach(([k,p])=>{if(p&&p.id)(parId[p.id]=parId[p.id]||[]).push({uid:k,...p});});
+  const users=(DB.users||[]);
+  const actifs=users.filter(u=>u.actif!==false);
+  const ok=actifs.filter(u=>parId[u.id]&&parId[u.id].length);
+  const inconnus=tous?Object.entries(tous).filter(([k,p])=>!p||!users.some(u=>u.id===p.id)):[];
+  const etat=_etatSecu.ferme
+    ?'<span class="badge bg">🟢 Mode sécurisé : seuls les comptes sécurisés ont accès</span>'
+    :'<span class="badge by">🟠 Transition : l\'ancien code marche encore</span>';
+  const lignes=users.map(u=>{
+    const c=parId[u.id];
+    return `<tr style="${u.actif===false?'opacity:.5':''}"><td class="mono" style="color:var(--gold);font-weight:700;font-size:11px;">${escapeHtml(u.id)}</td><td>${escapeHtml(u.nom||'')}</td>
+      <td>${c?'<span class="badge bg">✅ Sécurisé</span>':(tous?'<span class="badge by">⏳ Ancien code</span>':'<span class="badge bgr">?</span>')}</td>
+      <td><button class="btn btn-ghost btn-xs" onclick="donnerCodeSecurise('${u.id}')">🔑 ${c?'Nouveau code':'Créer le code'}</button></td></tr>`;
+  }).join('');
+  el.innerHTML=`<div class="card-hdr"><h3>🔐 Sécurité des comptes</h3>${etat}</div>
+    <div style="font-size:11px;color:var(--text2);margin:6px 0 9px;">${tous?`<b>${ok.length} / ${actifs.length}</b> employés actifs ont un compte sécurisé (code de 6 chiffres minimum).`:'⚠️ Liste des comptes sécurisés indisponible (connexion ou règles Firebase).'}</div>
+    <div class="twrap"><table><thead><tr><th>ID</th><th>Nom</th><th>Compte</th><th></th></tr></thead><tbody>${lignes}</tbody></table></div>
+    ${inconnus.length?`<div style="margin-top:9px;padding:8px;border:1px solid var(--red);border-radius:8px;font-size:11px;"><b style="color:var(--red)">⚠️ ${inconnus.length} compte(s) sécurisé(s) inconnu(s)</b> — pas dans votre liste d'employés. Supprimez-les s'ils ne viennent pas de vous :
+      ${inconnus.map(([k,p])=>`<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;"><span class="mono">${escapeHtml((p&&p.id)||'?')} · ${escapeHtml((p&&p.role)||'?')} · ${p&&p.cree?new Date(p.cree).toLocaleDateString('fr-FR'):''}</span><button class="btn btn-red btn-xs" onclick="supprimerCompteSecurise('${k}')">🗑 Supprimer</button></div>`).join('')}</div>`:''}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+      <button class="btn btn-ghost btn-sm" onclick="ouvrirGuideSecurite()">📋 Guide & règles Firebase</button>
+      ${_etatSecu.ferme?'':`<button class="btn btn-gold btn-sm" onclick="fermerAccesAnciens()">🔒 Passer en mode sécurisé</button>`}
+    </div>`;
+}
+async function donnerCodeSecurise(id){
+  const u=DB.users.find(x=>x.id===id);if(!u)return;
+  const c1=prompt('Nouveau code pour '+(u.nom||id)+' ('+id+')\n\n6 chiffres minimum. Donnez-le à l\'employé en main propre.');
+  if(c1===null)return;
+  if(!/^\d{6,}$/.test(c1.trim())){toast('Le code doit avoir au moins 6 chiffres','err');return;}
+  const c2=prompt('Retapez le même code pour confirmer');
+  if(c2===null)return;
+  if(c1.trim()!==c2.trim()){toast('Les deux codes ne sont pas identiques','err');return;}
+  toast('⏳ Création du compte sécurisé...','info');
+  try{
+    await creerCompteSecurise(u,c1.trim());
+    save();window._forcerPushUsers=true;try{pushUsersToFirebase();}finally{window._forcerPushUsers=false;}
+    try{logAction('Sécurité','Nouveau code sécurisé donné à '+id);}catch(e){}
+    toast('🔐 Compte sécurisé de '+(u.nom||id)+' prêt. L\'ancien code ne marche plus pour ce compte.','ok');
+  }catch(e){soundErr();toast('❌ '+_messageErreurSecu(e),'err');}
+  renderSecuriteComptes();
+}
+async function supprimerCompteSecurise(uid){
+  if(!confirm('Supprimer ce compte sécurisé ? Il perdra tout accès.'))return;
+  try{await firebase.database().ref('negoce_comptes/'+uid).remove();toast('Compte supprimé','ok');}
+  catch(e){toast('❌ '+e.message,'err');}
+  renderSecuriteComptes();
+}
+// Fermeture : l'ancien code ne marche plus, les anciens codes sont effacés des données
+async function fermerAccesAnciens(){
+  if(session.user?.role!=='admin')return;
+  if(!fbConnected){toast('Connexion internet nécessaire','err');return;}
+  if(!session.user._securise){toast('Créez d\'abord VOTRE compte sécurisé (bouton 🔑 sur votre ligne), puis reconnectez-vous avec le nouveau code','err');return;}
+  const tous=await lireComptesSecurises();
+  if(!tous){toast('Liste des comptes indisponible','err');return;}
+  const ids=new Set(Object.values(tous).map(p=>p&&p.id));
+  const manquants=(DB.users||[]).filter(u=>u.actif!==false&&!ids.has(u.id));
+  if(manquants.length&&!confirm('⚠️ '+manquants.length+' employé(s) n\'ont pas encore de compte sécurisé :\n'+manquants.map(u=>'• '+u.nom+' ('+u.id+')').join('\n')+'\n\nIls ne pourront plus se connecter tant que vous ne leur aurez pas donné un code (bouton 🔑).\n\nContinuer ?'))return;
+  if(!confirm('🔒 Passer en mode sécurisé ?\n\n• Les anciens codes ne marcheront plus\n• Ils seront effacés des données\n\nEnsuite, collez les règles de fermeture dans Firebase (le guide va s\'ouvrir).'))return;
+  try{
+    await firebase.database().ref('public/securite').set({ferme:true,date:Date.now(),par:session.user.id});
+    _etatSecu.ferme=true;SS('etat_secu',_etatSecu);
+    const ts=Date.now();
+    DB.users.forEach(u=>{delete u.pwd;u._updated=ts;});
+    SS('users',DB.users);
+    await firebase.database().ref('negoce_users').set({users:DB.users.map(u=>({...u,_updated:ts})),_updated:ts});
+    try{logAction('Sécurité','🔒 Passage en mode sécurisé — anciens codes effacés');}catch(e){}
+    toast('🔒 Mode sécurisé activé. Collez maintenant les règles de fermeture.','ok');
+    renderSecuriteComptes();ouvrirGuideSecurite(true);
+  }catch(e){soundErr();toast('❌ '+e.message,'err');}
+}
+const REGLES_TRANSITION=`{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "public": { ".read": true }
+  }
+}`;
+const _ACTIF="auth != null && root.child('negoce_comptes/' + auth.uid + '/actif').val() === true";
+const _ADMIN=_ACTIF+" && root.child('negoce_comptes/' + auth.uid + '/role').val() === 'admin'";
+const REGLES_FERMETURE=JSON.stringify({rules:{
+  public:{'.read':true,'.write':_ADMIN},
+  negoce_comptes:{'.read':_ADMIN,'.write':_ADMIN,'$uid':{'.read':"auth != null && auth.uid === $uid"}},
+  negoce_users:{'.read':_ACTIF,'.write':_ADMIN},
+  negoce:{'.read':_ACTIF,'.write':_ACTIF},
+  chat:{'.read':_ACTIF,'.write':_ACTIF},
+  chat_presence:{'.read':_ACTIF,'.write':_ACTIF},
+  chat_typing:{'.read':_ACTIF,'.write':_ACTIF},
+  monnegoce:{'.read':_ACTIF,'.write':_ACTIF}
+}},null,2);
+function ouvrirGuideSecurite(fermeture){
+  document.getElementById('gs-transition').textContent=REGLES_TRANSITION;
+  document.getElementById('gs-fermeture').textContent=REGLES_FERMETURE;
+  openModal('modal-guide-secu');
+  if(fermeture)setTimeout(()=>document.getElementById('gs-etape3')?.scrollIntoView({behavior:'smooth'}),200);
+}
+function copierRegles(id){
+  const t=document.getElementById(id).textContent;
+  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('📋 Règles copiées','ok'))
+    .catch(()=>{const r=document.createRange();r.selectNodeContents(document.getElementById(id));const s=getSelection();s.removeAllRanges();s.addRange(r);toast('Sélectionné : faites Copier','info');});
+}
+
 async function doLogin(){
   if(AC&&AC.state==='suspended')AC.resume();
   const id=document.getElementById('l-id').value.trim().toUpperCase();
@@ -3217,9 +3564,42 @@ async function doLogin(){
     return;
   }
   const pwd=document.getElementById('l-pwd').value;
-  const userFound=DB.users.find(u=>u.id===id);
+  let userFound=DB.users.find(u=>u.id===id);
   let u=null;
-  if(userFound&&userFound.actif!==false&&await checkPwd(pwd,userFound.pwd)){
+  // ── 1) Compte sécurisé : c'est Firebase qui vérifie le code ──
+  if(String(pwd).length>=CODE_MIN){
+    const etatEl=document.getElementById('login-etat');
+    let r={ok:false,raison:'reseau'};
+    if(navigator.onLine&&typeof firebase!=='undefined'){if(etatEl)etatEl.textContent='🔐 Vérification du code...';r=await connexionSecurisee(id,pwd);}
+    if(r.ok){
+      if(!userFound||!(userFound.perms||[]).length){
+        try{const d=(await _avecDelai(firebase.database().ref('negoce_users').once('value'),8000)).val();_fusionComptesCloud(d&&d.users);userFound=DB.users.find(x=>x.id===id);}catch(e){}
+      }
+      const p=r.profil;
+      u={...(userFound||{id,perms:ROLE_PERMS[p.role]||[]}),id,nom:p.nom||userFound?.nom||id,role:p.role||userFound?.role||'vendeur',
+         boutique:(p.boutique!==undefined&&p.boutique!=='')?p.boutique:(userFound?.boutique||'all'),actif:true,_securise:p.v||1};
+      _codeSession=pwd;memoriserCodeLocal(id,pwd,u);
+    } else if(r.raison==='desactive'){soundErr();toast('Compte désactivé — contactez l\'administrateur','err');return;}
+    else if(r.raison==='trop'){soundErr();toast('🔒 Trop d\'essais : attendez quelques minutes','err');return;}
+    else if(r.raison==='reseau'){
+      const m=await verifierCodeLocal(id,pwd);
+      if(m){
+        u={...(userFound||{id,perms:ROLE_PERMS[m.role]||[]}),id,nom:m.nom||userFound?.nom||id,role:m.role||userFound?.role||'vendeur',actif:true,_securise:(_etatSecu.versions||{})[id]||1};
+        _codeSession=pwd;
+        toast('📴 Connexion sans internet — synchronisation au retour du réseau','info');
+      }
+    }
+    if(etatEl&&etatEl.textContent==='🔐 Vérification du code...')etatEl.textContent='';
+    if(u){
+      const selB=document.getElementById('l-boutique').value;
+      if(u.boutique&&u.boutique!=='all'&&u.boutique!==selB){
+        soundErr();toast('🚫 '+u.nom+' n\'est pas autorisé(e) sur '+(DB.settings[selB]?.nom||selB)+' (assigné à '+(DB.settings[u.boutique]?.nom||u.boutique)+')','err');
+        try{firebase.auth().signOut();}catch(e){}_codeSession=null;return;
+      }
+    }
+  }
+  // ── 2) Ancien code : seulement pendant la transition ──
+  if(!u&&!_etatSecu.ferme&&userFound&&userFound.actif!==false&&await checkPwd(pwd,userFound.pwd)){
     // Verrouillage par boutique: un user assigné à B1 ne peut pas se connecter sur B2, et vice-versa
     const selBoutique=document.getElementById('l-boutique').value;
     if(userFound.boutique&&userFound.boutique!=='all'&&userFound.boutique!==selBoutique){
@@ -3237,7 +3617,10 @@ async function doLogin(){
       save();
     }
   }
-  if(!u&&_APPAREIL_NEUF&&!_comptesCharges&&!LS('comptes_cloud_ok')){
+  if(!u&&_etatSecu.ferme&&String(pwd).length<CODE_MIN){
+    soundErr();toast('🔐 Utilisez votre nouveau code sécurisé (6 chiffres minimum)','err');return;
+  }
+  if(!u&&!_etatSecu.ferme&&_APPAREIL_NEUF&&!_comptesCharges&&!LS('comptes_cloud_ok')){
     // Nouvel appareil: les vrais comptes ne sont pas encore arrivés. Ce n'est pas
     // un mauvais code: on ne compte pas d'échec et on explique quoi faire.
     soundErr();
@@ -3282,8 +3665,10 @@ async function doLogin(){
   // Forcer une caisse valide si toujours vide
   if(!session.caisse)session.caisse=DB.caisses.find(c=>c.boutique===session.boutique)?.id||'C1';
   session._debutSession=Date.now();
-  logAction('Connexion','Login depuis '+session.boutique+'/'+session.caisse);
+  logAction('Connexion','Login depuis '+session.boutique+'/'+session.caisse+(u._securise?' (compte sécurisé)':' (ancien code)'));
   soundLogin();playBismillah();setTimeout(startApp,400);
+  // Ancien code accepté : proposer tout de suite le nouveau code sécurisé
+  if(!u._securise&&!_etatSecu.ferme&&navigator.onLine)setTimeout(()=>{try{proposerCompteSecurise();}catch(e){}},2500);
 }
 
 function startApp(){
@@ -3532,6 +3917,9 @@ function logout(){
   logAction('Déconnexion','Depuis '+(session.boutique||'?')+'/'+(session.caisse||'?')
     +(_duree!==null?' — session de '+_duree+' min':''));
   soundLogout();playAlhamdoulillah();clearInterval(autoSaveTimer);save();
+  // La session Firebase reste ouverte jusqu'à la connexion suivante (qui la remplace) :
+  // la fermer couperait la synchronisation en cours. L'écran reste verrouillé.
+  _codeSession=null;
   const cb=document.getElementById('chat-bubble');if(cb)cb.style.display='none';
   const cp=document.getElementById('chat-popup');if(cp)cp.style.display='none';
   setTimeout(()=>{session={user:null,boutique:'B1',caisse:'C1'};cart=[];document.body.classList.remove('role-admin');document.getElementById('app').style.display='none';document.getElementById('login-screen').style.display='flex';['l-id','l-pwd'].forEach(id=>document.getElementById(id).value='');},600);
@@ -7200,6 +7588,7 @@ async function saveUser(){
   // Si modification et champ vide -> garder l'ancien mot de passe (déjà haché)
   if(!nom||!id2||(!pwdInput&&!existing)){soundErr();toast('Tous les champs requis','err');return;}
   if(!eid&&DB.users.find(u=>u.id===id2)){soundDoublon();toast('Identifiant déjà pris','err');return;}
+  if(pwdInput&&!/^\d{6,}$/.test(pwdInput)){soundErr();toast('🔐 Le code doit avoir au moins 6 chiffres','err');return;}
   const perms=getSelectedPerms();
   if(perms.length===0&&document.getElementById('mu-role').value!=='admin'){if(!confirm('Aucune permission sélectionnée. Continuer ?')){return;}}
   const _ts=Date.now();
@@ -7229,6 +7618,14 @@ async function saveUser(){
   window._forcerPushUsers=true;
   try{if(typeof pushUsersToFirebase==='function')pushUsersToFirebase();}
   finally{window._forcerPushUsers=false;}
+  // Compte sécurisé : créé (ou nouveau code) quand un code est saisi ; sinon on met à jour rôle et statut
+  const _uFinal=DB.users.find(x=>x.id===(eid||id2));
+  if(_uFinal){
+    if(pwdInput){
+      creerCompteSecurise(_uFinal,pwdInput).then(()=>{toast('🔐 Compte sécurisé de '+_uFinal.nom+' prêt','ok');save();try{pushUsersToFirebase();}catch(e){}renderSecuriteComptes();})
+        .catch(e=>{toast((_etatSecu.ferme?'❌ ':'ℹ️ ')+'Compte sécurisé non créé : '+_messageErreurSecu(e),_etatSecu.ferme?'err':'info');});
+    } else majComptesSecurises(_uFinal);
+  }
   // Forcer refresh de l'interface
   setTimeout(()=>renderUsers(),100);
 }
@@ -7241,6 +7638,7 @@ function renderUsers(){
       <div style="font-size:10px;color:var(--text2);line-height:1.8;">${perms.map(p=>`<span style="color:var(--green)">✅</span> ${ALL_PERMS.find(x=>x.id===p)?.label||p}`).join('<br>')}</div>
     </div>`).join('');
   }
+  setTimeout(()=>{try{renderSecuriteComptes();}catch(e){console.error(e);}},0);
   const getCaisseName=id=>DB.caisses.find(c=>c.id===id)?.nom||'Libre';
   document.getElementById('tb-u').innerHTML=DB.users.map(u=>`<tr style="${u.actif===false?'opacity:.5':''}">
     <td class="mono" style="color:var(--gold);font-weight:700;font-size:11px;">${u.id}</td>
@@ -7260,7 +7658,7 @@ function renderUsers(){
 function editUser(id){const u=DB.users.find(x=>x.id===id);document.getElementById('mu-t').textContent='✏️ Modifier';document.getElementById('mu-eid').value=u.id;document.getElementById('mu-nom').value=u.nom;document.getElementById('mu-id2').value=u.id;document.getElementById('mu-pwd').value='';document.getElementById('mu-pwd').placeholder=u.pwd.length<20?u.pwd:'•••• (laisser vide pour garder)';document.getElementById('mu-role').value=u.role;document.getElementById('mu-boutique').value=u.boutique;buildCaisseSelect('mu-caisse',u.caisse||'');updatePermGrid();// Recocher perms sauvées
 setTimeout(()=>{(u.perms||[]).forEach(p=>{const cb=document.querySelector(`#perm-grid input[value="${p}"]`);if(cb){cb.checked=true;cb.closest('.perm-item').className='perm-item active';}});},50);openModal('modal-user');}
 function viewPerms(id){const u=DB.users.find(x=>x.id===id);if(!u)return;toast(`${u.nom}: ${(u.perms||[]).length} permissions actives`,'info');}
-function toggleUser(id){const u=DB.users.find(x=>x.id===id);u.actif=!u.actif;save();renderUsers();}
+function toggleUser(id){const u=DB.users.find(x=>x.id===id);u.actif=!u.actif;u._updated=Date.now();save();try{pushUsersToFirebase();}catch(e){}majComptesSecurises(u);renderUsers();}
 
 // ══ CONFIG CAISSES ══
 function renderCaissesConfig(){
@@ -8595,6 +8993,23 @@ function onFbAuthReady(cb){
   if(fbAuthReady)cb();
   else _fbAuthReadyCallbacks.push(cb);
 }
+async function connecterFirebaseSession(){
+  try{
+    await _attendreAuth();
+    const cu=firebase.auth().currentUser;
+    const voulu=session.user&&session.user._securise?emailCompte(session.user.id,session.user._securise):null;
+    if(voulu&&cu&&!cu.isAnonymous&&cu.email===voulu)return;          // déjà connecté au bon compte
+    if(voulu&&_codeSession&&navigator.onLine){
+      try{await firebase.auth().signInWithEmailAndPassword(voulu,_codeSession);return;}catch(e){console.warn('Connexion compte sécurisé:',e&&e.code);}
+    }
+    if(cu&&!cu.isAnonymous&&cu.email!==voulu){await firebase.auth().signOut().catch(()=>{});}   // compte d'un autre employé
+    if(!firebase.auth().currentUser&&!_etatSecu.ferme){
+      await firebase.auth().signInAnonymously().catch(e=>{console.error('Auth anonyme échouée:',e);toast('⚠️ Connexion Firebase échouée','err');});
+    }
+  }catch(e){console.error('connecterFirebaseSession:',e);}
+}
+// Retour d'internet après une connexion hors ligne : rattacher l'appareil au compte
+window.addEventListener('online',()=>{try{if(session.user&&fbInitialized)connecterFirebaseSession();}catch(e){}});
 function initFirebase(){
   try{
     if(typeof firebase==='undefined'){
@@ -8604,14 +9019,13 @@ function initFirebase(){
     fbApp=firebase.apps&&firebase.apps.length?firebase.app():firebase.initializeApp(FIREBASE_CONFIG);
     fbDB=firebase.database();
     fbInitialized=true;
-    // Authentification anonyme automatique — requis par les règles de sécurité Firebase
-    firebase.auth().signInAnonymously().catch(e=>{
-      console.error('Auth anonyme échouée:',e);
-      toast('⚠️ Authentification Firebase échouée — vérifiez la console','err');
-    });
+    // Connexion à Firebase avec le compte de l'employé (compte sécurisé), sinon anonyme pendant la transition
+    connecterFirebaseSession();
     let fbFirstConnect=true;
     firebase.auth().onAuthStateChanged(user=>{
       if(!user)return; // Attendre l'authentification avant de connecter la DB
+      if(window._fbEcoutesOk)return;   // changement de compte (anonyme → sécurisé) : les écoutes restent en place
+      window._fbEcoutesOk=true;
       // Marquer l'auth comme prête et déclencher les callbacks en attente (ex: startRealtimeSync)
       if(!fbAuthReady){
         fbAuthReady=true;
