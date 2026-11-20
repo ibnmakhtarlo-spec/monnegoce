@@ -266,6 +266,16 @@ tbody tr:hover{background:var(--surf2);}
 .gs-regles{position:relative;background:var(--surf3);border:1px solid var(--border2);border-radius:8px;padding:8px;margin:6px 0}
 .gs-regles pre{font-size:10px;white-space:pre-wrap;word-break:break-all;max-height:180px;overflow:auto;margin:0;font-family:var(--mono)}
 .gs-regles button{position:absolute;top:6px;right:6px}
+.cf-ligne{display:flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;margin-bottom:5px;font-size:12px}
+.cf-ligne small{display:block;font-size:10px;color:var(--text2)}.cf-ligne.off{opacity:.5}
+.cf-total{display:flex;justify-content:space-between;font-size:12px;padding:5px 9px}.cf-total b{color:var(--red)}
+.cf-form{border-top:1px solid var(--border);margin-top:10px;padding-top:9px}.cf-chk{display:flex;gap:6px;align-items:flex-start;font-size:11.5px;margin:4px 0}
+.bm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px;margin-top:6px}
+.bm-col{background:var(--surf2);border:1px solid var(--border);border-radius:9px;padding:9px 11px}
+.bm-t{font-weight:800;font-size:12px;margin-bottom:5px}.bm-l{display:flex;justify-content:space-between;font-size:11px;padding:2px 0}
+.bm-net{display:flex;justify-content:space-between;font-weight:900;font-size:13px;border-top:1px solid var(--border2);margin-top:5px;padding-top:5px}
+.bm-net.pos b{color:var(--green)}.bm-net.neg b{color:var(--red)}
+.bm-avenir{margin-top:9px;font-size:11px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:8px;padding:7px 9px}
 .pos-mult{background:rgba(245,158,11,.15);border:1px solid var(--gold);color:var(--gold);border-radius:7px;padding:6px 9px;font-size:12px;margin-bottom:7px;}
 .qte-edit:focus{border-color:var(--gold);}
 .qb{background:var(--surf3);border:1px solid var(--border2);color:var(--text);width:19px;height:19px;border-radius:4px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;}
@@ -919,7 +929,12 @@ canvas.chart-canvas{display:block;width:100%!important;}
   <div class="sec" id="sec-depenses">
     <div style="display:flex;gap:6px;margin-bottom:11px;flex-wrap:wrap;">
       <input class="srch" style="flex:1" placeholder="🔍 Dépense..." id="srch-dep" oninput="renderDepenses()">
+      <button class="btn btn-ghost btn-sm admin-bloc" onclick="ouvrirCharges()">🔁 Charges fixes & salaires</button>
       <button class="btn btn-gold btn-sm" onclick="openModal('modal-dep')">+ Nouvelle</button>
+    </div>
+    <div class="card admin-bloc" id="bilan-mois" style="padding:13px;margin-bottom:13px;display:none;">
+      <div class="card-hdr"><h3>📊 Bilan du mois</h3><select id="bm-mois" onchange="renderBilanMois()" style="background:var(--surf2);border:1px solid var(--border2);color:var(--text);border-radius:6px;padding:4px 8px;font-size:11px;"></select></div>
+      <div id="bm-contenu"></div>
     </div>
     <div class="kgrid" style="grid-template-columns:repeat(3,1fr);margin-bottom:13px;">
       <div class="kpi rd"><div class="klabel">Dépenses du mois</div><div class="kval" id="dep-mois">0</div></div>
@@ -2505,6 +2520,34 @@ canvas.chart-canvas{display:block;width:100%!important;}
     <div class="mfooter"><button class="btn btn-gold" onclick="closeModal('modal-guide-secu')">Fermer</button></div>
   </div>
 </div>
+<div class="overlay" id="modal-charges">
+  <div class="modal">
+    <div class="mtitle"><span>🔁 Charges fixes & salaires</span><span class="mclose" onclick="closeModal('modal-charges')">✕</span></div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:9px;">Chaque mois, à la date indiquée, le logiciel enregistre tout seul ces dépenses. Vous n'avez plus rien à saisir.</div>
+    <div id="cf-liste"></div>
+    <div class="cf-form">
+      <h4 style="font-size:12px;margin-bottom:6px;">Ajouter / modifier une charge</h4>
+      <input type="hidden" id="cf-id">
+      <div class="fgrid">
+        <div class="fg"><label>Libellé *</label><input id="cf-lib" placeholder="Loyer Rahma, Électricité, Internet..."></div>
+        <div class="fg"><label>Montant par mois (FCFA) *</label><input type="number" id="cf-mont" min="0" inputmode="numeric"></div>
+        <div class="fg"><label>Catégorie</label><select id="cf-cat"><option>Loyer</option><option>Électricité / Eau</option><option>Communication</option><option>Transport</option><option>Entretien</option><option>Publicité</option><option>Impôts / Taxes</option><option>Crédit / Banque</option><option>Autre</option></select></div>
+        <div class="fg"><label>Boutique</label><select id="cf-b"><option value="B1">Boutique 1</option><option value="B2">Boutique 2</option><option value="general">Général (les deux)</option></select></div>
+        <div class="fg"><label>Jour du mois</label><input type="number" id="cf-jour" min="1" max="31" value="5"></div>
+        <div class="fg"><label>Commencer</label><select id="cf-depuis"><option value="courant">Ce mois-ci</option><option value="suivant">Le mois prochain</option></select></div>
+      </div>
+      <div style="display:flex;gap:6px;"><button class="btn btn-gold btn-sm" id="cf-btn" onclick="enregistrerCharge()">➕ Ajouter</button><button class="btn btn-ghost btn-sm" onclick="annulerCharge()">Effacer</button></div>
+    </div>
+    <div class="cf-form">
+      <h4 style="font-size:12px;margin-bottom:6px;">Salaires et primes</h4>
+      <label class="cf-chk"><input type="checkbox" id="cf-sal-auto"> Enregistrer les salaires chaque mois (montants de base de la page <b>Salaires</b>)</label>
+      <div class="fg" style="max-width:220px;margin-top:5px;"><label>Jour de paie</label><input type="number" id="cf-jour-paie" min="1" max="31"></div>
+      <label class="cf-chk"><input type="checkbox" id="cf-prim-auto"> Enregistrer les primes vendeurs du mois écoulé (le 1er du mois)</label>
+      <button class="btn btn-ghost btn-sm" style="margin-top:6px;" onclick="sauverCfgCharges()">💾 Enregistrer ces réglages</button>
+    </div>
+    <div class="mfooter"><button class="btn btn-gold" onclick="closeModal('modal-charges')">Fermer</button></div>
+  </div>
+</div>
 <div class="overlay" id="modal-scanner">
   <div class="modal sm">
     <div class="mtitle"><span id="scan-titre">📷 Lecteur codes-barres &amp; QR</span><span class="mclose" onclick="closeScanner()">✕</span></div>
@@ -3734,6 +3777,9 @@ function startApp(){
     onFbAuthReady(()=>setTimeout(()=>{try{diffuserAlertesSecuriteEnAttente();}catch(e){}},600));
     if(session.user?.role==='admin')onFbAuthReady(()=>setTimeout(()=>{try{ecouterAlertesSecurite();}catch(e){}},900));
     if(session.user?.role==='admin')setTimeout(()=>{try{surveillerRapportDuSoir();}catch(e){}},3000);
+    if(session.user?.role==='admin'&&!window._chargesAutoOk){window._chargesAutoOk=true;
+      setTimeout(()=>{try{genererChargesAuto();}catch(e){console.error('charges auto:',e);}},12000);
+      setInterval(()=>{try{genererChargesAuto();}catch(e){}},60*60*1000);}
   },800);
 }
 
@@ -7584,8 +7630,167 @@ function renderInventaire(){
 
 // ══ DÉPENSES ══
 function saveDep(){const lib=document.getElementById('dep-lib').value.trim();const mont=parseFloat(document.getElementById('dep-mont').value);if(!lib||isNaN(mont)){soundErr();toast('Libellé et montant obligatoires','err');return;}const d={id:'DEP'+Date.now().toString(36).toUpperCase().slice(-6),lib,cat:document.getElementById('dep-cat').value,montant:mont,boutique:document.getElementById('dep-b').value,par:document.getElementById('dep-par').value,date:maintenant().toISOString()};DB.depenses.push(d);save();closeModal('modal-dep');renderDepenses();['dep-lib','dep-mont','dep-par'].forEach(i=>document.getElementById(i).value='');toast('Dépense enregistrée ✅','ok');}
-function renderDepenses(){const q=(document.getElementById('srch-dep')?.value||'').toLowerCase();const curM=maintenant().toISOString().slice(0,7);const list=[...DB.depenses].reverse().filter(d=>!q||d.lib.toLowerCase().includes(q));const tM=DB.depenses.filter(d=>d.date.startsWith(curM)).reduce((s,d)=>s+d.montant,0);const caM=DB.factures.filter(f=>f.date.startsWith(curM)).reduce((s,f)=>s+f.total,0);const benM=DB.factures.filter(f=>f.date.startsWith(curM)).reduce((s,f)=>s+f.items.reduce((ss,i)=>ss+(i.prix-(i.achat||0))*i.qty,0),0)-tM;const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};set('dep-mois',fmt(tM));set('dep-ca',fmt(caM));set('dep-ben',fmt(benM));document.getElementById('tb-dep').innerHTML=list.length?list.map(d=>`<tr><td><b>${escapeHtml(d.lib)}</b></td><td><span class="badge bo">${escapeHtml(d.cat)}</span></td><td class="mono" style="color:var(--red);font-weight:700">${fmt(d.montant)}</td><td>${d.boutique==='general'?'Général':getBName(d.boutique)}</td><td style="font-size:10px;">${escapeHtml(d.par)||'—'}</td><td style="font-size:10px;">${new Date(d.date).toLocaleDateString('fr-FR')}</td><td><button class="btn btn-red btn-xs" onclick="delDep('${d.id}')">🗑</button></td></tr>`).join(''):`<tr><td colspan="7" class="empty"><div class="ei">💸</div>Aucune dépense</td></tr>`;}
-function delDep(id){const d=DB.depenses.find(x=>x.id===id);safeDelete('cette dépense',()=>{DB.depenses=DB.depenses.filter(x=>x.id!==id);logAction&&logAction('Suppression dépense',d?.lib||id);save();renderDepenses();});}
+function renderDepenses(){const q=(document.getElementById('srch-dep')?.value||'').toLowerCase();const curM=maintenant().toISOString().slice(0,7);const list=[...DB.depenses].reverse().filter(d=>!q||d.lib.toLowerCase().includes(q));const tM=DB.depenses.filter(d=>d.date.startsWith(curM)).reduce((s,d)=>s+d.montant,0);const caM=DB.factures.filter(f=>f.date.startsWith(curM)).reduce((s,f)=>s+f.total,0);const benM=DB.factures.filter(f=>f.date.startsWith(curM)).reduce((s,f)=>s+f.items.reduce((ss,i)=>ss+(i.prix-(i.achat||0))*i.qty,0),0)-tM;const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};set('dep-mois',fmt(tM));set('dep-ca',fmt(caM));set('dep-ben',fmt(benM));document.getElementById('tb-dep').innerHTML=list.length?list.map(d=>`<tr><td><b>${escapeHtml(d.lib)}</b></td><td><span class="badge bo">${escapeHtml(d.cat)}</span>${d.auto?' <span class="badge bb" title="Enregistrée automatiquement">🔁 auto</span>':''}</td><td class="mono" style="color:var(--red);font-weight:700">${fmt(d.montant)}</td><td>${d.boutique==='general'?'Général':getBName(d.boutique)}</td><td style="font-size:10px;">${escapeHtml(d.par)||'—'}</td><td style="font-size:10px;">${new Date(d.date).toLocaleDateString('fr-FR')}</td><td><button class="btn btn-red btn-xs" onclick="delDep('${d.id}')">🗑</button></td></tr>`).join(''):`<tr><td colspan="7" class="empty"><div class="ei">💸</div>Aucune dépense</td></tr>`;try{renderBilanMois();}catch(e){console.error('bilan:',e);}}
+function delDep(id){const d=DB.depenses.find(x=>x.id===id);safeDelete('cette dépense',()=>{if(d&&d.auto){DB.settings.chargesSupprimees=[...(DB.settings.chargesSupprimees||[]),id].slice(-500);}DB.depenses=DB.depenses.filter(x=>x.id!==id);logAction&&logAction('Suppression dépense',d?.lib||id);save();renderDepenses();});}
+// ══ CHARGES FIXES AUTOMATIQUES & BILAN DU MOIS ══
+// Chaque mois, le logiciel enregistre tout seul les dépenses fixes (loyer, électricité, internet...),
+// les salaires des employés et les primes des vendeurs du mois écoulé.
+// Identifiants fixes (charge + mois) : jamais de doublon, même avec plusieurs appareils.
+function cfgCharges(){
+  const c=Object.assign({salairesAuto:true,jourPaie:30,primesAuto:true},DB.settings.chargesCfg||{});
+  c.jourPaie=Math.min(31,Math.max(1,Number(c.jourPaie)||30));
+  return c;
+}
+function listeCharges(){return Array.isArray(DB.settings.charges)?DB.settings.charges.filter(c=>c&&c.id):[];}
+function _moisCourant(){return today().slice(0,7);}
+function _moisSuivant(m){const [a,b]=m.split('-').map(Number);return b===12?(a+1)+'-01':a+'-'+String(b+1).padStart(2,'0');}
+function _dernierJour(m){const [a,b]=m.split('-').map(Number);return new Date(Date.UTC(a,b,0)).getUTCDate();}
+function _dateCharge(m,jour){return m+'-'+String(Math.min(jour,_dernierJour(m))).padStart(2,'0');}
+function _moisLisible(m){const [a,b]=m.split('-').map(Number);return new Date(Date.UTC(a,b-1,15)).toLocaleDateString('fr-FR',{month:'long',year:'numeric',timeZone:'UTC'});}
+// Toutes les dépenses automatiques dues jusqu'à aujourd'hui
+function _chargesDues(){
+  const auj=today(),mc=_moisCourant(),cfg=cfgCharges(),dues=[];
+  const ignorees=new Set(DB.settings.chargesSupprimees||[]);
+  listeCharges().filter(c=>c.actif!==false&&Number(c.montant)>0).forEach(c=>{
+    for(let m=c.depuis||mc,n=0;m<=mc&&n<60;m=_moisSuivant(m),n++){
+      const d=_dateCharge(m,Number(c.jour)||1);if(d>auj)break;
+      if(c.jusqua&&m>c.jusqua)break;
+      dues.push({id:'CF-'+c.id+'-'+m,lib:c.lib+' — '+_moisLisible(m),cat:c.cat||'Autre',montant:Math.round(Number(c.montant)),boutique:c.boutique||'general',date:d,chargeId:c.id,mois:m});
+    }
+  });
+  if(cfg.salairesAuto&&!DB.settings.salairesDepuis)DB.settings.salairesDepuis=mc;   // pas de rattrapage avant la mise en place
+  if(cfg.salairesAuto)(DB.salaires||[]).filter(s=>s&&s.id&&Number(s.base)>0&&s.actif!==false).forEach(s=>{
+    for(let m=s.depuis||DB.settings.salairesDepuis||mc,n=0;m<=mc&&n<60;m=_moisSuivant(m),n++){
+      const d=_dateCharge(m,cfg.jourPaie);if(d>auj)break;
+      dues.push({id:'SAL-'+s.id+'-'+m,lib:'Salaire '+s.nom+' — '+_moisLisible(m),cat:'Salaires',montant:Math.round(Number(s.base)),boutique:s.boutique||'general',date:d,salarieId:s.id,mois:m});
+    }
+  });
+  // Primes vendeurs : le mois écoulé, le 1er du mois suivant
+  if(cfg.primesAuto&&typeof calculerPrimes==='function'){
+    const mp=(()=>{const [a,b]=mc.split('-').map(Number);return b===1?(a-1)+'-12':a+'-'+String(b-1).padStart(2,'0');})();
+    if(!DB.settings.primesDepuis)DB.settings.primesDepuis=mc;   // pas de rattrapage avant la mise en place
+    if(mp>=DB.settings.primesDepuis)['B1','B2'].forEach(b=>{
+      const tot=calculerPrimes(mp+'-01',_dateCharge(mp,31),b).reduce((t,x)=>t+x.prime,0);
+      if(tot>0)dues.push({id:'PRIM-'+b+'-'+mp,lib:'Primes vendeurs '+getBName(b)+' — '+_moisLisible(mp),cat:'Primes',montant:Math.round(tot),boutique:b,date:mc+'-01',mois:mp});
+    });
+  }
+  return dues.filter(d=>!ignorees.has(d.id));
+}
+// Enregistre les charges dues qui manquent (administrateur)
+function genererChargesAuto(silence){
+  if(session.user?.role!=='admin')return [];
+  const deja=new Set((DB.depenses||[]).map(d=>d&&d.id));
+  const nouv=_chargesDues().filter(d=>!deja.has(d.id));
+  if(!nouv.length)return [];
+  nouv.forEach(d=>DB.depenses.push({...d,date:d.date+'T08:00:00.000Z',par:'🔁 Automatique',auto:true}));
+  save();
+  try{logAction('Charges auto',nouv.length+' dépense(s) : '+nouv.map(d=>d.lib).join(', ').slice(0,300));}catch(e){}
+  const tot=nouv.reduce((t,d)=>t+d.montant,0);
+  if(!silence){
+    toast('🔁 '+nouv.length+' charge(s) du mois enregistrée(s) : '+fmt(tot),'info');
+    try{addNotif('🔁 Charges du mois',nouv.map(d=>d.lib+' : '+fmt(d.montant)).join(' · '),'info');}catch(e){}
+  }
+  try{if(document.getElementById('sec-depenses')?.classList.contains('active'))renderDepenses();}catch(e){}
+  return nouv;
+}
+// ── Fenêtre « Charges fixes » ──
+function ouvrirCharges(){
+  if(session.user?.role!=='admin'){toast('Réservé à l\'administrateur','err');return;}
+  const c=cfgCharges();
+  document.getElementById('cf-sal-auto').checked=c.salairesAuto;
+  document.getElementById('cf-jour-paie').value=c.jourPaie;
+  document.getElementById('cf-prim-auto').checked=c.primesAuto;
+  ['cf-b'].forEach(id=>{const s=document.getElementById(id);if(s&&!s.dataset.ok){s.options[0].text=getBName('B1');s.options[1].text=getBName('B2');s.dataset.ok=1;}});
+  annulerCharge();renderCharges();openModal('modal-charges');
+}
+function renderCharges(){
+  const L=listeCharges(),zone=document.getElementById('cf-liste');if(!zone)return;
+  const totMois=L.filter(c=>c.actif!==false).reduce((t,c)=>t+(Number(c.montant)||0),0);
+  const sal=cfgCharges().salairesAuto?(DB.salaires||[]).filter(s=>s&&Number(s.base)>0&&s.actif!==false).reduce((t,s)=>t+Number(s.base),0):0;
+  zone.innerHTML=(L.length?L.map(c=>`<div class="cf-ligne${c.actif===false?' off':''}">
+      <div style="flex:1;min-width:0;"><b>${escapeHtml(c.lib)}</b><small>${escapeHtml(c.cat||'')} · ${c.boutique==='general'?'Général':escapeHtml(getBName(c.boutique))} · le ${c.jour} du mois${c.actif===false?' · en pause':''}</small></div>
+      <b class="mono" style="color:var(--red)">${fmt(c.montant)}</b>
+      <button class="btn btn-ghost btn-xs" onclick="editerCharge('${c.id}')">✏️</button>
+      <button class="btn btn-ghost btn-xs" onclick="pauseCharge('${c.id}')">${c.actif===false?'Reprendre':'Pause'}</button>
+      <button class="btn btn-red btn-xs" onclick="supprimerCharge('${c.id}')">🗑</button></div>`).join('')
+    :'<div class="empty" style="padding:12px;">Aucune charge fixe. Ajoutez votre loyer, l\'électricité, internet…</div>')
+    +`<div class="cf-total"><span>Charges fixes par mois</span><b>${fmt(totMois)}</b></div>`
+    +(sal?`<div class="cf-total"><span>+ Salaires (page Salaires)</span><b>${fmt(sal)}</b></div><div class="cf-total" style="font-size:13px;"><span>Total fixe par mois</span><b>${fmt(totMois+sal)}</b></div>`:'');
+}
+function annulerCharge(){
+  ['cf-id','cf-lib','cf-mont'].forEach(i=>{const e=document.getElementById(i);if(e)e.value='';});
+  document.getElementById('cf-jour').value='5';document.getElementById('cf-cat').value='Loyer';document.getElementById('cf-b').value='B1';
+  document.getElementById('cf-depuis').value='courant';
+  document.getElementById('cf-btn').textContent='➕ Ajouter';
+}
+function editerCharge(id){
+  const c=listeCharges().find(x=>x.id===id);if(!c)return;
+  document.getElementById('cf-id').value=c.id;document.getElementById('cf-lib').value=c.lib;document.getElementById('cf-mont').value=c.montant;
+  document.getElementById('cf-jour').value=c.jour;document.getElementById('cf-cat').value=c.cat||'Autre';document.getElementById('cf-b').value=c.boutique||'general';
+  document.getElementById('cf-btn').textContent='💾 Enregistrer';document.getElementById('cf-lib').focus();
+}
+function enregistrerCharge(){
+  const lib=document.getElementById('cf-lib').value.trim(),mont=Math.round(Number(document.getElementById('cf-mont').value)),jour=Math.min(31,Math.max(1,parseInt(document.getElementById('cf-jour').value)||1));
+  if(!lib||!(mont>0)){soundErr();toast('Libellé et montant obligatoires','err');return;}
+  const L=listeCharges(),eid=document.getElementById('cf-id').value;
+  const data={lib,montant:mont,jour,cat:document.getElementById('cf-cat').value,boutique:document.getElementById('cf-b').value};
+  if(eid){const c=L.find(x=>x.id===eid);if(c)Object.assign(c,data);}
+  else{
+    const mc=_moisCourant();
+    L.push({id:'C'+Date.now().toString(36).toUpperCase().slice(-6),...data,actif:true,depuis:document.getElementById('cf-depuis').value==='suivant'?_moisSuivant(mc):mc,cree:Date.now()});
+  }
+  DB.settings.charges=L;save();
+  try{logAction('Charges fixes',(eid?'Modifiée : ':'Ajoutée : ')+lib+' '+fmt(mont)+' le '+jour);}catch(e){}
+  toast(eid?'Charge modifiée (les mois déjà enregistrés ne changent pas)':'🔁 Charge ajoutée','ok');
+  annulerCharge();renderCharges();genererChargesAuto();
+}
+function pauseCharge(id){const c=listeCharges().find(x=>x.id===id);if(!c)return;c.actif=c.actif===false;DB.settings.charges=listeCharges();save();renderCharges();toast(c.actif?'Charge réactivée':'Charge en pause','info');}
+function supprimerCharge(id){
+  const c=listeCharges().find(x=>x.id===id);if(!c)return;
+  if(!confirm('Supprimer la charge « '+c.lib+' » ?\nLes mois déjà enregistrés restent dans les dépenses.'))return;
+  DB.settings.charges=listeCharges().filter(x=>x.id!==id);save();renderCharges();
+  try{logAction('Charges fixes','Supprimée : '+c.lib);}catch(e){}
+}
+function sauverCfgCharges(){
+  DB.settings.chargesCfg={salairesAuto:document.getElementById('cf-sal-auto').checked,jourPaie:Math.min(31,Math.max(1,parseInt(document.getElementById('cf-jour-paie').value)||30)),primesAuto:document.getElementById('cf-prim-auto').checked};
+  save();renderCharges();genererChargesAuto();toast('Réglages enregistrés','ok');
+}
+// ── Bilan du mois (administrateur) ──
+function renderBilanMois(){
+  const el=document.getElementById('bilan-mois');if(!el)return;
+  if(session.user?.role!=='admin'){el.style.display='none';return;}
+  el.style.display='block';
+  const sel=document.getElementById('bm-mois');
+  if(sel&&!sel.options.length){let m=_moisCourant();for(let i=0;i<12;i++){sel.add(new Option(_moisLisible(m),m));const [a,b]=m.split('-').map(Number);m=b===1?(a-1)+'-12':a+'-'+String(b-1).padStart(2,'0');}}
+  const mois=sel?.value||_moisCourant();
+  const B={B1:{ca:0,cout:0,dep:{}},B2:{ca:0,cout:0,dep:{}},general:{ca:0,cout:0,dep:{}}};
+  (DB.factures||[]).forEach(f=>{
+    if(!f||typeof f.date!=='string'||!f.date.startsWith(mois)||!B[f.boutique])return;
+    if(typeof estFactureSupprimee==='function'&&estFactureSupprimee(f.id))return;
+    B[f.boutique].ca+=Number(f.total)||0;
+    B[f.boutique].cout+=(f.items||[]).reduce((t,i)=>t+(Number(i.achat)||0)*(Number(i.qty)||0),0);
+  });
+  const grp=d=>d.cat==='Salaires'?'Salaires':d.cat==='Primes'?'Primes':d.chargeId?'Charges fixes':d.cat==='Achat marchandises'?'Achats':'Autres dépenses';
+  (DB.depenses||[]).forEach(d=>{if(!d||!String(d.date||'').startsWith(mois))return;const b=B[d.boutique]?d.boutique:'general';const g=grp(d);B[b].dep[g]=(B[b].dep[g]||0)+(Number(d.montant)||0);});
+  const tot={ca:0,cout:0,dep:{}};Object.values(B).forEach(x=>{tot.ca+=x.ca;tot.cout+=x.cout;Object.entries(x.dep).forEach(([k,v])=>tot.dep[k]=(tot.dep[k]||0)+v);});
+  const sDep=o=>Object.values(o).reduce((t,v)=>t+v,0);
+  // Charges encore à venir ce mois-ci
+  let avenir=0,nbAv=0;
+  if(mois===_moisCourant()){
+    const deja=new Set((DB.depenses||[]).map(d=>d&&d.id));
+    listeCharges().filter(c=>c.actif!==false&&(c.depuis||mois)<=mois).forEach(c=>{if(!deja.has('CF-'+c.id+'-'+mois)){avenir+=Number(c.montant)||0;nbAv++;}});
+    if(cfgCharges().salairesAuto)(DB.salaires||[]).filter(s=>s&&Number(s.base)>0&&s.actif!==false).forEach(s=>{if(!deja.has('SAL-'+s.id+'-'+mois)){avenir+=Number(s.base);nbAv++;}});
+  }
+  const ligne=(k,v,c)=>`<div class="bm-l"><span>${k}</span><b style="${c?'color:'+c:''}">${fmt(Math.round(v))}</b></div>`;
+  const colonne=(nom,x)=>{const brut=x.ca-x.cout,dep=sDep(x.dep),net=brut-dep;
+    return `<div class="bm-col"><div class="bm-t">${escapeHtml(nom)}</div>${ligne('Ventes',x.ca)}${ligne('Coût des marchandises',-x.cout,'var(--text2)')}${ligne('Bénéfice brut',brut,'var(--green)')}
+      ${['Charges fixes','Salaires','Primes','Achats','Autres dépenses'].filter(k=>x.dep[k]).map(k=>ligne(k,-x.dep[k],'var(--red)')).join('')}
+      <div class="bm-net ${net>=0?'pos':'neg'}"><span>Bénéfice net</span><b>${fmt(Math.round(net))}</b></div></div>`;};
+  const dg=sDep(B.general.dep);
+  document.getElementById('bm-contenu').innerHTML=`<div class="bm-grid">${colonne(getBName('B1'),B.B1)}${colonne(getBName('B2'),B.B2)}${colonne('Total (avec dépenses générales)',tot)}</div>
+    ${dg?`<div style="font-size:10.5px;color:var(--text2);margin-top:6px;">Dépenses générales (non liées à une boutique) : ${fmt(dg)} — comptées dans le total.</div>`:''}
+    ${avenir?`<div class="bm-avenir">⏳ Encore à venir ce mois : <b>${fmt(avenir)}</b> (${nbAv} charge${nbAv>1?'s':''} et salaire${nbAv>1?'s':''}) — bénéfice net estimé en fin de mois : <b>${fmt(Math.round(tot.ca-tot.cout-sDep(tot.dep)-avenir))}</b></div>`:''}`;
+}
 
 // ══ UTILISATEURS & RÔLES ══
 function updatePermGrid(){
