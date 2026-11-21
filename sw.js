@@ -1,5 +1,5 @@
-const CACHE = 'monnegoce-v56';
-const ASSETS = ['./', './index.html'];
+const CACHE = 'monnegoce-v57';
+const ASSETS = ['./', './index.html', './commerce.html', './manifest-commerce.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -15,6 +15,6 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
+    fetch(e.request).catch(() => caches.match(e.request, {ignoreSearch: true}))   // ?app=commerce hors ligne
   );
 });
