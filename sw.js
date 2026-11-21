@@ -1,5 +1,5 @@
-const CACHE = 'monnegoce-v57';
-const ASSETS = ['./', './index.html', './commerce.html', './manifest-commerce.json'];
+const CACHE='monnegoce-v58';
+const ASSETS = ['./', './index.html', './commerce.html', './manifest-commerce.json', './icon-tayba-192.png', './icon-tayba-512.png', './apple-touch-icon-tayba.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));

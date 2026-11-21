@@ -1,21 +1,21 @@
 {
-  "name": "Mon Commerce",
-  "short_name": "Mon Commerce",
-  "description": "Gestion de votre autre commerce",
+  "name": "Tayba Telecom",
+  "short_name": "Tayba Telecom",
+  "description": "Gestion commerciale Tayba Telecom",
   "start_url": "/monnegoce/?app=commerce",
   "display": "standalone",
   "background_color": "#060910",
-  "theme_color": "#2563eb",
+  "theme_color": "#0b50e6",
   "orientation": "any",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "icon-tayba-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-512.png",
+      "src": "icon-tayba-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
