@@ -17,7 +17,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(noms => Promise.all(noms.filter(n => n !== CACHE).map(n => caches.delete(n))))
+      .then(noms => Promise.all(noms.filter(n => n.startsWith('mn-produits-v') && n !== CACHE).map(n => caches.delete(n))))
       .then(() => self.clients.claim())
   );
 });

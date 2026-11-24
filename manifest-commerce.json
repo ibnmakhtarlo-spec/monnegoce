@@ -2,7 +2,7 @@
   "name": "Tayba Telecom",
   "short_name": "Tayba Telecom",
   "description": "Gestion commerciale Tayba Telecom",
-  "start_url": "/monnegoce/?app=commerce",
+  "start_url": "/monnegoce/tayba/",
   "display": "standalone",
   "background_color": "#060910",
   "theme_color": "#0b50e6",

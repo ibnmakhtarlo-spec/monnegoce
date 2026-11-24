@@ -1,4 +1,4 @@
-const CACHE='monnegoce-v59';
+const CACHE='monnegoce-v60';
 const ASSETS = ['./', './index.html', './commerce.html', './manifest-commerce.json', './icon-tayba-192.png', './icon-tayba-512.png', './apple-touch-icon-tayba.png'];
 
 self.addEventListener('install', e => {
@@ -8,7 +8,7 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => 
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    Promise.all(keys.filter(k => k.startsWith('monnegoce-') && k !== CACHE).map(k => caches.delete(k)))
   ));
   self.clients.claim();
 });
