@@ -3151,6 +3151,7 @@ async function doResetPassword(){
 let _inactTimer=null;
 const INACT_DELAY=30*60*1000; // 30 minutes
 function resetInactivity(){
+  try{memoriserSession();}catch(e){}
   if(_inactTimer)clearTimeout(_inactTimer);
   _inactTimer=setTimeout(()=>{
     if(session.user){
@@ -3188,6 +3189,40 @@ function startAlhamdoulillahTimer(){
   setInterval(playAlhamdoulillah,30*60*1000); // 30 minutes
 }
 
+// ══ RESTER CONNECTÉ (téléphone / tablette) ══
+// Sur téléphone, quitter l'application la ferme souvent : on garde la session sur l'appareil
+// tant que la règle d'inactivité (30 min) n'est pas dépassée. « Déconnexion » l'efface.
+const _MEMO_SESSION='session_memo';let _memoT=0;
+function memoriserSession(force){
+  if(!session.user)return;const n=Date.now();
+  if(!force&&n-_memoT<15000)return;_memoT=n;
+  const u={...session.user};delete u.pwd;
+  try{SS(_MEMO_SESSION,{u,b:session.boutique,c:session.caisse,t:n,d:session._debutSession||n});}catch(e){}
+}
+function oublierSession(){_memoT=0;try{localStorage.removeItem(PFX+_MEMO_SESSION);}catch(e){}}
+function restaurerSession(){
+  if(session.user)return false;
+  const m=LS(_MEMO_SESSION);if(!m||!m.u||!m.u.id)return false;
+  if(!(Date.now()-m.t<INACT_DELAY)){oublierSession();return false;}
+  const lu=(DB.users||[]).find(x=>x.id===m.u.id);
+  if(lu&&lu.actif===false){oublierSession();return false;}
+  session.user={...m.u,...(lu?{nom:lu.nom||m.u.nom,perms:lu.perms||m.u.perms}:{})};
+  session.boutique=m.b||'B1';session.caisse=m.c||'C1';session._debutSession=m.d||Date.now();
+  try{const lb=document.getElementById('l-boutique');if(lb)lb.value=session.boutique;}catch(e){}
+  startApp();memoriserSession(true);
+  // Le compte Firebase de l'appareil doit être celui de l'employé, sinon on redemande le code
+  if(session.user._securise)setTimeout(async()=>{
+    try{
+      if(!_fbPret()||!navigator.onLine||!session.user)return;
+      await _attendreAuth();
+      const cu=firebase.auth().currentUser,voulu=emailCompte(session.user._cle||session.user.id,session.user._securise);
+      if(!cu||cu.isAnonymous||cu.email!==voulu){toast('🔐 Entrez à nouveau votre code','info');logout();}
+    }catch(e){}
+  },2500);
+  return true;
+}
+window.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{try{restaurerSession();}catch(e){console.warn('reprise session:',e);}},150));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){try{memoriserSession(true);}catch(e){}}});
 function startInactivityTimer(){
   ['click','keydown','touchstart','mousemove'].forEach(e=>document.addEventListener(e,resetInactivity,{passive:true}));
   resetInactivity();
@@ -3832,6 +3867,7 @@ async function doLogin(){
   // Forcer une caisse valide si toujours vide
   if(!session.caisse)session.caisse=DB.caisses.find(c=>c.boutique===session.boutique)?.id||'C1';
   session._debutSession=Date.now();
+  try{memoriserSession(true);}catch(e){}
   logAction('Connexion','Login depuis '+session.boutique+'/'+session.caisse+(u._securise?' (compte sécurisé)':' (ancien code)'));
   soundLogin();playBismillah();setTimeout(startApp,400);
   // Ancien code accepté : proposer tout de suite le nouveau code sécurisé
@@ -4084,6 +4120,7 @@ function applyNavPerms(){
 }
 
 function logout(){
+  try{oublierSession();}catch(e){}
   // Tracer la déconnexion avec la durée de la session
   const _duree=session._debutSession?Math.round((Date.now()-session._debutSession)/60000):null;
   logAction('Déconnexion','Depuis '+(session.boutique||'?')+'/'+(session.caisse||'?')

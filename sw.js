@@ -1,4 +1,4 @@
-const CACHE='monnegoce-v61';
+const CACHE='monnegoce-v62';
 const ASSETS = ['./', './index.html', './commerce.html', './manifest-commerce.json', './icon-tayba-192.png', './icon-tayba-512.png', './apple-touch-icon-tayba.png'];
 
 self.addEventListener('install', e => {
