@@ -3126,10 +3126,7 @@ async function doResetPassword(){
   if(!targetId){toast('Entrez d\'abord l\'identifiant en haut','err');return;}
   if(_etatSecu.ferme){toast('🔐 Mode sécurisé : l\'administrateur donne un nouveau code depuis Utilisateurs → Sécurité des comptes','info');return;}
   if(!/^\d{6,}$/.test(newPwd)){toast('Le nouveau code doit avoir au moins 6 chiffres','err');return;}
-  let admin=null;
-  for(const u of DB.users){
-    if(u.role==='admin'&&u.actif!==false&&await checkPwd(adminCode,u.pwd)){admin=u;break;}
-  }
+  const admin=await verifierCodeAdmin(adminCode);
   if(!admin){soundErr();toast('Code Admin incorrect','err');return;}
   const target=DB.users.find(u=>u.id===targetId);
   if(!target){toast('Utilisateur "'+targetId+'" introuvable','err');return;}
@@ -3447,6 +3444,36 @@ async function verifierCodeLocal(id,code){
   try{return (await _pbkdf2(code,m.sel))===m.h?m:null;}catch(e){return null;}
 }
 function oublierCodeLocal(id){const m=LS('codes_locaux')||{};delete m[id];SS('codes_locaux',m);}
+// Vérifie un code ADMINISTRATEUR (suppression/modification de facture, etc.).
+// Depuis le mode sécurisé, les codes ne sont plus dans les données : on vérifie
+// 1) l'ancien code (transition), 2) le vérificateur local de l'appareil, 3) le compte sécurisé en ligne
+// (sur une connexion Firebase à part, sans toucher à la session de l'employé connecté).
+async function verifierCodeAdmin(code){
+  code=String(code||'');if(!code)return null;
+  const admins=(DB.users||[]).filter(u=>u&&u.role==='admin'&&u.actif!==false);
+  for(const u of admins){if(u.pwd&&await checkPwd(code,u.pwd))return u;}
+  const loc=LS('codes_locaux')||{};
+  const ids=[...new Set([...admins.map(u=>u.id),...Object.keys(loc).filter(k=>loc[k]&&loc[k].role==='admin')])];
+  if(!ids.length)ids.push('ADM01');
+  for(const id of ids){const m=await verifierCodeLocal(id,code);if(m&&m.role==='admin')return admins.find(u=>u.id===id)||{id,nom:m.nom||id,role:'admin'};}
+  if(code.length<CODE_MIN||!_fbPret()||!navigator.onLine)return null;
+  try{
+    await lireEtatSecu();
+    const app3=firebase.apps.find(a=>a.name==='verif_admin')||firebase.initializeApp(FIREBASE_CONFIG,'verif_admin');
+    for(const id of ids){
+      const v=Number(_etatSecu.versions&&_etatSecu.versions[id])||1;
+      try{
+        const cred=await _avecDelai(app3.auth().signInWithEmailAndPassword(emailCompte(id,v),code),15000);
+        const prof=(await _avecDelai(app3.database().ref('negoce_comptes/'+cred.user.uid).once('value'),10000)).val();
+        await app3.auth().signOut().catch(()=>{});
+        if(prof&&prof.id===id&&prof.role==='admin'&&prof.actif!==false){
+          return admins.find(u=>u.id===id)||{id,nom:prof.nom||id,role:'admin'};
+        }
+      }catch(e){if(/network|timeout|délai/i.test(String(e&&(e.code||e.message))))break;}
+    }
+  }catch(e){console.warn('code admin:',e&&e.message);}
+  return null;
+}
 // Connexion avec un compte sécurisé → {ok, profil} ou {ok:false, raison}
 async function connexionSecurisee(id,code){
   if(!_fbPret())return {ok:false,raison:'reseau'};
@@ -4730,11 +4757,8 @@ function openDelFact(id){
 }
 async function confirmDelFact(){
   const id=document.getElementById('del-fact-id').value;const pwd=document.getElementById('del-fact-pwd').value;
-  let admin=null;
-  for(const u of DB.users){
-    if(u.role==='admin'&&u.actif!==false&&await checkPwd(pwd,u.pwd)){admin=u;break;}
-  }
-  if(!admin){soundErr();toast('Code administrateur incorrect','err');return;}
+  const admin=await verifierCodeAdmin(pwd);
+  if(!admin){soundErr();toast(navigator.onLine?'Code administrateur incorrect':'Code administrateur incorrect (ou pas de connexion internet)','err');return;}
   const _fSupp=DB.factures.find(f=>f.id===id);
   DB.factures=DB.factures.filter(f=>f.id!==id);
   // Enregistrer la suppression dans un registre partagé, sinon les autres caisses
@@ -4784,11 +4808,8 @@ async function confirmEditFact(){
   const f=DB.factures.find(x=>x.id===id);
   if(!f){toast('Facture introuvable','err');return;}
 
-  let admin=null;
-  for(const u of DB.users){
-    if(u.role==='admin'&&u.actif!==false&&await checkPwd(pwd,u.pwd)){admin=u;break;}
-  }
-  if(!admin){soundErr();toast('Code administrateur incorrect','err');return;}
+  const admin=await verifierCodeAdmin(pwd);
+  if(!admin){soundErr();toast(navigator.onLine?'Code administrateur incorrect':'Code administrateur incorrect (ou pas de connexion internet)','err');return;}
 
   const nouvellesLignes=_parseLignesEditFact();
   if(!nouvellesLignes.length){soundErr();toast('Ajoutez au moins un article','err');return;}
